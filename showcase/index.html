@@ -1,0 +1,79 @@
+<!doctype html><meta charset=utf-8><title>Procedural motion showcase</title><meta name=viewport content="width=device-width,initial-scale=1">
+<style>body{font:15px system-ui,sans-serif;margin:0 auto;max-width:1500px;padding:16px;background:#f6f6f2;color:#222}h1{margin:.2em 0}h2{margin-top:1.6em;border-bottom:1px solid #bbb}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}figure{margin:0;background:#fff;border:1px solid #ddd;padding:6px;border-radius:6px}img{width:100%;display:block}
+figcaption{font-size:13px;padding-top:4px}.tag{font-size:11px;padding:1px 6px;border-radius:9px;background:#ddd;margin-left:6px}.emergent{background:#cfe8cf}.goal{background:#f2e3b8}.kinematic{background:#e3d0f0}.physics{background:#bcd7f2}.retarget{background:#eee}
+table{border-collapse:collapse;margin:8px 0}td,th{border:1px solid #ccc;padding:3px 8px;font-size:13px}</style>
+<h1>Procedural motion showcase</h1>
+<p>Green = comes out of general rules (gait from body size, footholds from terrain, reactions chosen by predicting geometry). Yellow = goals for pelvis, hands and feet solved by IK. Purple = hand-built kinematic model. Blue = trained or evolved on a physical body.</p>
+<h2>Walking, running and terrain (one planner, gait from the Froude number)</h2><div class=grid>
+<figure><img loading="lazy" src="sim/walk_run.gif"><figcaption><b>walk_run</b> <span class="tag emergent">emergent</span><br>stand, walk, fast walk, run, back to walk, stop</figcaption></figure>
+<figure><img loading="lazy" src="sim/stairs_up_down.gif"><figcaption><b>stairs_up_down</b> <span class="tag emergent">emergent</span><br>stairs are just terrain: footholds searched, swing height from the terrain</figcaption></figure>
+<figure><img loading="lazy" src="sim/slope_up_down.gif"><figcaption><b>slope_up_down</b> <span class="tag emergent">emergent</span><br>slopes: trunk pitch and foot rotation follow the ground normal</figcaption></figure>
+<figure><img loading="lazy" src="sim/step_over_log.gif"><figcaption><b>step_over_log</b> <span class="tag emergent">emergent</span><br>step over a log</figcaption></figure>
+<figure><img loading="lazy" src="sim/duck_under_beam.gif"><figcaption><b>duck_under_beam</b> <span class="tag emergent">emergent</span><br>auto-duck below a ceiling</figcaption></figure>
+<figure><img loading="lazy" src="sim/around_obstacles.gif"><figcaption><b>around_obstacles</b> <span class="tag emergent">emergent</span><br>A* navigation around walls</figcaption></figure>
+<figure><img loading="lazy" src="sim/bodies_walk.gif"><figcaption><b>bodies_walk</b> <span class="tag emergent">emergent</span><br>different bodies (tall, dwarf, belly, armour, pack, skirt) pick their own posture</figcaption></figure>
+<figure><img loading="lazy" src="sim/crowd.gif"><figcaption><b>crowd</b> <span class="tag emergent">emergent</span><br>14 people cross a plaza</figcaption></figure>
+<figure><img loading="lazy" src="sim/run_forest.gif"><figcaption><b>run_forest</b> <span class="tag emergent">emergent</span><br>run through a forest: A* around trunks, duck under low branches</figcaption></figure>
+<figure><img loading="lazy" src="sim/run_crowd.gif"><figcaption><b>run_crowd</b> <span class="tag emergent">emergent</span><br>run through a crowd: speed follows the gap, shoulders turn</figcaption></figure>
+<figure><img loading="lazy" src="sim/outfits_walk.gif"><figcaption><b>outfits_walk</b> <span class="tag emergent">emergent</span><br>tight skirt, wide skirt, trousers, heavy boots, high heels, chainmail, plate: limits, mass, foot shape</figcaption></figure>
+<figure><img loading="lazy" src="sim/limp_people.gif"><figcaption><b>limp_people</b> <span class="tag emergent">emergent</span><br>sore leg, rigid stick for a lower leg, crutches with one leg held up</figcaption></figure>
+<figure><img loading="lazy" src="sim/limp_dogs.gif"><figcaption><b>limp_dogs</b> <span class="tag emergent">emergent</span><br>dog with a sore leg, on three legs, with a stick for the lower hind leg</figcaption></figure>
+<figure><img loading="lazy" src="sim/climb_rock.gif"><figcaption><b>climb_rock</b> <span class="tag emergent">emergent</span><br>rock face: only the coloured holds can be used</figcaption></figure>
+<figure><img loading="lazy" src="sim/climb_tree.gif"><figcaption><b>climb_tree</b> <span class="tag emergent">emergent</span><br>tree: branch stubs are the only holds</figcaption></figure>
+</div>
+<h2>Jumping (power-limited: the planner refuses a jump the legs cannot make)</h2><div class=grid>
+<figure><img loading="lazy" src="sim/jump_gap.gif"><figcaption><b>jump_gap</b> <span class="tag emergent">emergent</span><br>1.2 m gap from a run-up</figcaption></figure>
+<figure><img loading="lazy" src="sim/jump_wall.gif"><figcaption><b>jump_wall</b> <span class="tag emergent">emergent</span><br>standing jump over a 60 cm wall</figcaption></figure>
+<figure><img loading="lazy" src="sim/cat_jump_up.gif"><figcaption><b>cat_jump_up</b> <span class="tag emergent">emergent</span><br>cat: 8 spine joints coil, stretch, tuck, land</figcaption></figure>
+<figure><img loading="lazy" src="sim/horse_jump_fence.gif"><figcaption><b>horse_jump_fence</b> <span class="tag emergent">emergent</span><br>horse: stiff column, small trunk rotation</figcaption></figure>
+<figure><img loading="lazy" src="sim/quad_jump_species.gif"><figcaption><b>quad_jump_species</b> <span class="tag emergent">emergent</span><br>same relative obstacle: cat, dog, wolf, pig</figcaption></figure>
+</div>
+<h2>Animals: spine, neck, tail and feet differ by species</h2><div class=grid>
+<figure><img loading="lazy" src="sim/animals_trot.gif"><figcaption><b>animals_trot</b> <span class="tag emergent">emergent</span><br>dog, cat, horse, wolf, pig trot</figcaption></figure>
+<figure><img loading="lazy" src="sim/quadruped_speeds.gif"><figcaption><b>quadruped_speeds</b> <span class="tag emergent">emergent</span><br>walk to gallop by Froude number</figcaption></figure>
+<figure><img loading="lazy" src="sim/horse_load.gif"><figcaption><b>horse_load</b> <span class="tag emergent">emergent</span><br>horse with 0, 90, 180 kg</figcaption></figure>
+<figure><img loading="lazy" src="sim/quad_species_tails.gif"><figcaption><b>quad_species_tails</b> <span class="tag emergent">emergent</span><br>balance tail, wag, low tail, curl</figcaption></figure>
+<figure><img loading="lazy" src="sim/horse_gait_tail.gif"><figcaption><b>horse_gait_tail</b> <span class="tag emergent">emergent</span><br>5-joint neck nod, hair tail flags and flicks</figcaption></figure>
+<figure><img loading="lazy" src="sim/animals_stairs_log.gif"><figcaption><b>animals_stairs_log</b> <span class="tag emergent">emergent</span><br>stairs and a log, four legs</figcaption></figure>
+</div>
+<h2>Birds and snake</h2><div class=grid>
+<figure><img loading="lazy" src="sim/birds_walk.gif"><figcaption><b>birds_walk</b> <span class="tag emergent">emergent</span><br>bird gaits</figcaption></figure>
+<figure><img loading="lazy" src="sim/bird_flight.gif"><figcaption><b>bird_flight</b> <span class="tag kinematic">kinematic model</span><br>flapping flight model (beat rate from mass)</figcaption></figure>
+<figure><img loading="lazy" src="sim/bird_land_ground.gif"><figcaption><b>bird_land_ground</b> <span class="tag kinematic">kinematic model</span><br>landing on the ground: flare, feet first, run out</figcaption></figure>
+<figure><img loading="lazy" src="sim/bird_land_branch.gif"><figcaption><b>bird_land_branch</b> <span class="tag kinematic">kinematic model</span><br>landing on a branch: near-stall, toes grip</figcaption></figure>
+<figure><img loading="lazy" src="sim/bird_land_water.gif"><figcaption><b>bird_land_water</b> <span class="tag kinematic">kinematic model</span><br>landing on water: skid and float</figcaption></figure>
+<figure><img loading="lazy" src="sim/snake_around.gif"><figcaption><b>snake_around</b> <span class="tag kinematic">kinematic model</span><br>serpentine motion between walls</figcaption></figure>
+</div>
+<h2>Everyday situations (goals for pelvis, hands and feet + IK)</h2><div class=grid>
+<figure><img loading="lazy" src="sim/door_open.gif"><figcaption><b>door_open</b> <span class="tag goal">goal script</span><br>open a door</figcaption></figure>
+<figure><img loading="lazy" src="sim/sit_stand.gif"><figcaption><b>sit_stand</b> <span class="tag goal">goal script</span><br>sit on a chair and stand</figcaption></figure>
+<figure><img loading="lazy" src="sim/sit_table.gif"><figcaption><b>sit_table</b> <span class="tag goal">goal script</span><br>sit at a table</figcaption></figure>
+<figure><img loading="lazy" src="sim/bed_lie_rise.gif"><figcaption><b>bed_lie_rise</b> <span class="tag goal">goal script</span><br>lie down in a bed, get up</figcaption></figure>
+<figure><img loading="lazy" src="sim/get_up_floor.gif"><figcaption><b>get_up_floor</b> <span class="tag goal">goal script</span><br>get up from the floor</figcaption></figure>
+<figure><img loading="lazy" src="sim/ladder_climb.gif"><figcaption><b>ladder_climb</b> <span class="tag goal">goal script</span><br>ladder</figcaption></figure>
+<figure><img loading="lazy" src="sim/rider.gif"><figcaption><b>rider</b> <span class="tag goal">goal script</span><br>ride a horse</figcaption></figure>
+<figure><img loading="lazy" src="sim/swim_freestyle.gif"><figcaption><b>swim_freestyle</b> <span class="tag kinematic">kinematic model</span><br>swim, head above water</figcaption></figure>
+<figure><img loading="lazy" src="sim/dive_swim.gif"><figcaption><b>dive_swim</b> <span class="tag kinematic">kinematic model</span><br>dive</figcaption></figure>
+<figure><img loading="lazy" src="sim/crowd_squeeze.gif"><figcaption><b>crowd_squeeze</b> <span class="tag emergent">emergent</span><br>squeeze through people: shoulders turn, hands go up</figcaption></figure>
+<figure><img loading="lazy" src="sim/bump_head.gif"><figcaption><b>bump_head</b> <span class="tag emergent">emergent</span><br>hit the head on a beam</figcaption></figure>
+</div>
+<h2>Combat as a set of reactions (no scripted duel)</h2><div class=grid>
+<figure><img loading="lazy" src="sim/run_into_wall.gif"><figcaption><b>run_into_wall</b> <span class="tag emergent">emergent</span><br>run into a wall: seen early, late, not at all (arms and knees lengthen the stop)</figcaption></figure>
+<figure><img loading="lazy" src="sim/weapon_reactions.gif"><figcaption><b>weapon_reactions</b> <span class="tag emergent">emergent</span><br>axe vs shield, axe on a bare head, arrows dodged, caught by a shield, taken; shin block</figcaption></figure>
+<figure><img loading="lazy" src="sim/hit_reactions_c.gif"><figcaption><b>hit_reactions_c</b> <span class="tag physics,">physics, evolved</span><br>groin (man vs woman) and knee</figcaption></figure>
+<figure><img loading="lazy" src="sim/hit_reactions_a.gif"><figcaption><b>hit_reactions_a</b> <span class="tag emergent">emergent</span><br>hit on head, torso, arm: stagger, doubled over, drop the weapon, clutch</figcaption></figure>
+<figure><img loading="lazy" src="sim/hit_reactions_b.gif"><figcaption><b>hit_reactions_b</b> <span class="tag physics,">physics, evolved</span><br>leg: limp; hard head blow: physical fall, lie, get up; blow in the back</figcaption></figure>
+<figure><img loading="lazy" src="sim/dodge_reactions.gif"><figcaption><b>dodge_reactions</b> <span class="tag emergent">emergent</span><br>notice in time: side step, duck, hop, block; too late: hit</figcaption></figure>
+<figure><img loading="lazy" src="sim/duel.gif"><figcaption><b>duel</b> <span class="tag emergent">emergent</span><br>two fighters choose targets and reactions on their own</figcaption></figure>
+<figure><img loading="lazy" src="sim/push_recovery.gif"><figcaption><b>push_recovery</b> <span class="tag emergent">emergent</span><br>shoved: recovery steps</figcaption></figure>
+</div>
+<h2>Physical fall and landing reflex (MuJoCo, CMA-ES on a bone-injury score)</h2><table><tr><th>controller (240 held-out shoves and drops)</th><th>injury cost</th><th>head risk</th><th>torso</th><th>arms</th><th>legs</th></tr><tr><td>statue (stiff, no reflex)</td><td>3.72</td><td>0.46</td><td>0.67</td><td>0.44</td><td>0.71</td></tr><tr><td>hand-made starting pose</td><td>3.81</td><td>0.55</td><td>0.48</td><td>0.73</td><td>0.53</td></tr><tr><td>evolved on bone-injury score</td><td>1.61</td><td>0.02</td><td>0.01</td><td>0.61</td><td>0.78</td></tr></table><h3>Standing on a slippery slope (40 held-out slopes 8-25 degrees, friction 0.12-0.4)</h3><table><tr><th>controller</th><th>stays up 5 s</th><th>mean time up</th><th>mean slide</th></tr><tr><td>stiff body, no controller</td><td>0%</td><td>1.1 s</td><td>0.44 m</td></tr><tr><td>evolved controller</td><td>20%</td><td>1.8 s</td><td>0.25 m</td></tr></table><p>A partial result: the evolved controller helps but most slopes still end in a fall.</p><div class=grid>
+<figure><img loading="lazy" src="physics/drop_1m.gif"><figcaption><b>drop_1m</b> <span class="tag physics">physics, evolved</span></figcaption></figure>
+<figure><img loading="lazy" src="physics/drop_2m.gif"><figcaption><b>drop_2m</b> <span class="tag physics">physics, evolved</span></figcaption></figure>
+<figure><img loading="lazy" src="physics/drop_2p5m_fwd.gif"><figcaption><b>drop_2p5m_fwd</b> <span class="tag physics">physics, evolved</span></figcaption></figure>
+<figure><img loading="lazy" src="physics/shove_back.gif"><figcaption><b>shove_back</b> <span class="tag physics">physics, evolved</span></figcaption></figure>
+<figure><img loading="lazy" src="physics/shove_forward.gif"><figcaption><b>shove_forward</b> <span class="tag physics">physics, evolved</span></figcaption></figure>
+<figure><img loading="lazy" src="physics/shove_side.gif"><figcaption><b>shove_side</b> <span class="tag physics">physics, evolved</span></figcaption></figure>
+<figure><img loading="lazy" src="physics/slide_slope.gif"><figcaption><b>slide_slope</b> <span class="tag physics">physics, evolved</span></figcaption></figure>
+</div>

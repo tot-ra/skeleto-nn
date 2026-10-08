@@ -1,0 +1,5 @@
+numpy
+pillow
+mujoco>=3.1        # physical body, reflex evolution, rendering (Python 3.10+)
+cma>=4.0           # CMA-ES for the evolved reflexes
+torch              # only for the PPO tracker (train.py)
