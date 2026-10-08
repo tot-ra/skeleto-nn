@@ -61,6 +61,10 @@ A leg can be sore (chronic pain makes the stance on it shorter and the trunk lea
 * `tests/test_env.py`, `tests/test_reflex.py`: the tracking environment and the reflex run.
 * Every shot in the showcase is rendered by `catalog.py`; `reflex_eval.py` evaluates the reflex on 240 held-out scenarios and compares it with a stiff body and a hand-made pose.
 
+## 8b. Getting a motion into an engine
+
+`export_clip.py SHOT clip.json` runs a shot and writes, per frame, the root position and the world rotation of each mapped bone. `bake_blender.py` retargets that onto a rigged glTF and keyframes every bone at the clip's frame rate; `bake_clip.py` runs both. The output is a plain `.glb` animation. The planner, the combat and the climbing logic do not run in the engine: they produce clips offline. A runtime port would mean re-implementing the planner in the engine's language; the learned parts are parameter files (`results/*.json`) that port with it.
+
 ## 9. Limits
 
 * Kinematic scenes use a stick-figure body; the retarget to a rigged mesh is a basic world-rotation delta method.

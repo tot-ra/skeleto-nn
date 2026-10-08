@@ -62,6 +62,7 @@ class HumanBody:
     strength: float = 1.0
     stoop: float = 0.0           # rest kyphosis, radians
     width: float = 1.0           # shoulder and hip width
+    vigor: float = 1.0           # muscle power for the body size: 0.45 starved, 0.55 old, 1.0 adult, 1.5 energetic child
     peg: str = ""              # "L", "R" or "LR": the shank and foot of that leg are replaced by a rigid stick
     outfit: str = "none"        # key of OUTFITS: clothing that restricts joints, adds mass or changes the foot
     sex: str = "m"                # "m" | "f": changes shoulder/hip proportions and how a blow to the groin is felt
@@ -96,6 +97,8 @@ def _apply_outfit(bones, name):
 
 def human(b: HumanBody | None = None, name="human", rig: dict | None = None) -> Creature:
     b = b or HumanBody()
+    if b.vigor < 1.0 and b.stoop == 0.0:
+        import dataclasses; b = dataclasses.replace(b, stoop=0.5 * (1 - b.vigor))     # weak bodies stand stooped
     rig = rig or {}
     s = b.height / 1.75
     sl = s * b.leg_ratio ** 0.5; st = s / b.leg_ratio ** 0.5     # leg scale, torso scale
@@ -162,6 +165,15 @@ def human(b: HumanBody | None = None, name="human", rig: dict | None = None) -> 
     c.params = dict(height=b.height, mass=b.mass, dress=b.dress, ankle_h=ah, body=b.__dict__.copy(),
                     stand_ratio=0.99, step_ratio=0.62, arm_swing=1.0, skirt=b.dress, sex=b.sex)
     c.params.update(outfit_params)
+    v_ = b.vigor
+    c.params.update(vigor=v_, jump_gain=1.0 * v_ ** 0.6, v_sprint=6.2 * v_ ** 0.7, acc_scale=v_ ** 0.5)
+    if v_ < 1.0:                                           # weak: slower, shorter steps, more time on both feet, stooped, small arm swing
+        c.params["v_max"] = min(c.params.get("v_max") or 99.0, 6.2 * v_ ** 0.7 * 0.55)           # even a fast walk is a run for them
+        c.params["stride_scale"] = c.params.get("stride_scale", 1.0) * v_ ** 0.35
+        c.params["duty_add"] = 0.14 * (1 - v_); c.params["arm_swing"] = c.params.get("arm_swing", 1.0) * (0.45 + 0.55 * v_)
+        c.params["balance"] = c.params.get("balance", 1.0) * (0.55 + 0.45 * v_); c.params["toe_amp"] = c.params.get("toe_amp", 1.0) * (0.5 + 0.5 * v_)
+    elif v_ > 1.2:                                         # energetic: springy steps
+        c.params["bounce"] = 0.05 * (v_ - 1.0) / 0.5
     for side in b.peg:                                  # the shank and foot of this leg are a rigid stick with a point contact
         for nm in ("foot_", "toes_"):
             bn = sk.bones[sk.idx[nm + side]]; bn.lim = {ax: (0.0, 0.0) for ax in "XYZ"}

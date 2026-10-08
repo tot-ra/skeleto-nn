@@ -160,7 +160,7 @@ class Walker:
             # leg order in c.legs is [HL, HR, FL, FR]
             off = np.array(off)
         else:
-            duty = interp_table(Fr, DUTY_X, DUTY_Y)
+            duty = interp_table(Fr, DUTY_X, DUTY_Y) + self.c.params.get("duty_add", 0.0)
             lam = 2.3 * h * max(Fr, 1e-4) ** 0.3
             off = np.array([0.0, 0.5])
             if self.kind == "bird":
@@ -210,7 +210,7 @@ class Walker:
         if vcap and np.linalg.norm(vdes) > vcap: vdes = vdes / np.linalg.norm(vdes) * vcap       # clothing sets how fast this body can move
         sp_des = float(np.linalg.norm(vdes))
         # --- body velocity and heading
-        acc = 3.0 * math.sqrt(self.reach) + 1.0
+        acc = (3.0 * math.sqrt(self.reach) + 1.0) * c.params.get("acc_scale", 1.0)
         dv = vdes + self.extra_vel * 0 - self.v
         nv = np.linalg.norm(dv)
         if nv > acc * dt: dv = dv / nv * acc * dt
@@ -577,6 +577,8 @@ class Walker:
             uu = float(np.mean([ls.u for ls in stance_legs]))
             comp = (0.025 + 0.06 * min(2.0, self.Fr)) * self.reach * math.sin(math.pi * uu) * (1.0 if self.duty < 0.55 else 0.3)
         z_des = ground + nominal - comp - self.inj_dip
+        bn = self.c.params.get("bounce", 0.0)
+        if bn and self.mode == "go": z_des += bn * self.reach * abs(math.sin(2 * math.pi * self.phase)) * min(1.0, self.speed / 1.0)        # an energetic body springs
         if self.kind == "quadruped":
             z_des = ground + nominal - 0.6 * comp
         jp = self.jumpplan
@@ -749,7 +751,7 @@ class Walker:
         pk = jp.get("pitch_k", 0.5) * pmax
         return pk * (-1.0 + 1.7 * smooth(tau))
 
-    def _can_jump(self, p0, tgt, clear):
+    def _can_jump(self, p0, tgt, clear, run_speed=None):
         """Ballistic jump that the legs can actually power. Two limits from the muscles: the vertical take-off speed (jump_gain * sqrt(g L))
         and the total take-off speed (1.5x that), to which a run-up adds horizontal speed. The lowest apex that fits both is used."""
         tr = self.terrain
@@ -760,7 +762,7 @@ class Walker:
         D = float(np.linalg.norm(tgt - p0))
         gain = self.c.params.get("jump_gain", 1.0)
         cap = gain * math.sqrt(G * self.reach); vtot = 1.5 * cap
-        run = 0.9 * float(np.linalg.norm(self.v))
+        run = 0.9 * (float(np.linalg.norm(self.v)) if run_speed is None else float(run_speed))
         best = None
         for apex in np.linspace(apex_min, z_to + cap * cap / (2 * G), 40):
             if apex < apex_min - 1e-9: continue
@@ -945,6 +947,16 @@ class Walker:
 
     def apply_hit(self, region, direction, strength):
         import hit as _hit; _hit.apply_hit(self, region, direction, strength)
+
+    def jump_range(self, direction, run_speed, clear=None, d_max=12.0, step=0.1):
+        """Longest distance this body can jump along `direction` from its position with a given run-up speed (landing on whatever the terrain is there)."""
+        d = np.asarray(direction, float); d = d / np.linalg.norm(d); best = 0.0
+        for D in np.arange(0.3, d_max, step):
+            tgt = self.pos + d * D
+            if self.terrain.is_pit(tgt[0], tgt[1]): continue
+            if self._can_jump(self.pos.copy(), tgt, clear, run_speed=run_speed)["ok"]: best = float(D)
+            elif best > 0: break
+        return best
 
     def start_jump(self, target_xy, clearance=None):
         """Crouch, take off from both feet, fly a ballistic arc over whatever lies between, land at target_xy."""

@@ -140,9 +140,21 @@ Needs ffmpeg for GIFs. Python 3.10+.
 | `hit.py`, `combat.py`, `injury.py` | pain, knock-down, reactions, injury score |
 | `physics.py`, `reflex.py`, `slide.py`, `env.py`, `train.py` | MuJoCo body, evolved controllers, PPO tracker |
 | `shots.py`, `catalog*.py`, `render.py` | scenes and GIF rendering |
-| `export_clip.py`, `retarget_blender.py`, `game_gif.py` | optional: retarget a motion onto your own rigged glTF in Blender |
+| `export_clip.py`, `bake_clip.py`, `bake_blender.py`, `retarget_blender.py`, `game_gif.py` | export: bake a motion into a glTF animation clip on your rigged character (Blender), or render it |
 
 See [`docs/DESIGN.md`](docs/DESIGN.md) for how it works and where it is weak.
+
+## From the planner to your engine
+
+There is **no neural network in the runtime path.** The planner is an algorithm and the controllers that were learned or evolved are tiny parameter files: `results/reflex_fall.json` (48 numbers, the fall and landing reflex) and `results/slide_controller.json` (18 numbers). The PPO tracker in `train.py` is the only neural network; it did not converge and no weights are published.
+
+To use a motion in an engine, bake it into an ordinary skeletal animation on your rigged character:
+
+```bash
+python bake_clip.py walk_run my_character.glb walk_run.glb      # needs Blender; edit MAP in bake_blender.py to your bone names
+```
+
+`bake_clip.py` simulates the shot (`export_clip.py` writes the world rotation of every bone per frame), retargets it onto the rig (trunk, legs and feet take the world rotation of the planner's skeleton, the arms take the direction of each segment) and writes a `.glb` with one animation of that name at 20 fps and one keyframe per bone per frame. Godot, Unity, Blender and three.js import it as an animation clip. Checked here: a 13 s walk bakes into a clip with 123 channels over 260 frames; it has not yet been played back inside a game engine. Reactive behaviours (fights, falls with a physical reflex, climbing) are baked the same way, one clip per situation; the decision logic itself stays in Python. Only the first character of a shot is baked (a duel gives one clip per fighter if you run it twice with a different actor index), and the bone map is for a humanoid rig; an animal rig needs its own `MAP`.
 
 ## Use it on your own rig
 
