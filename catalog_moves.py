@@ -166,8 +166,8 @@ def climb_rock():
 def climb_tree():
     rng = np.random.default_rng(5); wall_x = 3.0; holds = []; z = 0.55; side = 1.0
     while z < 6.2:
-        holds.append(CL.Hold(np.array([wall_x - 0.14, side * rng.uniform(0.12, 0.26), z]), "both")); z += rng.uniform(0.42, 0.62); side = -side
-        if rng.random() < 0.5: holds.append(CL.Hold(np.array([wall_x - 0.14, -side * rng.uniform(0.12, 0.28), z - 0.22]), "foot"))
+        holds.append(CL.Hold(np.array([wall_x - 0.14, side * rng.uniform(0.12, 0.26), z]), "both")); z += rng.uniform(0.34, 0.50); side = -side
+        if rng.random() < 0.7: holds.append(CL.Hold(np.array([wall_x - 0.14, -side * rng.uniform(0.12, 0.28), z - 0.17]), "foot"))
     return _climb_shot("climb_tree", "climbing a tree: branch stubs are the only holds; the climber hugs the trunk and uses them alternately", holds, wall_x, 6.0, True, 42.0)
 
 # ---------------------------------------------------------------------------- limping: a sore leg, a stick for a leg, crutches, a dog on three legs

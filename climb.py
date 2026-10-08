@@ -22,7 +22,7 @@ class Climber:
         self.rng = np.random.default_rng(seed)
         self.Larm = float(sum(self.sk.length[k] for k in creature.arms[0].chain[:2])) + 0.05
         self.Lleg = creature.legs[0].reach
-        self.lat = np.array([-self.n[1], self.n[0], 0.0])        # horizontal along the wall
+        self.lat = np.array([self.n[1], -self.n[0], 0.0])        # the climber's left: horizontal along the wall, +lat is left
         self.yaw = math.atan2(-self.n[1], -self.n[0])             # facing the wall
         self.limbs = {}                                           # name -> hold index
         self.moving = None; self.t_move0 = 0.0; self.from_p = None; self.to_idx = None
@@ -69,7 +69,15 @@ class Climber:
             return np.linalg.norm(p - sh) <= 0.95 * self.Larm + 0.05
         if hold.kind == "hand" and not self.relax: return False
         hip = pelvis + self.lat * (0.09 if name == "fL" else -0.09)
-        return np.linalg.norm(p - hip) <= 0.92 * self.Lleg
+        return np.linalg.norm(p - hip) <= (1.0 if self.relax else 0.92) * self.Lleg
+
+    def _lateral_ok(self, nm, p, sup, pel):
+        """Legs (and hands) may not swap sides or touch: the left foot stays left of the right foot with a gap, the same for the hands."""
+        other = {"fL": "fR", "fR": "fL", "hL": "hR", "hR": "hL"}[nm]
+        if other not in sup: return True
+        sep = (0.15 if nm[0] == "f" else 0.08) * (0.5 if self.relax else 1.0)
+        l_new = float((p - pel) @ self.lat); l_oth = float((sup[other] - pel) @ self.lat)
+        return (l_new - l_oth >= sep) if nm[1] == "L" else (l_oth - l_new >= sep)
 
     def _current(self, nm):
         if nm in self.hold_of: return self.holds[self.hold_of[nm]].p
@@ -90,15 +98,17 @@ class Climber:
             for idx, h in enumerate(self.holds):
                 if idx in occupied: continue
                 if not self._reachable(nm, h, pel): continue
+                if not self._lateral_ok(nm, h.p, sup, pel): continue
                 gain = h.p[2] - (cur[2] if cur is not None else 0.6)
                 if nm[0] == "h" and gain < 0.05: continue
-                if nm[0] == "f" and gain < 0.02 and cur is not None and not self.foot_ground[nm]: continue
-                if nm[0] == "f" and h.p[2] > pel[2] - 0.15: continue
+                if nm[0] == "f" and gain < (-0.05 if self.relax else 0.02) and cur is not None and not self.foot_ground[nm]: continue
+                if nm[0] == "f" and h.p[2] > pel[2] + (0.05 if self.relax else -0.15): continue          # a high step is allowed only when stuck
                 if nm[0] == "f" and hands_z and h.p[2] > max(hands_z) - 0.35: continue          # feet stay below the hands
                 lat = abs(float((h.p - pel) @ self.lat))
                 reach = np.linalg.norm(h.p - (pel + np.array([0, 0, 0.5]))) / self.Larm if nm[0] == "h" else np.linalg.norm(h.p - pel) / self.Lleg
                 lowness = (cur[2] if cur is not None else 0.0)
-                cost = 1.2 * lat + 0.8 * reach + 0.5 * lowness - 0.8 * gain
+                side = 1.0 if nm[1] == "L" else -1.0; wrong_side = max(0.0, -side * float((h.p - pel) @ self.lat))
+                cost = 1.2 * lat + 0.8 * reach + 0.5 * lowness - 0.8 * gain + 2.5 * wrong_side            # each limb prefers its own side of the body
                 if best is None or cost < best[0]: best = (cost, nm, idx)
         return best
 
@@ -153,3 +163,22 @@ class Climber:
         spq = spine_split(self.c, (0, 0.08, 0), (0, 0.06, 0))
         S, E, R, q = self.poser.pose(self.pelvis, R_p, spq, feet, hands)
         return S, E, R
+
+
+def seg_seg_dist(p1, q1, p2, q2):
+    """Smallest distance between two segments (used to check that the legs do not pass through each other)."""
+    import numpy as _np
+    d1 = q1 - p1; d2 = q2 - p2; r = p1 - p2
+    a = d1 @ d1; e = d2 @ d2; f = d2 @ r
+    if a < 1e-12 and e < 1e-12: return float(_np.linalg.norm(r))
+    if a < 1e-12: s_ = 0.0; t_ = float(_np.clip(f / e, 0, 1))
+    else:
+        c = d1 @ r
+        if e < 1e-12: t_ = 0.0; s_ = float(_np.clip(-c / a, 0, 1))
+        else:
+            b = d1 @ d2; den = a * e - b * b
+            s_ = float(_np.clip((b * f - c * e) / den, 0, 1)) if den > 1e-12 else 0.0
+            t_ = (b * s_ + f) / e
+            if t_ < 0: t_ = 0.0; s_ = float(_np.clip(-c / a, 0, 1))
+            elif t_ > 1: t_ = 1.0; s_ = float(_np.clip((b - c) / a, 0, 1))
+    return float(_np.linalg.norm((p1 + d1 * s_) - (p2 + d2 * t_)))
