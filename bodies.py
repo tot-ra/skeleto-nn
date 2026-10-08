@@ -56,13 +56,16 @@ class HumanBody:
     mass: float = 75.0
     leg_ratio: float = 1.0       # legs relative to torso
     belly: float = 0.0           # kg carried in front of the abdomen
+    pregnancy: float = 0.0       # 0..1 of term: a heavy belly, a hollow back, a wider stance, slower and more careful (sets belly mass itself)
     armour: float = 0.0          # kg on chest and thighs
     pack: float = 0.0            # kg on the back
     dress: float = 0.0           # 0..1 skirt: restricts stride, adds drag
     strength: float = 1.0
     stoop: float = 0.0           # rest kyphosis, radians
     width: float = 1.0           # shoulder and hip width
-    vigor: float = 1.0           # muscle power for the body size: 0.45 starved, 0.55 old, 1.0 adult, 1.5 energetic child
+    muscle: float = 1.0          # muscle power for the body size: 0.5 starved or old, 1.0 adult, 1.4 athlete
+    energy: float = 1.0          # size of the energy reserve and how fast it refills: 0.2 starved, 0.5 old, 1 adult, 2 child
+    flex: float = 1.0            # joint ranges: 1.25 supple child, 1.0 adult, 0.7 stiff old person
     peg: str = ""              # "L", "R" or "LR": the shank and foot of that leg are replaced by a rigid stick
     outfit: str = "none"        # key of OUTFITS: clothing that restricts joints, adds mass or changes the foot
     sex: str = "m"                # "m" | "f": changes shoulder/hip proportions and how a blow to the groin is felt
@@ -97,8 +100,10 @@ def _apply_outfit(bones, name):
 
 def human(b: HumanBody | None = None, name="human", rig: dict | None = None) -> Creature:
     b = b or HumanBody()
-    if b.vigor < 1.0 and b.stoop == 0.0:
-        import dataclasses; b = dataclasses.replace(b, stoop=0.5 * (1 - b.vigor))     # weak bodies stand stooped
+    if b.pregnancy > 0:
+        import dataclasses; b = dataclasses.replace(b, belly=max(b.belly, 8.0 * b.pregnancy), sex="f", stoop=(b.stoop if b.stoop else -0.30 * b.pregnancy), flex=min(b.flex, 1.0))
+    if min(b.muscle, b.flex) < 1.0 and b.stoop == 0.0:
+        import dataclasses; b = dataclasses.replace(b, stoop=0.5 * (1 - min(b.muscle, b.flex)))     # weak or stiff bodies stand stooped
     rig = rig or {}
     s = b.height / 1.75
     sl = s * b.leg_ratio ** 0.5; st = s / b.leg_ratio ** 0.5     # leg scale, torso scale
@@ -145,6 +150,9 @@ def human(b: HumanBody | None = None, name="human", rig: dict | None = None) -> 
         Bone("hand_L", "farm_L", (0, 0, -1), L["hand"], m(0.5), R(0.04), order="YXZ",
              lim={"Y": (-60, 60), "X": (-30, 30)}, side="L", group="arm", tau=8 * tau),
     ]
+    if b.flex != 1.0:
+        for bn in bones:
+            if bn.group in ("leg", "foot", "arm", "trunk", "neck", "head"): bn.lim = {ax: (lo * b.flex, hi * b.flex) for ax, (lo, hi) in bn.lim.items()}
     sk_extra, outfit_params = _apply_outfit(bones, b.outfit)
     if b.belly: sk_extra.append(("lumbar1", 0.4, (0.13 * s, 0, 0), b.belly, "belly"))
     if b.armour: sk_extra += [("chest", 0.5, (0.02, 0, 0), b.armour * 0.6, "armour"),
@@ -165,15 +173,21 @@ def human(b: HumanBody | None = None, name="human", rig: dict | None = None) -> 
     c.params = dict(height=b.height, mass=b.mass, dress=b.dress, ankle_h=ah, body=b.__dict__.copy(),
                     stand_ratio=0.99, step_ratio=0.62, arm_swing=1.0, skirt=b.dress, sex=b.sex)
     c.params.update(outfit_params)
-    v_ = b.vigor
-    c.params.update(vigor=v_, jump_gain=1.0 * v_ ** 0.6, v_sprint=6.2 * v_ ** 0.7, acc_scale=v_ ** 0.5)
+    v_ = b.muscle
+    preg = b.pregnancy
+    c.params.update(vigor=v_, muscle=v_, energy=b.energy, flex=b.flex, jump_gain=1.0 * v_ ** 0.4 * b.flex ** 0.3, v_sprint=6.2 * v_ ** 0.7, acc_scale=v_ ** 0.5)
+    c.params["stride_scale"] = c.params.get("stride_scale", 1.0) * b.flex ** 0.4
     if v_ < 1.0:                                           # weak: slower, shorter steps, more time on both feet, stooped, small arm swing
         c.params["v_max"] = min(c.params.get("v_max") or 99.0, 6.2 * v_ ** 0.7 * 0.55)           # even a fast walk is a run for them
         c.params["stride_scale"] = c.params.get("stride_scale", 1.0) * v_ ** 0.35
         c.params["duty_add"] = 0.14 * (1 - v_); c.params["arm_swing"] = c.params.get("arm_swing", 1.0) * (0.45 + 0.55 * v_)
         c.params["balance"] = c.params.get("balance", 1.0) * (0.55 + 0.45 * v_); c.params["toe_amp"] = c.params.get("toe_amp", 1.0) * (0.5 + 0.5 * v_)
-    elif v_ > 1.2:                                         # energetic: springy steps
-        c.params["bounce"] = 0.05 * (v_ - 1.0) / 0.5
+    if b.energy > 1.3: c.params["bounce"] = 0.05 * (b.energy - 1.0)         # a lot of energy: springy steps
+    if preg > 0:                                           # pregnancy: slower, shorter steps, longer double support, wide careful stance, a waddle, feet placed with care
+        c.params["stride_scale"] = c.params.get("stride_scale", 1.0) * (1 - 0.22 * preg); c.params["duty_add"] = c.params.get("duty_add", 0.0) + 0.08 * preg
+        c.params["v_max"] = min(c.params.get("v_max") or 99.0, 3.2 - 1.3 * preg); c.params["balance"] = c.params.get("balance", 1.0) * (1 - 0.25 * preg)
+        c.params["foot_care"] = 1.0 + 2.5 * preg; c.params["waddle"] = 0.06 * preg; c.params["pregnancy"] = preg
+        c.params["injury_weights"] = dict(abdomen=10.0 * preg, head=3.0, torso=1.5)
     for side in b.peg:                                  # the shank and foot of this leg are a rigid stick with a point contact
         for nm in ("foot_", "toes_"):
             bn = sk.bones[sk.idx[nm + side]]; bn.lim = {ax: (0.0, 0.0) for ax in "XYZ"}
@@ -186,6 +200,19 @@ def human(b: HumanBody | None = None, name="human", rig: dict | None = None) -> 
     if b.peg: c.params["toe_amp"] = 0.4
     c.z0 = _rest_height(c)
     return c
+
+# People that differ in more than size: muscle power, size of the energy reserve, flexibility, a heavy belly, clothing.
+PERSONAS = {
+    "adult": dict(),
+    "child": dict(height=1.2, mass=26, muscle=0.9, energy=2.0, flex=1.25),
+    "elder": dict(muscle=0.55, energy=0.5, flex=0.7),
+    "starved": dict(mass=48, muscle=0.5, energy=0.2, flex=0.9),
+    "athlete": dict(muscle=1.4, energy=1.5),
+    "pregnant": dict(sex="f", height=1.65, mass=68, pregnancy=1.0, outfit="skirt_wide"),
+}
+
+def persona(name, **over):
+    kw = dict(PERSONAS[name]); kw.update(over); return human(HumanBody(**kw))
 
 def _normalize_mass(sk: Skeleton, total: float):
     """Scale bone masses so bones plus extras add up to `total` kg."""
@@ -238,6 +265,10 @@ class QuadSpec:
     neck_speed_drop: float = 0.1        # how far the neck stretches forward and down at speed (rad)
     tail_type: str = "wag"              # wag | balance | hair | curl | none
     foot_type: str = "paw"              # paw | hoof
+    vigor: float = 1.0                  # muscle power for the body size (0.5 old, 1 adult, 1.4 strong)
+    turn_rate: float = 3.0              # fastest turn on the spot (rad/s)
+    min_radius: float = 1.0             # tightest turn at a run, in metres (a big body with a long trunk and neck turns in a wide curve)
+    energy: float = 1.0                 # energy reserve and refill (0.5 old, 1 adult, 2 playful young)
     jump_pitch: float = 0.65            # max trunk rotation about the hind feet at take-off (rad)
     jump_gain: float = 2.2              # take-off speed a hind-limb push can give, in units of sqrt(g * leg length)
 
@@ -247,13 +278,17 @@ class QuadSpec:
 QUADS = {
     "dog": QuadSpec("dog", 30.0, 1.0),
     "cat": QuadSpec("cat", 4.5, 0.58, tail_n=6, leg_scale=0.95, spine_flex=1.7, tail_len=1.3, neck_len=0.8, head_len=0.7, body_len=1.05,
-                    n_neck=3, neck_rom=110.0, neck_nod=0.04, neck_speed_drop=0.05, tail_type="balance", n_spine=8, ext_rom=45.0, flex_rom=75.0, lat_rom=95.0, twist_rom=45.0, core_power=1.5, jump_gain=3.4, jump_pitch=1.05),
+                    turn_rate=4.5, min_radius=0.45, n_neck=3, neck_rom=110.0, neck_nod=0.04, neck_speed_drop=0.05, tail_type="balance", n_spine=8, ext_rom=45.0, flex_rom=75.0, lat_rom=95.0, twist_rom=45.0, core_power=1.5, jump_gain=3.4, jump_pitch=1.05),
     "horse": QuadSpec("horse", 500.0, 2.45, tail_n=5, leg_scale=1.22, cannon=1.45, spine_flex=0.35, neck_len=1.3, tail_len=0.8, head_len=1.2, body_len=0.95, chest_depth=0.78,
-                      n_neck=5, neck_rom=140.0, neck_nod=0.14, neck_speed_drop=0.30, tail_type="hair", foot_type="hoof", n_spine=3, ext_rom=9.0, flex_rom=14.0, lat_rom=16.0, twist_rom=6.0, core_power=0.9, jump_gain=1.35, jump_pitch=0.3),
+                      turn_rate=1.2, min_radius=5.5, n_neck=5, neck_rom=140.0, neck_nod=0.14, neck_speed_drop=0.30, tail_type="hair", foot_type="hoof", n_spine=3, ext_rom=9.0, flex_rom=14.0, lat_rom=16.0, twist_rom=6.0, core_power=0.9, jump_gain=1.2, jump_pitch=0.3),
+    "goat": QuadSpec("goat", 45.0, 0.95, leg_scale=1.0, cannon=1.15, spine_flex=0.9, neck_len=0.85, tail_len=0.3, tail_n=2, head_len=0.9, body_len=0.95,
+                     n_spine=5, ext_rom=35.0, flex_rom=45.0, lat_rom=45.0, twist_rom=18.0, core_power=1.2, jump_gain=2.8, jump_pitch=0.6, n_neck=4, neck_rom=100.0, neck_nod=0.09, tail_type="wag_low", foot_type="hoof"),
     "wolf": QuadSpec("wolf", 40.0, 1.15, leg_scale=1.1, cannon=1.1, spine_flex=1.1, tail_len=1.0,
                      n_neck=4, neck_rom=100.0, neck_nod=0.07, neck_speed_drop=0.10, tail_type="wag_low", n_spine=6, ext_rom=32.0, flex_rom=52.0, lat_rom=60.0, twist_rom=22.0, core_power=1.15, jump_gain=2.5, jump_pitch=0.7),
+    "bear": QuadSpec("bear", 280.0, 1.35, leg_scale=0.85, cannon=0.9, spine_flex=0.7, neck_len=0.55, tail_len=0.12, tail_n=2, head_len=0.95, body_len=1.0, chest_depth=1.3,
+                     turn_rate=2.4, min_radius=1.6, n_neck=3, neck_rom=80.0, neck_nod=0.05, neck_speed_drop=0.05, tail_type="wag_low", n_spine=4, ext_rom=25.0, flex_rom=40.0, lat_rom=35.0, twist_rom=15.0, core_power=1.0, jump_gain=1.1, jump_pitch=0.4),
     "pig": QuadSpec("pig", 100.0, 1.0, tail_n=4, leg_scale=0.55, cannon=0.6, spine_flex=0.5, neck_len=0.5, tail_len=0.3, head_len=1.1, body_len=1.15, chest_depth=1.45,
-                    n_neck=2, neck_rom=50.0, neck_nod=0.10, neck_speed_drop=0.05, tail_type="curl", foot_type="hoof", n_spine=3, ext_rom=10.0, flex_rom=18.0, lat_rom=20.0, twist_rom=8.0, core_power=0.8, jump_gain=1.0, jump_pitch=0.25),
+                    turn_rate=2.0, min_radius=1.2, n_neck=2, neck_rom=50.0, neck_nod=0.10, neck_speed_drop=0.05, tail_type="curl", foot_type="hoof", n_spine=3, ext_rom=10.0, flex_rom=18.0, lat_rom=20.0, twist_rom=8.0, core_power=0.8, jump_gain=1.0, jump_pitch=0.25),
 }
 
 def quadruped(spec: QuadSpec | str = "dog", load: float = 0.0, name=None, missing: str = "", peg: str = "") -> Creature:
@@ -328,8 +363,11 @@ def quadruped(spec: QuadSpec | str = "dog", load: float = 0.0, name=None, missin
             pl = sk.length[ch[-1]]
             c.legs.append(Leg(f"{tag}{side}", side, ch, i[anchor], np.array([-0.01 * s, 0, -paw_r]), np.array([pl, 0, -paw_r]),
                               reach=float(sum(sk.length[k] for k in ch[:-1])), fore=fore_))
-    c.params = dict(mass=sp.mass, spec=sp.__dict__.copy(), stand_ratio=1.0, spine_flex=fl, tail=sp.tail_n, jump_gain=sp.jump_gain, jump_pitch=sp.jump_pitch, tail_type=sp.tail_type, neck_nod=sp.neck_nod, neck_speed_drop=sp.neck_speed_drop, foot_type=sp.foot_type,
+    c.params = dict(mass=sp.mass, spec=sp.__dict__.copy(), stand_ratio=1.0, spine_flex=fl, tail=sp.tail_n, turn_rate=sp.turn_rate, min_radius=sp.min_radius, jump_gain=sp.jump_gain * sp.vigor ** 0.4, v_sprint=(9.0 * sp.vigor ** 0.6), vigor=sp.vigor, muscle=sp.vigor, energy=sp.energy, acc_scale=sp.vigor ** 0.5, jump_pitch=sp.jump_pitch, tail_type=sp.tail_type, neck_nod=sp.neck_nod, neck_speed_drop=sp.neck_speed_drop, foot_type=sp.foot_type,
                     ext_rom=math.radians(sp.ext_rom), flex_rom=math.radians(sp.flex_rom))
+    if sp.vigor < 0.9:                                      # old or weak: shorter strides, slower, stiffer
+        c.params["stride_scale"] = sp.vigor ** 0.35; c.params["v_max"] = 9.0 * sp.vigor ** 0.6 * 0.4
+    if sp.energy > 1.3: c.params["bounce"] = 0.05 * (sp.energy - 1.0)
     if missing: c.params["nwb"] = missing                 # one leg is gone (or held up): a tripod gait
     for nm_ in ([peg] if peg else []):                      # the last segments of this leg are a rigid stick
         for part in ("meta", "paw"):
@@ -406,10 +444,10 @@ def bird(spec: BirdSpec | str = "crow", name=None) -> Creature:
         prev = nm
     wl = 0.16 * s / 0.4 * sp.wing_len; ch = s / 0.4
     bones += [
-        Bone("wing_a_L", "chest", d((0, 1, 0)), wl, m(0.03), 0.02 * s / 0.4, t=0.7, offset=(0, 0.03 * s / 0.4, 0.02 * s / 0.4), order="XZY",
-             lim={"X": (-100, 100), "Z": (-90, 100), "Y": (-80, 80)}, side="L", group="wing", tau=1.0 * m(1) * s, shape="box", size=(0.055 * ch, wl / 2, 0.004 * ch)),
-        Bone("wing_b_L", "wing_a_L", d((0, 1, 0)), wl * 0.9, m(0.025), 0.016 * s / 0.4, order="XZY", lim={"X": (-30, 30), "Z": (-165, 20), "Y": (-30, 30)}, side="L", group="wing", tau=0.5 * m(1) * s, shape="box", size=(0.05 * ch, wl * 0.45, 0.003 * ch)),
-        Bone("wing_c_L", "wing_b_L", d((0, 1, 0)), wl * 1.0, m(0.02), 0.012 * s / 0.4, order="XZY", lim={"X": (-40, 40), "Z": (-20, 155), "Y": (-20, 20)}, side="L", group="wing", tau=0.3 * m(1) * s, shape="box", size=(0.04 * ch, wl * 0.5, 0.003 * ch)),
+        Bone("wing_a_L", "chest", d((0, 1, 0)), wl, m(0.03), 0.02 * s / 0.4, t=0.7, offset=(-0.058 * s / 0.4, 0.03 * s / 0.4, 0.02 * s / 0.4), order="XZY",
+             lim={"X": (-100, 100), "Z": (-90, 100), "Y": (-80, 80)}, side="L", group="wing", tau=6.0 * m(1), shape="box", size=(0.055 * ch, wl / 2, 0.004 * ch)),
+        Bone("wing_b_L", "wing_a_L", d((0, 1, 0)), wl * 0.9, m(0.025), 0.016 * s / 0.4, order="XZY", lim={"X": (-30, 30), "Z": (-165, 20), "Y": (-30, 30)}, side="L", group="wing", tau=3.0 * m(1), shape="box", size=(0.05 * ch, wl * 0.45, 0.003 * ch)),
+        Bone("wing_c_L", "wing_b_L", d((0, 1, 0)), wl * 1.0, m(0.02), 0.012 * s / 0.4, order="XZY", lim={"X": (-40, 40), "Z": (-20, 155), "Y": (-20, 20)}, side="L", group="wing", tau=1.2 * m(1), shape="box", size=(0.04 * ch, wl * 0.5, 0.003 * ch)),
     ]
     sk = Skeleton(name or sp.name, bones)
     _normalize_mass(sk, sp.mass)

@@ -129,6 +129,37 @@ def snake_around():
                 dict(dist=4.2, azimuth=140, elevation=-55, follow=0, look_z=0.1), size=(480, 300))
 
 # ---------------------------------------------------------------------------- rider
+def rider_kin(P, poser):
+    """Kinematic rider on the horse that is actor 0 of the shot: a damped spring on the saddle, legs and hands to stirrups and reins; over a fence it rises and folds."""
+    def kin(t, ctx):
+        w = ctx.walkers[0]; sk = w.sk
+        if w.S is None: return None
+        i = sk.idx
+        Sp, Ep = w.S[i["spine"]], w.E[i["spine"]]
+        jumping = w.jumpplan is not None
+        saddle = 0.5 * (Sp + Ep) + np.array([0, 0, 0.30 * (w.c.z0 / 1.4) + 0.12 + (0.13 if jumping else 0.0)])
+        rp = ctx.state.setdefault("rider", dict(off=np.zeros(3), v=np.zeros(3), pitch=0.0, pv=0.0, t=0.0))
+        dt = 1 / 24; target = saddle
+        if "pos" not in rp: rp["pos"] = target.copy(); rp["vel"] = np.zeros(3)
+        acc = -90.0 * (rp["pos"] - target) - 16.0 * rp["vel"]
+        rp["vel"] += acc * dt; rp["pos"] += rp["vel"] * dt
+        pos = rp["pos"]; hy = w.heading; hp = w.pitch
+        tgt_pitch = 0.25 * hp + 0.12 * min(1.0, w.speed / 5.0) + (0.55 if jumping else 0.0) + 0.5 * float(np.clip(w.yaw_rate * w.speed / 9.81, -0.3, 0.3)) * 0.0
+        rp["pv"] += (-60.0 * (rp["pitch"] - tgt_pitch) - 12.0 * rp["pv"]) * dt; rp["pitch"] += rp["pv"] * dt
+        roll = -0.9 * float(np.clip(w.yaw_rate * w.speed / 9.81, -0.35, 0.35))                     # leans with the horse into a turn
+        Rp = rot("Z", hy) @ rot("Y", rp["pitch"]) @ rot("X", roll * 0.6)
+        fwd = np.array([math.cos(hy), math.sin(hy), 0]); left = np.array([-fwd[1], fwd[0], 0])
+        feet = {}
+        for side, sg in (("L", 1.0), ("R", -1.0)):
+            ctr = pos + left * sg * 0.30 * (w.c.z0 / 1.4) ** 0.3 - np.array([0, 0, 0.78 * P.leg_len() / 0.86 - (0.1 if jumping else 0.0)]) + fwd * 0.05
+            Rf = foot_rot(hy, 0.35); feet[side] = (ankle_for(P, side, ctr, Rf), Rf)
+        neck = w.S[i["neck"]] + 0.6 * (w.E[i["neck"]] - w.S[i["neck"]])
+        hands = {"L": neck + left * 0.16 + np.array([0, 0, 0.12]), "R": neck - left * 0.16 + np.array([0, 0, 0.12])}
+        spq = spine_split(P, (0, 0.12 - rp["pitch"] * 0.5, 0), (0, 0.10 - rp["pitch"] * 0.5, 0))
+        S, E, R, q = poser.pose(pos, Rp, spq, feet, hands)
+        return S, E, R
+    return kin
+
 @shot
 def rider():
     tr = Terrain(); H = quadruped("horse"); P = human(HumanBody(mass=75))

@@ -82,46 +82,84 @@ def door_open():
 # ---------------------------------------------------------------------------- sit at a table
 @shot
 def sit_table():
-    c = human(); tr = Terrain()
-    chair = (3.0, 0.0); seat_h = 0.46
-    table_c = np.array([chair[0] + 0.78, 0.0])
-    props = [dict(geom=chair_geom(seat_h)), dict(geom=table_geom())]
-    goal = (chair[0] + 0.40 * c.leg_len() / 0.86 * 0 + 0.40, 0.0)
-    nv = Navigator(tr, c); nv.plan(np.array([7.0, 0.8]), np.array([chair[0] + 0.62, 0.0]))
+    """Sit at a table with real obstacles: the chair is tucked under the table, the person pulls it out by the back, goes round it, sits,
+    scoots in, eats, scoots out, stands and leaves. The table and the chair block the body (A* goes round them), the hands grip the chair back."""
+    c = human(); tr = Terrain(-2, 12, -4, 4)
+    T = np.array([5.0, 0.0]); chair_in, chair_out = 4.55, 3.55
+    tr.add_hidden_ceiling(T[0] - 0.6, T[0] + 0.6, -0.45, 0.45, 0.72)                  # nobody walks under the tabletop
+    for sx in (-1, 1):
+        for sy in (-1, 1): tr.add_block(T[0] + sx * 0.52 - 0.04, T[0] + sx * 0.52 + 0.04, sy * 0.38 - 0.04, sy * 0.38 + 0.04, 0.76)
+    block = [None]
+    def put_chair(x):
+        if block[0] is not None: tr.clear_block(*block[0])
+        block[0] = (x - 0.26, x + 0.26, -0.26, 0.26); tr.add_block(*block[0], 0.5)
+    put_chair(chair_in)
+    props = [dict(geom=chair_geom(0.46)), dict(geom=table_geom())]
+    seat_h = 0.46; top = 0.78
+    nv0 = Navigator(tr, c, radius=0.22); nv0.plan(np.array([0.0, 1.6]), np.array([chair_in - 0.22 - 0.37, 0.0]))
+    hist = {}
     def cmd(t, w, ctx):
-        s = ctx.state; ph = s.get("ph", "walk")
+        s = ctx.state; ph = s.setdefault("ph", "walk"); cx = s.setdefault("chair_x", chair_in); hist[round(t * 60)] = cx
+        w.auto_duck = False
         if ph == "walk":
-            cm = nv.cmd(w.pos, 1.2)
-            if np.linalg.norm(w.pos - np.array([chair[0] + 0.62, 0.0])) < 0.2 and w.speed < 0.15: s["ph"] = "turn"; s["t"] = t
+            cm = nv0.cmd(w.pos, 1.2)
+            if np.linalg.norm(w.pos - np.array([chair_in - 0.22 - 0.37, 0.0])) < 0.2 and w.speed < 0.15: s["ph"] = "turn1"; s["t"] = t
+            return cm
+        grip = lambda x: {"L": np.array([x - 0.22, 0.13, 0.93]), "R": np.array([x - 0.22, -0.13, 0.93])}
+        if ph == "turn1":
+            if abs(wrap(0.0 - w.heading)) < 0.08 and t - s["t"] > 0.6 and all(l.stance for l in w.legs): s["ph"] = "grab"; s["t"] = t
+            return Cmd(heading=0.0)
+        if ph == "grab":
+            u = minjerk((t - s["t"]) / 1.0); sh = {sd: w.S[w.sk.idx["uarm_" + sd]] for sd in "LR"}
+            g = grip(cx); arms = {sd: (sh[sd] + np.array([0.15, 0, -0.45])) * (1 - u) + g[sd] * u for sd in "LR"}
+            if t - s["t"] > 1.0: s["ph"] = "pull"; s["t"] = t
+            return Cmd(heading=0.0, arms=arms, crouch=0.1)
+        if ph == "pull":
+            s["chair_x"] = float(w.pos[0] + 0.59)                                             # the chair follows the hands
+            if s["chair_x"] <= chair_out: s["chair_x"] = chair_out; s["ph"] = "release"; s["t"] = t
+            put_chair(s["chair_x"]); return Cmd(v=np.array([-0.75, 0.0]), heading=0.0, arms=grip(s["chair_x"]), crouch=0.1)
+        if ph == "release":
+            if "nv" not in s:
+                s["nv"] = Navigator(tr, c, radius=0.2); s["nv"].plan(w.pos.copy(), np.array([chair_out + 0.40, 0.0]))
+            cm = s["nv"].cmd(w.pos, 1.0)
+            if np.linalg.norm(w.pos - np.array([chair_out + 0.40, 0.0])) < 0.2 and w.speed < 0.15: s["ph"] = "turn"; s["t"] = t
             return cm
         if ph == "turn":
             if abs(wrap(0.0 - w.heading)) < 0.08 and t - s["t"] > 0.8 and all(l.stance for l in w.legs): s["ph"] = "sit"; s["t"] = t
             return Cmd(heading=0.0)
-        if ph in ("sit", "seated", "rise"):
+        if ph in ("sit", "scoot", "seated", "unscoot", "rise"):
             if ph == "sit":
-                pel, tau = SK.sit_cmd(w, t, s["t"], chair, seat_h, 0.0, dur=1.7)
-                if tau >= 1.0: s["ph"] = "seated"; s["t"] = t
+                pel, tau = SK.sit_cmd(w, t, s["t"], (cx, 0.0), seat_h, 0.0, dur=1.7)
+                if tau >= 1.0: s["ph"] = "scoot"; s["t"] = t
+            elif ph == "scoot":
+                u = minjerk((t - s["t"]) / 1.0); s["chair_x"] = chair_out + 0.40 * u
+                pel, tau = SK.sit_cmd(w, 9e9, 0.0, (s["chair_x"], 0.0), seat_h, 0.0)
+                if t - s["t"] > 1.0: s["ph"] = "seated"; s["t"] = t
             elif ph == "seated":
-                pel, tau = SK.sit_cmd(w, 9e9, 0.0, chair, seat_h, 0.0)
-                if t - s["t"] > 7.0: s["ph"] = "rise"; s["t"] = t
+                pel, tau = SK.sit_cmd(w, 9e9, 0.0, (cx, 0.0), seat_h, 0.0)
+                if t - s["t"] > 7.0: s["ph"] = "unscoot"; s["t"] = t
+            elif ph == "unscoot":
+                u = minjerk((t - s["t"]) / 1.0); s["chair_x"] = (chair_out + 0.40) - 0.40 * u
+                pel, tau = SK.sit_cmd(w, 9e9, 0.0, (s["chair_x"], 0.0), seat_h, 0.0)
+                if t - s["t"] > 1.0: s["ph"] = "rise"; s["t"] = t; put_chair(chair_out)
             else:
-                pel, tau = SK.sit_cmd(w, t, s["t"], chair, seat_h, 0.0, stand=True, dur=1.5)
-                if t - s["t"] > 1.5: s["ph"] = "leave"; s["nv"] = Navigator(tr, c); s["nv"].plan(w.pos, np.array([9.0, 2.5]))
-            # hands: on the table, the right one brings a cup to the mouth now and then
-            top = 0.78
-            hl = np.array([table_c[0] - 0.15, 0.20, top]); hr_t = np.array([table_c[0] - 0.05, -0.15, top + 0.07])
-            head = w.S[w.sk.idx["head"]] + (w.E[w.sk.idx["head"]] - w.S[w.sk.idx["head"]]) * 0.4
-            mouth = head + np.array([0.12, 0.0, -0.06])
+                pel, tau = SK.sit_cmd(w, t, s["t"], (cx, 0.0), seat_h, 0.0, stand=True, dur=1.5)
+                if t - s["t"] > 1.5:
+                    s["ph"] = "leave"; s["nv"] = Navigator(tr, c, radius=0.2); s["nv"].plan(w.pos.copy(), np.array([0.5, 1.8]))
+            if ph in ("sit", "scoot", "seated"): put_chair(s["chair_x"]) if ph != "sit" else None
+            hl = np.array([T[0] - 0.55, 0.20, top + 0.05]); hr_t = np.array([T[0] - 0.50, -0.15, top + 0.09])
+            head = w.S[w.sk.idx["head"]] + (w.E[w.sk.idx["head"]] - w.S[w.sk.idx["head"]]) * 0.4; mouth = head + np.array([0.12, 0.0, -0.06])
             cyc = (t - s.get("t", 0.0)) % 3.6 if ph == "seated" else 0.0
             k = minjerk(min(cyc, 1.2) / 1.2) - minjerk(max(0.0, cyc - 2.2) / 1.2) if ph == "seated" and (t - s["t"]) > 0.8 else 0.0
             hr = hr_t * (1 - k) + mouth * k
-            arms = {"L": hl, "R": hr} if ph != "rise" else None
+            arms = {"L": hl, "R": hr} if ph in ("scoot", "seated", "unscoot") else ({"L": SK.knee_hands(w, "L"), "R": SK.knee_hands(w, "R")} if ph == "sit" else None)
             return Cmd(heading=0.0, pelvis=pel, arms=arms)
         return s["nv"].cmd(w.pos, 1.2)
     def prop_fn(t, ctx, sc, row):
-        sc.set_prop(0, [chair[0], chair[1], 0.0]); sc.set_prop(1, [table_c[0], 0.0, 0.0])
-    return Shot("sit_table", "sit at a table: chair, table, hands on the tabletop, a cup brought to the mouth, stand up and leave", tr,
-                [ActorSpec(c, pos=(7.0, 0.8), heading=math.pi, cmd=cmd)], 22.0, dict(dist=4.8, azimuth=75, elevation=-8), props=props, prop_fn=prop_fn, size=(480, 300))
+        k = round(t * 60); cx = hist.get(k) or hist.get(k - 1) or chair_in
+        sc.set_prop(0, [cx, 0.0, 0.0]); sc.set_prop(1, [T[0], 0.0, 0.0])
+    return Shot("sit_table", "sit at a table with real obstacles: pull the chair out by its back, go round it, sit, scoot in, eat, scoot out, stand and leave (the table and chair block the body)", tr,
+                [ActorSpec(c, pos=(0.0, 1.6), heading=0.0, cmd=cmd)], 34.0, dict(dist=5.0, azimuth=70, elevation=-14, follow=0, look_z=0.8, look_off=(1.2, 0, 0)), props=props, prop_fn=prop_fn, size=(520, 320))
 
 # ---------------------------------------------------------------------------- bed: lie down, lie, get up
 @shot

@@ -159,15 +159,18 @@ def getup_keys(w, P, yaw, t0, injured_arm=None, injured_leg=None, hold=1.0, lie_
     return ks
 
 _PHYS = {}
-def _fall_params():
+def _fall_params(c=None):
+    """The evolved fall reflex for this body: a body with a heavy belly has its own (the belly is what must not hit the ground)."""
     import json, os
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", "reflex_fall.json")
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
+    name = "reflex_fall_pregnant.json" if (c is not None and c.params.get("pregnancy", 0) > 0.3) else "reflex_fall.json"
+    p = os.path.join(here, name)
     return np.array(json.load(open(p))["params"]) if os.path.exists(p) else None
 
 def begin_down(w, d, region):
     """Floor the body. With the evolved reflex available the fall itself is simulated on a physical body (muscle-like PD joints that
     yield on impact, head tucked); otherwise a goal sequence. Either way the get-up follows from the pose the body ends in."""
-    params = _fall_params()
+    params = _fall_params(w.c)
     if params is not None and w.kind == "biped":
         try:
             if _begin_down_physical(w, d, region, params): return

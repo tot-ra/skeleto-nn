@@ -93,7 +93,7 @@ def set_stiffness(pc: PhysChar, scale, base_kp, m_arm=1.0, m_leg=1.0):
 
 def contact_forces(pc: PhysChar, geom_region):
     d = pc.data; m = pc.model
-    out = {k: 0.0 for k in ("head", "torso", "arms", "legs")}
+    out = {k: 0.0 for k in ("head", "torso", "arms", "legs", "abdomen")}
     f6 = np.zeros(6)
     for k in range(d.ncon):
         c = d.contact[k]
@@ -112,6 +112,7 @@ def run_scenario(c, params, scen, T=3.5, record=False, passive=False, pc=None, b
     geom_region = {}
     for reg, names in REGIONS.items():
         for nm in names: geom_region[m.geom("g_" + nm).id] = reg
+    if mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "g_belly") >= 0: geom_region[m.geom("g_belly").id] = "abdomen"
     rf = Reflex(c, params)
     z0 = c.z0 + 0.003
     h = scen.get("h", 0.0)
@@ -120,7 +121,7 @@ def run_scenario(c, params, scen, T=3.5, record=False, passive=False, pc=None, b
     mass = pc.total_mass
     if scen["kind"] == "drop" and scen.get("v") is not None:
         pc.data.qvel[0:3] = scen["v"]
-    n = int(T * CTRL_HZ); peak = {k: 0.0 for k in ("head", "torso", "arms", "legs")}; traj = []
+    n = int(T * CTRL_HZ); peak = {k: 0.0 for k in ("head", "torso", "arms", "legs", "abdomen")}; traj = []
     series = {k: [] for k in peak}; mg0 = pc.total_mass * G
     state = "stand"; t_brace = None; t_land = 0.0; d_dir = np.array([1.0, 0.0])
     air_t = 0
@@ -177,7 +178,7 @@ def run_scenario(c, params, scen, T=3.5, record=False, passive=False, pc=None, b
     mg = mass * G
     p, R = pc.root_pose()
     upright = float(R[2, 2] > 0.8 and p[2] > 0.6 * c.z0)
-    icost, parts = INJ.score(series, 1.0 / (CTRL_HZ * SUBSTEPS))
+    icost, parts = INJ.score(series, 1.0 / (CTRL_HZ * SUBSTEPS), c.params.get("injury_weights"))
     cost = icost
     if scen["kind"] == "drop" and scen.get("h", 0) < 1.1: cost += 1.0 * (1.0 - upright)
     out = dict(cost=float(cost), peak={k: float(v / mg) for k, v in peak.items()}, upright=upright, risk={k: parts[k]["risk"] for k in parts}, rate={k: parts[k]["rate"] for k in parts})
@@ -195,9 +196,12 @@ def sample_scenarios(rng, n, kinds=("shove", "drop")):
             sc.append(dict(kind="drop", h=float(rng.uniform(0.4, 2.6)), v=np.array([sp * math.cos(a), sp * math.sin(a), 0.0])))
     return sc
 
+_BODY = human
 _G = {}
 def _init_worker():
-    c = human(); pc = PhysChar(c)
+    import os
+    from bodies import persona
+    c = persona(os.environ["REFLEX_BODY"]) if os.environ.get("REFLEX_BODY") else _BODY(); pc = PhysChar(c)
     _G["c"] = c; _G["pc"] = pc; _G["kp"] = np.array([pc.model.actuator_gainprm[a, 0] for a in pc.aid])
 
 def _eval(args):
@@ -241,11 +245,12 @@ def fall_from_state(c, pc, params, root_pos, root_R, qvec, vel, angvel, T=3.2, b
     geom_region = {}
     for reg, names in REGIONS.items():
         for nm in names: geom_region[m.geom("g_" + nm).id] = reg
+    if mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "g_belly") >= 0: geom_region[m.geom("g_belly").id] = "abdomen"
     rf = Reflex(c, params)
     pc.set_state(root_pos, root_R, qvec, root_vel=vel, root_angvel=angvel)
     set_stiffness(pc, rf.kp_b, base_kp, rf.m_arm, rf.m_leg)
     mg0 = pc.total_mass * G
-    series = {k: [] for k in REGIONS}
+    series = {k: [] for k in INJ.REGIONS}
     def probe():
         cf = contact_forces(pc, geom_region)
         for kk in series: series[kk].append(cf[kk] / mg0)
@@ -265,6 +270,6 @@ def fall_from_state(c, pc, params, root_pos, root_R, qvec, vel, angvel, T=3.2, b
         still = still + 1 / CTRL_HZ if (sp < 0.08 and t > 0.6) else 0.0
         if still > min_still: break
         if not np.all(np.isfinite(pc.data.qpos)): break
-    cost, parts = INJ.score(series, 1.0 / (CTRL_HZ * SUBSTEPS))
+    cost, parts = INJ.score(series, 1.0 / (CTRL_HZ * SUBSTEPS), c.params.get("injury_weights"))
     p, R = pc.root_pose()
     return dict(traj=traj, cost=float(cost), parts=parts, upright=bool(R[2, 2] > 0.85))

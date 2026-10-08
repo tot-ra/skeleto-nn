@@ -14,34 +14,60 @@ def put(src, dst):
 
 EMERGENT, GOAL, KIN, PHYS = "emergent", "goal script", "kinematic model", "physics, evolved"
 SECTIONS = [
- ("Walking, running and terrain (one planner, gait from the Froude number)", "sim", [
-  ("walk_run", EMERGENT, "stand, walk, fast walk, run, back to walk, stop"), ("stairs_up_down", EMERGENT, "stairs are just terrain: footholds searched, swing height from the terrain"),
-  ("slope_up_down", EMERGENT, "slopes: trunk pitch and foot rotation follow the ground normal"), ("step_over_log", EMERGENT, "step over a log"), ("duck_under_beam", EMERGENT, "auto-duck below a ceiling"),
-  ("around_obstacles", EMERGENT, "A* navigation around walls"), ("bodies_walk", EMERGENT, "different bodies (tall, dwarf, belly, armour, pack, skirt) pick their own posture"), ("crowd", EMERGENT, "14 people cross a plaza"), ("run_forest", EMERGENT, "run through a forest: A* around trunks, duck under low branches"), ("run_crowd", EMERGENT, "run through a crowd: speed follows the gap, shoulders turn"), ("outfits_walk", EMERGENT, "tight skirt, wide skirt, trousers, heavy boots, high heels, chainmail, plate: limits, mass, foot shape"), ("limp_people", EMERGENT, "sore leg, rigid stick for a lower leg, crutches with one leg held up"), ("limp_dogs", EMERGENT, "dog with a sore leg, on three legs, with a stick for the lower hind leg"), ("climb_rock", EMERGENT, "rock face: only the coloured holds can be used"), ("climb_tree", EMERGENT, "tree: branch stubs are the only holds")]),
- ("Jumping (power-limited: the planner refuses a jump the legs cannot make)", "sim", [
-  ("jump_gap", EMERGENT, "1.2 m gap from a run-up"), ("jump_wall", EMERGENT, "standing jump over a 60 cm wall"), ("cat_jump_up", EMERGENT, "cat: 8 spine joints coil, stretch, tuck, land"),
-  ("horse_jump_fence", EMERGENT, "horse: stiff column, small trunk rotation"), ("quad_jump_species", EMERGENT, "same relative obstacle: cat, dog, wolf, pig")]),
- ("Animals: spine, neck, tail and feet differ by species", "sim", [
-  ("animals_trot", EMERGENT, "dog, cat, horse, wolf, pig trot"), ("quadruped_speeds", EMERGENT, "walk to gallop by Froude number"), ("horse_load", EMERGENT, "horse with 0, 90, 180 kg"),
-  ("quad_species_tails", EMERGENT, "balance tail, wag, low tail, curl"), ("horse_gait_tail", EMERGENT, "5-joint neck nod, hair tail flags and flicks"), ("animals_stairs_log", EMERGENT, "stairs and a log, four legs")]),
+ ("People: walking, running, terrain, obstacles (one planner, gait from the Froude number)", "sim", [
+  ("walk_run", EMERGENT, "stand, walk, fast walk, run, back to walk, stop"), ("stairs_up_down", EMERGENT, "stairs are just terrain (the steps span the whole width: the only way is over)"),
+  ("slope_up_down", EMERGENT, "slopes: trunk pitch and foot rotation follow the ground"), ("step_over_log", EMERGENT, "step over a log"), ("duck_under_beam", EMERGENT, "auto-duck below a ceiling"),
+  ("obstacle_course", EMERGENT, "uneven ground, a log, pits (jumped with the run-up the body needs), a low wall, a waist-high wall (vaulted), a wall that is too high (gone round), a pit that is too wide (stops, afraid)"),
+  ("around_obstacles", EMERGENT, "A* around walls"), ("run_forest", EMERGENT, "run through a forest, duck under branches"), ("run_crowd", EMERGENT, "run through a crowd"), ("crowd", EMERGENT, "14 people cross a plaza"),
+  ("crowd_squeeze", EMERGENT, "squeeze through people: shoulders turn, hands go up"), ("run_into_wall", EMERGENT, "run into a wall: seen early, late, not at all"),
+  ("start_from_squat", EMERGENT, "from a squat to a run: stand first, drive out, or a sprinter's start"), ("joystick_control", EMERGENT, "stick input with inertia: brake, pivot, corner, accelerate"), ("push_recovery", EMERGENT, "shoved: recovery steps")]),
+ ("People: muscle, energy, flexibility, age, pregnancy, clothing, injury", "sim", [
+  ("bodies_walk", EMERGENT, "tall, dwarf, belly, armour, pack, skirt"), ("personas_course", EMERGENT, "child, adult, elder, starved, athlete on the same course: what each jumps, vaults, refuses"),
+  ("personas_race", EMERGENT, "a 36 s all-out run: the reserve of energy sets the pace that can be held"), ("outfits_walk", EMERGENT, "tight skirt, wide skirt, trousers, boots, heels, chainmail, plate"),
+  ("pregnant_stairs", EMERGENT, "stairs in a skirt: not pregnant vs heavily pregnant"), ("limp_people", EMERGENT, "sore leg, rigid stick for a lower leg, crutches"), ("bump_head", EMERGENT, "hit the head on a beam")]),
+ ("Jumping: how far the body knows it can jump (self-model learned by practice, fear)", "sim", [
+  ("jump_gap", EMERGENT, "gaps of 0.8, 1.8, 2.8 and 3.4 m: the run-up follows the gap"), ("jump_fear", EMERGENT, "knowing the limit: jumps 3.4 m, is afraid of 4.4 m, an over-confident one balks at the edge, an over-cautious one will not try"), ("jump_wall", EMERGENT, "standing jump over a wall")]),
+ ("Climbing and hanging", "sim", [
+  ("climb_rock", EMERGENT, "rock face: only the coloured holds can be used"), ("climb_tree", EMERGENT, "tree: branch stubs are the only holds"), ("ladder_climb", GOAL, "ladder"),
+  ("pullup_bar", GOAL, "pull-ups on a bar, legs help"), ("pullup_pipe", GOAL, "pull-ups on a pipe"), ("pullup_rings", GOAL, "pull-ups on rings"), ("mantle_ledge", GOAL, "from a hang to standing on a ledge"), ("rope_climb", GOAL, "climbing a rope with hands and feet")]),
+ ("Everyday situations", "sim", [
+  ("door_open", GOAL, "open a door"), ("sit_stand", GOAL, "sit on a chair and stand"), ("sit_table", GOAL, "pull the chair out, sit, scoot in, eat, leave (table and chair are real obstacles)"),
+  ("bed_lie_rise", GOAL, "lie in a bed, get up"), ("get_up_floor", GOAL, "get up from the floor"), ("rider", GOAL, "ride a horse (see the horse section)")]),
+ ("Blows, pain, reactions", "sim", [
+  ("hit_reactions_a", EMERGENT, "hit on head, torso, arm: stagger, doubled over, drop the weapon, clutch"), ("hit_reactions_b", PHYS, "leg: limp; hard head blow: physical fall, lie, get up"),
+  ("hit_reactions_c", PHYS, "groin (man vs woman) and knee"), ("dodge_reactions", EMERGENT, "notice in time: side step, duck, hop, block; too late: hit"),
+  ("weapon_reactions", EMERGENT, "axe vs shield, axe on a bare head, arrows dodged, caught by a shield, taken; shin block"), ("duel", EMERGENT, "two fighters choose targets and reactions on their own")]),
+ ("Blows with different weapons and limbs; damage from animals", "sim", [
+  ("weapons_human", EMERGENT, "sword, axe, spear and fist: swing or straight thrust, hit or dodged"), ("kick_human", EMERGENT, "a kick to the thigh: the victim limps"),
+  ("wolf_bite", EMERGENT, "a wolf lunges and bites the forearm: the arm is hurt"), ("bear_swipe", EMERGENT, "a bear's paw swipe to the head: a knock-down"), ("horse_kick", EMERGENT, "a hind hoof kick: a hard blow to the torso")]),
+ ("Cat", "sim", [("cat_jump_up", EMERGENT, "jump up and down: eight spine joints coil and stretch"), ("slalom_cat", EMERGENT, "slalom: tight turns, balance tail")]),
+ ("Dog", "sim", [("slalom_dog", EMERGENT, "slalom at a run"), ("limp_dogs", EMERGENT, "sore leg, three legs, a stick for a lower leg"), ("animal_ages", EMERGENT, "old dog, puppy, kid goat")]),
+ ("Horse (and rider)", "sim", [
+  ("horse_gaits", EMERGENT, "walk, trot, canter, gallop"), ("slalom_horse", EMERGENT, "slalom: the big body swings wide"), ("horse_jumps", EMERGENT, "fences of 1.0, 1.6 and 2.7 m: jumps, jumps, refuses"),
+  ("horse_load", EMERGENT, "with 0, 90, 180 kg on the back"), ("horse_gait_tail", EMERGENT, "5-joint neck nod, hair tail"), ("rider", GOAL, "rider on the saddle: walk to gallop"), ("rider_course", GOAL, "horse and rider: slalom and a fence")]),
+ ("Other animals, side by side", "sim", [
+  ("animals_trot", EMERGENT, "dog, cat, horse, wolf, pig trot"), ("quadruped_speeds", EMERGENT, "walk to gallop by Froude number"), ("quad_species_tails", EMERGENT, "balance tail, wag, low tail, curl"),
+  ("quad_jump_species", EMERGENT, "same relative obstacle: cat, dog, wolf, pig"), ("animals_stairs_log", EMERGENT, "stairs and a log, four legs")]),
  ("Birds and snake", "sim", [
-  ("birds_walk", EMERGENT, "bird gaits"), ("bird_flight", KIN, "flapping flight model (beat rate from mass)"), ("bird_land_ground", KIN, "landing on the ground: flare, feet first, run out"),
-  ("bird_land_branch", KIN, "landing on a branch: near-stall, toes grip"), ("bird_land_water", KIN, "landing on water: skid and float"), ("snake_around", KIN, "serpentine motion between walls")]),
- ("Everyday situations (goals for pelvis, hands and feet + IK)", "sim", [
-  ("door_open", GOAL, "open a door"), ("sit_stand", GOAL, "sit on a chair and stand"), ("sit_table", GOAL, "sit at a table"), ("bed_lie_rise", GOAL, "lie down in a bed, get up"),
-  ("get_up_floor", GOAL, "get up from the floor"), ("ladder_climb", GOAL, "ladder"), ("rider", GOAL, "ride a horse"), ("swim_freestyle", KIN, "swim, head above water"), ("dive_swim", KIN, "dive"),
-  ("crowd_squeeze", EMERGENT, "squeeze through people: shoulders turn, hands go up"), ("bump_head", EMERGENT, "hit the head on a beam")]),
- ("Combat as a set of reactions (no scripted duel)", "sim", [
-  ("run_into_wall", EMERGENT, "run into a wall: seen early, late, not at all (arms and knees lengthen the stop)"), ("weapon_reactions", EMERGENT, "axe vs shield, axe on a bare head, arrows dodged, caught by a shield, taken; shin block"), ("hit_reactions_c", PHYS, "groin (man vs woman) and knee"), ("hit_reactions_a", EMERGENT, "hit on head, torso, arm: stagger, doubled over, drop the weapon, clutch"), ("hit_reactions_b", PHYS, "leg: limp; hard head blow: physical fall, lie, get up; blow in the back"),
-  ("dodge_reactions", EMERGENT, "notice in time: side step, duck, hop, block; too late: hit"), ("duel", EMERGENT, "two fighters choose targets and reactions on their own"), ("push_recovery", EMERGENT, "shoved: recovery steps")]),
+  ("birds_walk", EMERGENT, "bird gaits"), ("bird_flight", KIN, "flapping flight model"), ("bird_land_ground", KIN, "landing on the ground"), ("bird_land_branch", KIN, "landing on a branch"), ("bird_land_water", KIN, "landing on water"),
+  ("bird_fly", PHYS, "physical flight: wings and tail are plates in the air; gliding about 3 s (the stroke is not good yet)"), ("bird_land", PHYS, "physical landing: not solved (hits hard)"), ("bird_takeoff", PHYS, "physical take-off: not learned"),
+  ("snake_around", KIN, "serpentine motion between walls")]),
+ ("Water", "sim", [
+  ("swim_freestyle", KIN, "swimming with the head above water (hand-built)"), ("dive_swim", KIN, "diving (hand-built)"),
+  ("swim_surface", PHYS, "physical swimmer at the surface with an oxygen budget: a poor stroke, but it does breathe"), ("swim_under_bottom", PHYS, "physical swimmer to a goal on the bottom"), ("swim_under_far", PHYS, "physical swimmer to a far goal at depth")]),
+ ("Physical falls (MuJoCo, evolved on the bone-injury score)", "sim", [
+  ("shove_forward", PHYS, "shove: stiff body vs evolved reflex"), ("drop_2m", PHYS, "drop of 2 m"), ("drop_2p5m_fwd", PHYS, "drop of 2.5 m with forward speed"),
+  ("preg_shove_forward", PHYS, "pregnant: the general reflex vs the reflex evolved for this body (the belly is scored most)"), ("preg_drop_1m", PHYS, "pregnant: a drop"), ("slide_slope", PHYS, "standing on a slippery slope")]),
 ]
 GALLERY = []
 def items_html(rows, sub):
     s = ""
     for name, label, cap in rows:
-        src = os.path.join(runs, "gifs3", name + ".gif")
-        if not os.path.exists(src): src = os.path.join(runs, "gifs2", name + ".gif")
-        if not os.path.exists(src): continue
+        src = None
+        for d_ in ("gifs3", "phys", "reflex_eval", "preg_eval", "gifs2"):
+            cand = os.path.join(runs, d_, name + ".gif")
+            if os.path.exists(cand): src = cand; break
+        if src is None: continue
         os.makedirs(os.path.join(out, sub), exist_ok=True); put(src, os.path.join(out, sub, name + ".gif"))
         GALLERY.append((sub, name, label, cap))
         s += f'<figure><img loading="lazy" src="{sub}/{name}.gif"><figcaption><b>{html.escape(name)}</b> <span class="tag {label.split()[0]}">{label}</span><br>{html.escape(cap)}</figcaption></figure>\n'
@@ -76,11 +102,12 @@ sj2 = os.path.join(runs, "slide_eval", "summary.json")
 if os.path.exists(sj2):
     d2 = json.load(open(sj2)); rows = "".join(f"<tr><td>{html.escape(k)}</td><td>{v['stays_up_5s'] * 100:.0f}%</td><td>{v['mean_time_fraction_up'] * 5:.1f} s</td><td>{v['mean_slide_m']:.2f} m</td></tr>" for k, v in d2.items())
     slide_tab = f"<h3>Standing on a slippery slope (40 held-out slopes 8-25 degrees, friction 0.12-0.4)</h3><table><tr><th>controller</th><th>stays up 5 s</th><th>mean time up</th><th>mean slide</th></tr>{rows}</table><p>A partial result: the evolved controller helps but most slopes still end in a fall.</p>"
-if phys:
-    g = ""; os.makedirs(os.path.join(out, "physics"), exist_ok=True)
-    for f in phys:
-        n = os.path.basename(f); put(f, os.path.join(out, "physics", n)); g += f'<figure><img loading="lazy" src="physics/{n}"><figcaption><b>{n[:-4]}</b> <span class="tag physics">physics, evolved</span></figcaption></figure>\n'
-    body += f"<h2>Physical fall and landing reflex (MuJoCo, CMA-ES on a bone-injury score)</h2>{summary}{slide_tab}<div class=grid>\n{g}</div>\n"
+preg_tab = ""
+sj3 = os.path.join(runs, "preg_eval", "summary.json")
+if os.path.exists(sj3):
+    d3 = json.load(open(sj3)); rows = "".join(f"<tr><td>{html.escape(k)}</td><td>{v['cost']:.2f}</td><td>{v['abdomen_risk']:.2f}</td><td>{v['head_risk']:.2f}</td><td>{v['torso_risk']:.2f}</td><td>{v['arms_risk']:.2f}</td><td>{v['legs_risk']:.2f}</td></tr>" for k, v in d3.items())
+    preg_tab = f"<h3>The same falls for a heavily pregnant body (120 held-out shoves and drops, the belly weighs most in the score)</h3><table><tr><th>controller</th><th>injury cost</th><th>belly</th><th>head</th><th>torso</th><th>arms</th><th>legs</th></tr>{rows}</table>"
+body += f"<h2>Numbers for the physical controllers</h2>{summary}{preg_tab}{slide_tab}"
 page = f"""<!doctype html><meta charset=utf-8><title>Procedural motion showcase</title><meta name=viewport content="width=device-width,initial-scale=1">
 <style>body{{font:15px system-ui,sans-serif;margin:0 auto;max-width:1500px;padding:16px;background:#f6f6f2;color:#222}}h1{{margin:.2em 0}}h2{{margin-top:1.6em;border-bottom:1px solid #bbb}}
 .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px}}figure{{margin:0;background:#fff;border:1px solid #ddd;padding:6px;border-radius:6px}}img{{width:100%;display:block}}

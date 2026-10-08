@@ -9,9 +9,9 @@ from __future__ import annotations
 import math
 import numpy as np
 
-REGIONS = ("head", "torso", "arms", "legs")
-TOL = dict(head=5.0, torso=8.0, arms=4.0, legs=10.0)      # peak force (mg) for ~63% fracture risk under slow loading (skull 4-6 kN, ribs, wrist 2.5-3.5 kN, femur and tibia 5-10 kN)
-WEIGHT = dict(head=3.0, torso=1.5, arms=1.0, legs=1.0)    # how bad it is to injure the region
+REGIONS = ("head", "torso", "arms", "legs", "abdomen")
+TOL = dict(head=5.0, torso=8.0, arms=4.0, legs=10.0, abdomen=3.0)      # peak force (mg) for ~63% fracture risk under slow loading (skull 4-6 kN, ribs, wrist 2.5-3.5 kN, femur and tibia 5-10 kN)
+WEIGHT = dict(head=3.0, torso=1.5, arms=1.0, legs=1.0, abdomen=1.5)    # how bad it is to injure the region
 RATE0 = 500.0                                              # loading rate (mg/s) that doubles the brittleness
 RATE_CAP = 3.0
 
@@ -25,16 +25,16 @@ def loading_rate(series, dt, win=0.02):
     if len(s) <= n: return float(s.max() / max(len(s) * dt, 1e-6)) if len(s) else 0.0
     return float(np.max((s[n:] - s[:-n]) / (n * dt)))
 
-def score(series_by_region, dt):
+def score(series_by_region, dt, weights=None):
     """series: {region: forces in mg per step}. Returns (cost, parts). Cost ~ weighted fracture risk + a small pain term."""
-    parts = {}; cost = 0.0
+    parts = {}; cost = 0.0; WT = dict(WEIGHT); WT.update(weights or {})
     for r in REGIONS:
         s = np.asarray(series_by_region.get(r, []), float)
         if len(s) == 0: parts[r] = dict(peak=0.0, rate=0.0, risk=0.0); continue
         pk = float(s.max()); rt = loading_rate(s, dt); rk = risk(pk, rt, r)
         pain = float(np.sum(np.maximum(s - 1.0, 0.0)) * dt)            # impulse above body weight, mg*s
         parts[r] = dict(peak=pk, rate=rt, risk=rk, pain=pain)
-        cost += WEIGHT[r] * rk + 0.05 * WEIGHT[r] * pain
+        cost += WT[r] * rk + 0.05 * WT[r] * pain
     return cost, parts
 
 def stroke_force(v, stroke, mass, g=9.81):

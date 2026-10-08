@@ -83,11 +83,6 @@ def _run_jump(c, tr, x0, v, trigger_x, target, T, title, name, cam):
     return Shot(name, title, tr, [a], T, cam)
 
 @shot
-def jump_gap():
-    tr = Terrain(); tr.add_pit(2.9, 4.1, -3, 3, 1.2)
-    return _run_jump(human(), tr, -2.0, 4.0, 2.0, (5.0, 0.0), 5.0, "jump over a 1.2 m gap from a 4 m/s run-up: the take-off speed is limited by the legs, a standing jump this long is refused", "jump_gap", dict(dist=6.5, elevation=-6, follow=0))
-
-@shot
 def jump_wall():
     tr = Terrain(); tr.add_box(2.7, 3.1, -3, 3, 0.6)
     return _run_jump(human(), tr, 2.0, 0.0, 2.0, (3.8, 0.0), 3.5, "standing jump over a 60 cm wall (the apex and the distance are limited by the take-off speed the legs can give)", "jump_wall", dict(dist=5.5, elevation=-6))
@@ -307,7 +302,7 @@ def build(name):
     return SHOTS[name]()
 
 if __name__ == "__main__":
-    sys.modules["catalog"] = sys.modules["__main__"]; import catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves
+    sys.modules["catalog"] = sys.modules["__main__"]; import catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves, catalog_hang, catalog_attacks
     cmd = sys.argv[1]
     if cmd == "list":
         print("\n".join(SHOTS))

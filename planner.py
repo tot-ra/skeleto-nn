@@ -98,7 +98,7 @@ class Walker:
         self.extra_vel = np.zeros(2)               # impulse-driven COM velocity offset (push)
         self.trunk_wobble = np.zeros(3); self.wob_v = np.zeros(3)
         self.nwb = c.params.get("nwb"); self.aids = None; self.leg_gait = c.params.get("leg_gait", {}); self.leg_duty = {}
-        self.leg_ovr = None; self.jumpplan = None; self.refused_jump = False; self.hit_flash = 0.0; self.auto_duck = True
+        self.stamina = 1.0; self.leg_ovr = None; self.leg_ovrs = []; self.head_goal = None; self.jumpplan = None; self.refused_jump = False; self.hit_flash = 0.0; self.auto_duck = True
         self.tail_state = np.zeros((max(1, len(c.tail)), 2)); self.tail_v = np.zeros_like(self.tail_state)
         self.arm_phase = 0.0
         self.foot_yaw_out = math.radians(6.0) if c.kind == "biped" else 0.0
@@ -165,7 +165,7 @@ class Walker:
             off = np.array([0.0, 0.5])
             if self.kind == "bird":
                 duty = max(duty, 0.55) if Fr < 0.8 else duty
-        lam *= self.c.params.get("stride_scale", 1.0)
+        lam *= self.c.params.get("stride_scale", 1.0) * (1.0 - 0.32 * min(1.0, abs(self.yaw_rate) / 1.0))          # shorter, quicker steps in a turn: the planted feet stay within reach
         f = speed / max(lam, 1e-3)
         return f, float(np.clip(duty, 0.2, 0.8)), off
 
@@ -190,10 +190,14 @@ class Walker:
                 dz = h - cur_z
                 reach_ok = hip_xyz[2] - h
                 if reach_ok < 0.2 * self.reach: continue
-                c = np.dot(off, off) * 4.0 + 30.0 * edge + 3.0 * max(0.0, abs(dz) - 0.55 * self.reach)
+                c = np.dot(off, off) * 4.0 + 30.0 * self.c.params.get("foot_care", 1.0) * edge + 3.0 * max(0.0, abs(dz) - 0.55 * self.reach)
                 if c < bc: bc, best = c, np.array([p[0], p[1], h])
-        if best is None:
-            best = np.array([nominal_xy[0], nominal_xy[1], float(tr.h(nominal_xy[0], nominal_xy[1]))])
+        if best is None:                       # every candidate is over a pit: plant at the nearest edge behind it, never in the pit
+            q = np.array(nominal_xy, float)
+            for _ in range(80):
+                if not tr.is_pit(q[0], q[1]): break
+                q = q - np.array([cy, sy]) * 0.05
+            best = np.array([q[0], q[1], float(tr.h(q[0], q[1]))])
         return best
 
     # ---- main step --------------------------------------------------------------------------
@@ -206,13 +210,19 @@ class Walker:
         cmd = _hit.modify_cmd(self, cmd, dt)
         if self.aids is not None: cmd = self.aids.apply(self, cmd, dt)
         vdes = np.asarray(cmd.v, float) if self.jumpplan is None else np.zeros(2)
+        # energy: the reserve drains with effort (squared speed over the sprint speed) and refills at rest; low reserve slows the body down
+        vsp = c.params.get("v_sprint", 6.2); en = c.params.get("energy", 1.0)
+        eff = (self.speed / vsp) ** 2 + (0.0 if self.jumpplan is None else 0.6)
+        self.stamina = float(np.clip(self.stamina + (-eff / (40.0 * en) + (0.012 * en if eff < 0.01 else 0.0)) * dt, 0.0, 1.0))
         vcap = c.params.get("v_max")
         if vcap and np.linalg.norm(vdes) > vcap: vdes = vdes / np.linalg.norm(vdes) * vcap       # clothing sets how fast this body can move
+        if self.stamina < 0.3: vdes = vdes * (0.45 + 0.55 * self.stamina / 0.3)             # tired
         sp_des = float(np.linalg.norm(vdes))
         # --- body velocity and heading
-        acc = (3.0 * math.sqrt(self.reach) + 1.0) * c.params.get("acc_scale", 1.0)
+        acc = (3.0 * math.sqrt(self.reach) + 1.0) * c.params.get("acc_scale", 1.0) * getattr(self, "acc_boost", 1.0)
         dv = vdes + self.extra_vel * 0 - self.v
         nv = np.linalg.norm(dv)
+        if float(dv @ self.v) < 0: acc = acc * getattr(self, "brake_gain", 1.0)        # braking is stronger than speeding up: the foot is planted against the motion
         if nv > acc * dt: dv = dv / nv * acc * dt
         self.v = self.v + dv
         self.speed = float(np.linalg.norm(self.v))
@@ -225,7 +235,11 @@ class Walker:
         dh = wrap(hd - self.heading)
         max_rate = 2.8 if self.kind != "quadruped" else 2.0
         # turning is limited when moving fast (curvature limit)
-        max_rate = max_rate / (1.0 + 0.35 * self.speed)
+        if self.kind == "quadruped" and "turn_rate" in c.params:             # a big body turns in a wide curve: yaw rate <= v / radius(v)
+            r_min = c.params["min_radius"] * (0.4 + 0.12 * min(self.speed, 8.0))
+            max_rate = min(c.params["turn_rate"], max(0.25, self.speed / max(r_min, 0.2)) if self.speed > 1.0 else c.params["turn_rate"])
+            if self.speed > 1.0: max_rate = min(max_rate, 0.55 * G / self.speed)             # lateral acceleration below about half a g
+        else: max_rate = max_rate / (1.0 + 0.35 * self.speed)
         new_rate = float(np.clip(dh * 5.0, -max_rate, max_rate))
         self.yaw_rate += (new_rate - self.yaw_rate) * min(1.0, 8 * dt)
         self.heading = wrap(self.heading + self.yaw_rate * dt)
@@ -255,10 +269,14 @@ class Walker:
         hips = self._hip_world_xy()
         in_flight = self.jumpplan is not None and self.jumpplan["stage"] == "flight"
         self.freeze_feet = cmd.pelvis is not None
+        ovr_names = {o["name"] for o in self.leg_ovrs if o.get("name") and self.t < o["until"]}
         for ls in self.legs:
             ls.td_event = ls.lo_event = False
             if self.nwb is not None and ls.leg.name == self.nwb:          # a leg that carries no weight (held up, on crutches, or missing)
                 ls.stance = False; ls.u = 0.5; continue
+            if ovr_names:                                              # a limb is busy with a blow: that leg stays free, the others keep carrying the body
+                if ls.leg.name in ovr_names: ls.stance = False; ls.u = 0.5; continue
+                if ls.stance: continue
             sd = ls.leg.side; duty_i = float(np.clip(duty * self.leg_gait.get(ls.leg.name, self.leg_gait.get(sd, {})).get("duty", 1.0) * self.leg_duty.get(sd, 1.0), 0.15, 0.9))
             if in_flight:
                 if not ls.stance:
@@ -266,6 +284,7 @@ class Walker:
                     if ls.swing_t >= ls.swing_T: self._touchdown(ls)
             elif self.mode == "go":
                 should_stance = ls.p < duty_i
+                if ls.stance and float(np.linalg.norm(ls.planted[:2] - hips[ls.idx])) > 0.74 * ls.pl.reach: should_stance = False; ls.p = max(ls.p, duty_i + 1e-3)      # a foot that the body has left behind must lift now (and its phase moves on to the swing)
                 if ls.stance and not should_stance:
                     self._liftoff(ls, hips, f, duty_i, left, fwd)
                 elif (not ls.stance) and should_stance:
@@ -444,13 +463,20 @@ class Walker:
                 hang = 0.55 if self.kind == "quadruped" else 0.80
                 pt = np.array([hip[0] + f_[0] * (0.05 if self.kind == "quadruped" else 0.10), hip[1] + f_[1] * 0.05, hip[2] - hang * ls.pl.reach])
                 Rf = self._foot_flat_R(self.heading, np.array([0, 0, 1.0])); out[ls.idx] = (pt - Rf @ mid, Rf); continue
-            ov = self.leg_ovr
-            if ov is not None and ov["side"] == ls.leg.side and self.t < ov["until"]:       # a deliberate leg movement (lifting the knee to block)
+            ov = None
+            if self.leg_ovr is not None and self.leg_ovr["side"] == ls.leg.side and self.t < self.leg_ovr["until"] and self.kind == "biped": ov = self.leg_ovr
+            for o in self.leg_ovrs:
+                if self.t < o["until"] and (o.get("name") == ls.leg.name or (o.get("name") is None and o.get("side") == ls.leg.side)): ov = o
+            if ov is not None:                                                                  # a deliberate leg movement: a knee lifted to block, a kick, a paw swiped, a hoof thrown back
+                pt = np.asarray(ov["fn"](self.t) if "fn" in ov else ov["point"], float)
+                if self.S is not None:                                                         # never beyond what the leg can reach: the foot stops short of a far target
+                    hip = self.S[ls.leg.chain[0]]; dv = pt - hip; dl = float(np.linalg.norm(dv)); lim = 0.97 * ls.pl.reach
+                    if dl > lim: pt = hip + dv / dl * lim
                 if ls.stance:
                     ls.stance = False; ls.lift = ls.planted.copy(); ls.lift_yaw = ls.yaw
-                ls.target = ov["point"].copy(); ls.target_yaw = self.heading; ls.apex = float(ov["point"][2]); ls.swing_t = 0.0; ls.swing_T = 1.0
+                ls.target = pt.copy(); ls.target_yaw = self.heading; ls.apex = float(pt[2]); ls.swing_t = 0.0; ls.swing_T = 1.0
                 Rf = self._foot_flat_R(self.heading, np.array([0, 0, 1.0]))
-                out[ls.idx] = (ov["point"] - Rf @ mid, Rf); continue
+                out[ls.idx] = (pt - Rf @ mid, Rf); continue
             if ls.stance:
                 out[ls.idx] = self._stance_foot(ls)
             elif self.jumpplan is not None and self.jumpplan["stage"] == "flight":
@@ -528,7 +554,7 @@ class Walker:
         sway_w = (wL / nL - wR / nR)
         self.sway = getattr(self, "sway", 0.0); self.sway += (sway_w - self.sway) * min(1.0, 7 * dt)
         turn_roll = float(np.clip(self.yaw_rate * speed / G, -0.35, 0.35))
-        roll_t = -0.9 * turn_roll + (0.02 * self.sway if self.kind == "biped" else 0.0) + self.inj_roll
+        roll_t = (-0.9 if self.kind != "quadruped" else -0.25) * turn_roll + (0.02 * self.sway if self.kind == "biped" else 0.0) + self.inj_roll + self.c.params.get("waddle", 0.0) * self.sway * 2.0
         self.pitch += (pitch_t - self.pitch) * min(1.0, 6 * dt)
         self.roll += (roll_t - self.roll) * min(1.0, 8 * dt)
         # gait-coupled pelvis yaw: rotate towards the leg that is going forward
@@ -566,6 +592,8 @@ class Walker:
                 if dd < rr:
                     zc = a[2] - h0[2] + math.sqrt(max(rr * rr - dd * dd, 0.0))
                     z_cap = min(z_cap, zc)
+                elif dd < 1.5 * rr:
+                    pass                                  # a foot the body has outrun: the leg stretches (the foot slips) instead of folding the body to the ground
                 else:
                     z_cap = min(z_cap, a[2] - h0[2] + 0.2 * rr)
         ground = float(np.mean([ls.planted[2] for ls in self.legs if ls.stance])) if stance_legs else float(np.mean([ls.planted[2] for ls in self.legs]))
@@ -576,6 +604,7 @@ class Walker:
         if stance_legs and self.mode == "go":
             uu = float(np.mean([ls.u for ls in stance_legs]))
             comp = (0.025 + 0.06 * min(2.0, self.Fr)) * self.reach * math.sin(math.pi * uu) * (1.0 if self.duty < 0.55 else 0.3)
+        if self.kind == "quadruped" and self.mode == "go" and z_cap < 1e8: z_cap = max(z_cap, ground + 0.80 * nominal)         # a running quadruped does not fold to the ground when a planted foot is left far behind: the leg stretches
         z_des = ground + nominal - comp - self.inj_dip
         bn = self.c.params.get("bounce", 0.0)
         if bn and self.mode == "go": z_des += bn * self.reach * abs(math.sin(2 * math.pi * self.phase)) * min(1.0, self.speed / 1.0)        # an energetic body springs
@@ -598,7 +627,7 @@ class Walker:
             self.vz = (z - self.z) / dt
         if cmd.pelvis is not None and "z" in cmd.pelvis:
             z = float(cmd.pelvis["z"]); self.z_f = z
-        self.z = z
+        self.z = z; self._dbg = dict(z_cap=z_cap, z_des=z_des, ground=ground, nominal=nominal, comp=comp, flight=bool(not stance_legs), n_stance=len(stance_legs))
         root = np.array([root_xy[0], root_xy[1], z])
         # --- whole-body centre of mass lean ---
         S, E, R = sk.fk(root, R_p, q)
@@ -760,7 +789,7 @@ class Walker:
         k = 0.30 if self.kind == "quadruped" else 0.45
         apex_min = max(mx + k * self.reach + 0.08 + (clear or 0.0), z_to + 0.12, zl + 0.12)
         D = float(np.linalg.norm(tgt - p0))
-        gain = self.c.params.get("jump_gain", 1.0)
+        gain = self.c.params.get("jump_gain", 1.0) * (0.65 + 0.35 * min(1.0, self.stamina / 0.5))        # tired legs jump less
         cap = gain * math.sqrt(G * self.reach); vtot = 1.5 * cap
         run = 0.9 * (float(np.linalg.norm(self.v)) if run_speed is None else float(run_speed))
         best = None
@@ -864,7 +893,14 @@ class Walker:
                 pitch_comp = -0.3 * self.pitch
             for k in nk: q[k, 1] = pitch_comp * 0.5 / len(nk) * 1.0
             q[hd, 1] = pitch_comp * 0.5 - 1.2 * self.trunk_wobble[1] * (1 if self.kind == 'biped' else 0.3)
-            if self.kind == "quadruped":
+            if self.kind == "quadruped" and self.head_goal is not None and self.S is not None:      # the head reaches for a point (a bite)
+                base = self.S[nk[0]]; d = np.asarray(self.head_goal, float) - base
+                cy, sy_ = math.cos(self.heading), math.sin(self.heading); dx = d[0] * cy + d[1] * sy_; dy = -d[0] * sy_ + d[1] * cy
+                elev = math.atan2(d[2], max(math.hypot(dx, dy), 1e-3)); yaw = math.atan2(dy, max(dx, 0.05))
+                tgt_y = float(np.clip(0.9 - elev - self.pitch, -0.9, 1.5)); tgt_z = float(np.clip(yaw, -0.9, 0.9))
+                for k in nk: q[k, 1] = tgt_y / (len(nk) + 1); q[k, 2] = tgt_z / (len(nk) + 1)
+                q[hd, 1] = tgt_y / (len(nk) + 1); q[hd, 2] = tgt_z / (len(nk) + 1)
+            elif self.kind == "quadruped":
                 nod = c.params.get("neck_nod", 0.06); drop = c.params.get("neck_speed_drop", 0.1)
                 go = self.mode == "go"
                 stretch = drop * smooth(self.Fr / 3.0) if go else 0.0

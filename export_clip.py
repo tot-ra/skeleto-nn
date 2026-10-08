@@ -5,8 +5,8 @@ import sys, json
 import numpy as np
 import bodies, catalog, shots
 sys.modules["catalog"] = catalog
-import catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves
-for mod in (catalog, catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves):
+import catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves, catalog_hang
+for mod in (catalog, catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves, catalog_hang):
     mod.human = lambda b=None, name="human", rig=None: bodies.human_game_rig()
 name, out = sys.argv[1], sys.argv[2]
 shot = catalog.build(name)

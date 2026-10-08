@@ -55,10 +55,26 @@ Holds are points with a kind (hand, foot, both). Three points of contact stay; t
 
 A leg can be sore (chronic pain makes the stance on it shorter and the trunk lean over it), replaced below the knee by a rigid stick (`HumanBody(peg="L")`: no ankle, a point contact, shorter stance, a swing that goes out and round), or carry no weight (`nwb`, held up). With a leg out of use, `Crutches` plants the tips while the good leg swings and moves them ahead while it is down; the hands are goals on the grips. A dog can have a missing or a stick leg (`quadruped("dog", missing="HL")`, `peg="HL"`).
 
+## 7c. What the body knows about itself (`jumper.py`, `bodies.py`)
+
+* **Muscle, energy, flexibility.** `muscle` scales the take-off power (`jump_gain`), the sprint speed and the acceleration; `energy` is the size of a reserve that drains with effort (squared speed over sprint speed) and refills at rest; at low reserve the body slows and jumps less; `flex` scales every joint range and the stride. Presets are in `PERSONAS`.
+* **A self-model learned by practice.** The agent keeps a probability distribution over its own jump capacity (at a reference run-up speed; how the capacity grows with the speed is known). Practising on flat ground at distances a little beyond what it believes safe, with a failure costing only a stumble, moves the belief to the truth in about a dozen attempts from any prior (a child over-estimates, an old person under-estimates).
+* **Decision.** For a gap of width w and depth h: the lowest run-up speed v with `(1 - P(capacity >= D / g(v))) * pain_fail(h) < detour` where `pain_fail = 1.2 h + 0.15`; if there is none the body is afraid: it slows, stops short of the edge, draws its hands to the chest, steps back and turns away. An over-confident agent decides to jump, runs, and is refused at the take-off by the real mechanics: it skids, flails its arms and its belief is corrected.
+* **Obstacles.** `ObstacleRunner` looks ahead along its lane: a low obstacle is stepped over, a pit is jumped when the self-model allows, a medium wall is hopped, a waist-high one is vaulted (the hands go on top, the body passes close over it), a high one is gone round, a pit that is too wide ends the way. Feet are never planted in a pit: they stop at its edge.
+* **Pregnancy.** `HumanBody(pregnancy=1.0)` adds a belly (mass and a collision sphere), a hollow back, a wider stance, a waddle and slower, shorter steps with more time on both feet and more care in foot placement. The belly gets its own region in the injury model with the highest weight, and a separate fall reflex is evolved for it (the general reflex leaves a belly risk of 0.55, the evolved one 0.07).
+* **Stick input** (`controls.py`): the speed allowed falls with the angle between where the body faces and where the stick points (none beyond about 110 degrees: it must stop and turn first), a turn at speed is limited by friction, braking is stronger than speeding up, and the trunk leans back when braking.
+* **Clothing, limping, aids** (`bodies.py`, `aids.py`): described in the README.
+
+## 7d. Water and air as physics (`water.py`, `swimmer.py`, `air.py`, `flier.py`)
+
+**Water.** Every segment carries buoyancy (the body displaces its own mass at 985 kg/m3), normal and axial drag, and the palm and the sole are flat plates (0.014 and 0.02 m2) that push on the water, so that a stroke is only useful if it moves the plate against the water. The surface is a plane: above it there is air. Oxygen is a reserve that is spent while the mouth is under water (faster the harder the muscles work), refilled when the mouth is in the air; strength falls as the reserve runs low and the swimmer blacks out at zero. The stroke is a rhythmic generator of 36 numbers (frequency; mean, amplitude and phase of shoulders, elbows, wrists, hips, knees, ankles, trunk twist; pitch and steering gains; when to breathe) found by CMA-ES. **Result: the physics is right, the learned stroke is poor** (about 0.5 m/s at the surface with breathing, goals under water not reached): it moves by a small flail and the initial push.
+
+**Air.** Wings are strips of a flat plate with a cambered lift curve (slope 2 pi up to the stall at 17 degrees, then a flat plate), the tail is a plate, the body drags. The bird must be balanced by its geometry (the wing root sits near the centre of mass, the tail provides the restoring moment); the generator adds feedback of tail and wing angle of attack on pitch error and rate and of differential flapping on roll, a burst/glide gate, a leg push for take-off and a flare for landing. **Result: gliding about 3 s from 6 m; landing hits hard; take-off is not learned.** The next steps would be a better aerodynamic model (downwash, unsteady lift) and a staged curriculum.
+
 ## 8. Verification
 
 * `tests/test_skeleton.py`, `tests/test_physics.py`: forward kinematics of the planner equal MuJoCo's for the human, dog and bird.
-* `tests/test_env.py`, `tests/test_reflex.py`: the tracking environment and the reflex run.
+* `tests/test_env.py`, `tests/test_reflex.py`: the tracking environment and the reflex run. `tests/test_injury.py`, `test_jump.py`, `test_hit.py`, `test_combat.py`, `test_climb.py` (the legs never cross), `test_aids.py`, `test_sit_table.py` (no bone enters the tabletop).
 * Every shot in the showcase is rendered by `catalog.py`; `reflex_eval.py` evaluates the reflex on 240 held-out scenarios and compares it with a stiff body and a hand-made pose.
 
 ## 8b. Getting a motion into an engine

@@ -42,7 +42,10 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
         for (bn, t, off, kg, lab) in sk.extra:
             if sk.idx[bn] == i:
                 p = d * t + np.array(off)
-                s += f'{sp}  <geom type="sphere" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" size="0.04" mass="{kg:.3f}" contype="0" conaffinity="0"/>\n'
+                if lab == "belly":                                # a carried belly can touch the ground: it gets a collision sphere, named so that its load is scored
+                    s += f'{sp}  <geom name="g_belly" type="sphere" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" size="{0.09 + 0.012 * kg:.4f}" mass="{kg:.3f}" contype="2" conaffinity="0"/>\n'
+                else:
+                    s += f'{sp}  <geom type="sphere" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" size="0.04" mass="{kg:.3f}" contype="0" conaffinity="0"/>\n'
         # foot contact sites (heel, ball) so we can read their world position
         for leg in creature.legs:
             if leg.chain[-1] == i:
@@ -134,7 +137,7 @@ class PhysChar:
         d.ctrl[self.aid] = qvec
         mujoco.mj_forward(m, d)
 
-    def step(self, target_vec, ext_force=None, ext_torque=None, wrench=None, probe=None):
+    def step(self, target_vec, ext_force=None, ext_torque=None, wrench=None, probe=None, pre=None):
         d = self.data; m = self.model
         d.ctrl[self.aid] = np.clip(target_vec, self.lo * 1.05, self.hi * 1.05)
         d.xfrc_applied[:] = 0
@@ -143,6 +146,7 @@ class PhysChar:
                 d.xfrc_applied[self.bid[0], :] = wrench
             if ext_force is not None:
                 d.xfrc_applied[self.bid[1 if len(self.bid) > 1 else 0], 0:3] = ext_force
+            if pre is not None: pre()
             mujoco.mj_step(m, d)
             if probe is not None: probe()
         if ext_force is not None: d.xfrc_applied[:] = 0

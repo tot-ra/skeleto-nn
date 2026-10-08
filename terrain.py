@@ -51,6 +51,17 @@ class Terrain:
         self.H[sx, sy] = -depth; self.pit[sx, sy] = True
         self.prims.append(("pit", (x0, x1, y0, y1, depth), rgba))
 
+    def add_block(self, x0, x1, y0, y1, top):
+        """An invisible solid (furniture drawn as a prop): the body cannot walk onto it and A* goes round it."""
+        sx, sy = self._sl(x0, x1, y0, y1); self.H[sx, sy] = np.maximum(self.H[sx, sy], top)
+
+    def clear_block(self, x0, x1, y0, y1):
+        sx, sy = self._sl(x0, x1, y0, y1); self.H[sx, sy] = 0.0
+
+    def add_hidden_ceiling(self, x0, x1, y0, y1, z_bottom):
+        """An invisible low ceiling (the underside of a tabletop): headroom is too small to walk in, so A* keeps out."""
+        sx, sy = self._sl(x0, x1, y0, y1); self.C[sx, sy] = np.minimum(self.C[sx, sy], z_bottom)
+
     def add_beam(self, x0, x1, y0, y1, z_bottom, z_top=None, rgba=(0.45, 0.33, 0.22, 1)):
         sx, sy = self._sl(x0, x1, y0, y1)
         self.C[sx, sy] = np.minimum(self.C[sx, sy], z_bottom)
@@ -108,6 +119,8 @@ class Terrain:
             elif kind == "pit":
                 x0, x1, y0, y1, depth = a
                 out.append(f'<geom type="box" pos="{(x0+x1)/2:.4f} {(y0+y1)/2:.4f} {-depth - 0.05:.4f}" size="{(x1-x0)/2:.4f} {(y1-y0)/2:.4f} 0.05" rgba="{c}" contype="1" conaffinity="1"/>')
+                # the floor plane would hide a pit: draw it as a dark slab on the surface (no collision) so that it can be seen
+                out.append(f'<geom type="box" pos="{(x0+x1)/2:.4f} {(y0+y1)/2:.4f} 0.004" size="{(x1-x0)/2:.4f} {(y1-y0)/2:.4f} 0.004" rgba="0.05 0.04 0.04 1" contype="0" conaffinity="0"/>')
         return out
 
     def ground_mjcf(self):

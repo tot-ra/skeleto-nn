@@ -34,6 +34,7 @@ def hit_test(tip, segs, travel=None):
 def travel_of(st):
     """The swing does not stop at the aim point: a chop continues down, a slash continues across, an arrow keeps flying."""
     if st.projectile: return st.bdir * 0.30
+    if st.kind == "thrust": f, l = H._fl(st.atk); return np.append(f, 0.0) * 0.25
     if st.kind == "chop": return np.array([0.0, 0.0, -0.40])
     f, l = H._fl(st.atk); return np.append(l, 0.0) * 0.40
 
@@ -41,7 +42,11 @@ WEAPONS = {
     "stick": dict(len=0.85, speed=1.00, dmg=1.0, r=0.00),
     "axe":   dict(len=0.90, speed=0.72, dmg=1.7, r=0.07),       # slower, heavier head, wider hit
     "bow":   dict(len=0.70, speed=1.00, dmg=1.1, r=0.02, v=30.0),
+    "sword": dict(len=1.00, speed=0.90, dmg=1.5, r=0.03),       # light, fast, cuts (chop or slash)
+    "spear": dict(len=2.00, speed=0.85, dmg=1.4, r=0.03),       # long reach, a straight thrust
+    "fist":  dict(len=0.12, speed=1.30, dmg=0.7, r=0.04),       # short and fast, a straight punch
 }
+THRUST = ("spear", "fist")
 
 class Strike:
     def __init__(self, atk, vic, region, kind, t0, strength, side="R", weapon="stick"):
@@ -60,7 +65,7 @@ class Strike:
         w = self.atk
         if t < self.t_launch or self.aim is None: self.aim = self.aim_point()
         tt = self.t0 + (t - self.t0) * self.scale
-        self.hand, ph, p = SK.strike_hand(w, tt, self.t0, self.aim, self.side, "chop" if self.kind == "chop" else "slash")
+        self.hand, ph, p = SK.strike_hand(w, tt, self.t0, self.aim, self.side, self.kind if self.kind in ("chop", "thrust") else "slash")
         self.bdir = SK.blade_dir(w, self.hand, ph, p, self.aim, self.side)
         self.phase, self.p = ph, p
         return self.hand, ph, p
@@ -172,7 +177,7 @@ def start_reaction(strike, name, t):
         side = strike.region[-1]; ls = next(l for l in v.legs if l.leg.side == side)
         f, l = H._fl(v); hip = v.S[ls.leg.chain[0]]
         tgt = np.array([hip[0] + f[0] * 0.40, hip[1] + f[1] * 0.40, hip[2] - 0.42])
-        v.leg_ovr = dict(side=side, point=tgt, until=v.t + 0.65)
+        v.leg_ovrs.append(dict(name=ls.leg.name, point=tgt, until=v.t + 0.65))
     elif name == "hop_up":
         mx = 0.0; need = (v.z + 0.28) - (mx + 0.62 * v.reach + 0.08)
         v.start_jump(v.pos + 0.05 * away, clearance=need)
@@ -209,6 +214,7 @@ class Arena:
                     region = str(fi.rng.choice(regs, p=wts / wts.sum()))
                     kind = "chop" if (region in ("head", "arm_L", "arm_R") and fi.rng.random() < 0.6) else "slash"
                     if region.startswith("leg"): kind = "slash"
+                    if fi.weapon in THRUST: kind = "thrust"
                     wp = WEAPONS[fi.weapon]
                     if fi.weapon == "bow": st = ArrowStrike(w, o, region, t, float(fi.rng.uniform(*fi.strength)) * wp["dmg"])
                     else: st = Strike(w, o, region, kind, t, float(fi.rng.uniform(*fi.strength)) * wp["dmg"], weapon=fi.weapon)

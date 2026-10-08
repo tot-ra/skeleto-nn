@@ -43,6 +43,15 @@ def strike_hand(w, t, t0, target, side="R", kind="chop"):
     L = arm_reach(w)
     sh = shoulder(w, side)
     guard = sh + fwd * 0.52 * L + left * sgn * 0.12 * L + up * -0.10 * L
+    if kind == "thrust":                      # spear and fist: pull back, then straight at the target
+        wind = sh + fwd * 0.05 * L + left * sgn * 0.12 * L + up * -0.05 * L
+        d = np.asarray(target, float) - sh; dn = np.linalg.norm(d); hit = sh + d / max(dn, 1e-6) * min(dn, 0.97 * L)
+        ph, p = strike_phase(t, t0)
+        if ph == "guard": return guard, ph, 0.0
+        if ph == "windup": return guard + (wind - guard) * minjerk(p), ph, 0.0
+        if ph == "strike": return wind + (hit - wind) * p ** 0.7, ph, p
+        if ph == "hold": return hit, ph, 1.0
+        return hit + (guard - hit) * minjerk(p), ph, 1.0
     if kind == "chop":
         wind = sh + fwd * 0.05 * L + left * sgn * 0.40 * L + up * 0.85 * L
     else:   # horizontal slash from the right side

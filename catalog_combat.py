@@ -14,6 +14,9 @@ BOW_GEOM = '<geom type="capsule" fromto="0.0 0 -0.45 0.05 0 0.0" size="0.012" rg
 ARROW_GEOM = '<geom type="capsule" fromto="0 0 -0.35 0 0 0.35" size="0.006" rgba="0.7 0.6 0.4 1"/><geom type="capsule" fromto="0 0 0.33 0 0 0.40" size="0.012" rgba="0.6 0.62 0.65 1"/>'
 SHIELD_GEOM = '<geom type="cylinder" size="0.30 0.02" rgba="0.55 0.18 0.15 1"/><geom type="sphere" size="0.045" pos="0 0 0.03" rgba="0.8 0.8 0.8 1"/>'
 STICK_GEOM = '<geom type="capsule" fromto="0 0 -0.12 0 0 0.85" size="0.02" rgba="0.55 0.38 0.20 1"/>'
+SWORD_GEOM = '<geom type="capsule" fromto="0 0 -0.10 0 0 0.00" size="0.02" rgba="0.3 0.2 0.1 1"/><geom type="box" size="0.07 0.012 0.012" pos="0 0 0.0" rgba="0.6 0.6 0.6 1"/><geom type="box" size="0.01 0.025 0.45" pos="0 0 0.46" rgba="0.75 0.77 0.8 1"/>'
+SPEAR_GEOM = '<geom type="capsule" fromto="0 0 -0.55 0 0 1.35" size="0.016" rgba="0.5 0.36 0.2 1"/><geom type="capsule" fromto="0 0 1.35 0 0 1.55" size="0.022" rgba="0.75 0.77 0.8 1"/>'
+FIST_GEOM = '<geom type="sphere" size="0.05" rgba="0.85 0.6 0.5 1"/>'
 FLOOR_ANGLE = {"front": 0.0, "side": math.pi / 2, "behind": math.pi, "side_r": -math.pi / 2}
 
 def _arena(ctx):
@@ -36,7 +39,7 @@ def _build(lanes, T, name, title, cam, dx=0.0, size=(600, 320), spacing=3.8, see
         if "walk" in ln: fv.walk = (ln["walk"][0], np.array(ln["walk"][1], float))
         fa = CB.Fighter(ai, vi, rng, attacks=True, react=False, regions={ln["region"]: 1}, strength=(ln.get("strength", 1.2),) * 2, cooldown=(99, 99), first=ln.get("t", 1.0), dist=ln.get("range", 1.25), weapon=ln.get("weapon", "stick"))
         if ln.get("kind"): fa.kind = ln["kind"]
-        fighters += [fv, fa]; wg = {"stick": STICK_GEOM, "axe": AXE_GEOM, "bow": BOW_GEOM}[ln.get("weapon", "stick")]; weapon_props += [dict(geom=STICK_GEOM), dict(geom=wg)]
+        fighters += [fv, fa]; wg = {"stick": STICK_GEOM, "axe": AXE_GEOM, "bow": BOW_GEOM, "sword": SWORD_GEOM, "spear": SPEAR_GEOM, "fist": FIST_GEOM}[ln.get("weapon", "stick")]; weapon_props += [dict(geom=STICK_GEOM), dict(geom=wg)]
         for a_, f_ in ((acts[vi], fv), (acts[ai], fa)): pass
     arena = CB.Arena(fighters)
     def mk(i):
