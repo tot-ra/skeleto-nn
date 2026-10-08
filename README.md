@@ -4,13 +4,7 @@ Procedural character motion for **any skeleton**: people, dogs, cats, horses, bi
 
 ![walk and run](showcase/sim/walk_run.gif)
 
-**Showcase (about 60 GIFs): open [`showcase/index.html`](showcase/index.html).**
-
-| | |
-|---|---|
-| ![stairs](showcase/sim/stairs_up_down.gif) | ![forest](showcase/sim/run_forest.gif) |
-| ![cat jump](showcase/sim/quad_jump_species.gif) | ![climb](showcase/sim/climb_rock.gif) |
-| ![dodge](showcase/sim/dodge_reactions.gif) | ![weapons](showcase/sim/weapon_reactions.gif) |
+**The whole showcase (about 60 GIFs) is further down this page, grouped by topic; the same page as HTML is [`showcase/index.html`](showcase/index.html).**
 
 ## What is in it
 
@@ -55,6 +49,68 @@ The evolved reflex nearly removes head and torso injury (risk 0.46 and 0.67 for 
 | evolved controller | 20% | 1.8 s | 0.25 m |
 
 A partial result: the evolved controller helps, most slopes still end in a fall.
+
+
+## Showcase
+
+Every GIF below is produced by `python catalog.py gif <name> out.gif`. The label says how the motion is made: **emergent** (general rules from the body and terrain), **goal script** (goals for pelvis, hands and feet + IK), **kinematic model** (hand-built), **physics, evolved**. The same page as HTML: [`showcase/index.html`](showcase/index.html).
+
+### Walking, running and terrain (one planner, gait from the Froude number)
+
+<table>
+<tr><td width="50%" valign="top"><img src="showcase/sim/walk_run.gif" width="100%"><br><b>walk_run</b> <i>(emergent)</i><br>stand, walk, fast walk, run, back to walk, stop</td><td width="50%" valign="top"><img src="showcase/sim/stairs_up_down.gif" width="100%"><br><b>stairs_up_down</b> <i>(emergent)</i><br>stairs are just terrain: footholds searched, swing height from the terrain</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/slope_up_down.gif" width="100%"><br><b>slope_up_down</b> <i>(emergent)</i><br>slopes: trunk pitch and foot rotation follow the ground normal</td><td width="50%" valign="top"><img src="showcase/sim/step_over_log.gif" width="100%"><br><b>step_over_log</b> <i>(emergent)</i><br>step over a log</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/duck_under_beam.gif" width="100%"><br><b>duck_under_beam</b> <i>(emergent)</i><br>auto-duck below a ceiling</td><td width="50%" valign="top"><img src="showcase/sim/around_obstacles.gif" width="100%"><br><b>around_obstacles</b> <i>(emergent)</i><br>A* navigation around walls</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/bodies_walk.gif" width="100%"><br><b>bodies_walk</b> <i>(emergent)</i><br>different bodies (tall, dwarf, belly, armour, pack, skirt) pick their own posture</td><td width="50%" valign="top"><img src="showcase/sim/crowd.gif" width="100%"><br><b>crowd</b> <i>(emergent)</i><br>14 people cross a plaza</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/run_forest.gif" width="100%"><br><b>run_forest</b> <i>(emergent)</i><br>run through a forest: A* around trunks, duck under low branches</td><td width="50%" valign="top"><img src="showcase/sim/run_crowd.gif" width="100%"><br><b>run_crowd</b> <i>(emergent)</i><br>run through a crowd: speed follows the gap, shoulders turn</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/outfits_walk.gif" width="100%"><br><b>outfits_walk</b> <i>(emergent)</i><br>tight skirt, wide skirt, trousers, heavy boots, high heels, chainmail, plate: limits, mass, foot shape</td><td width="50%" valign="top"><img src="showcase/sim/limp_people.gif" width="100%"><br><b>limp_people</b> <i>(emergent)</i><br>sore leg, rigid stick for a lower leg, crutches with one leg held up</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/limp_dogs.gif" width="100%"><br><b>limp_dogs</b> <i>(emergent)</i><br>dog with a sore leg, on three legs, with a stick for the lower hind leg</td><td width="50%" valign="top"><img src="showcase/sim/climb_rock.gif" width="100%"><br><b>climb_rock</b> <i>(emergent)</i><br>rock face: only the coloured holds can be used</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/climb_tree.gif" width="100%"><br><b>climb_tree</b> <i>(emergent)</i><br>tree: branch stubs are the only holds</td><td></td></tr>
+</table>
+
+### Jumping (power-limited: the planner refuses a jump the legs cannot make)
+
+<table>
+<tr><td width="50%" valign="top"><img src="showcase/sim/jump_gap.gif" width="100%"><br><b>jump_gap</b> <i>(emergent)</i><br>1.2 m gap from a run-up</td><td width="50%" valign="top"><img src="showcase/sim/jump_wall.gif" width="100%"><br><b>jump_wall</b> <i>(emergent)</i><br>standing jump over a 60 cm wall</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/cat_jump_up.gif" width="100%"><br><b>cat_jump_up</b> <i>(emergent)</i><br>cat: 8 spine joints coil, stretch, tuck, land</td><td width="50%" valign="top"><img src="showcase/sim/horse_jump_fence.gif" width="100%"><br><b>horse_jump_fence</b> <i>(emergent)</i><br>horse: stiff column, small trunk rotation</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/quad_jump_species.gif" width="100%"><br><b>quad_jump_species</b> <i>(emergent)</i><br>same relative obstacle: cat, dog, wolf, pig</td><td></td></tr>
+</table>
+
+### Animals: spine, neck, tail and feet differ by species
+
+<table>
+<tr><td width="50%" valign="top"><img src="showcase/sim/animals_trot.gif" width="100%"><br><b>animals_trot</b> <i>(emergent)</i><br>dog, cat, horse, wolf, pig trot</td><td width="50%" valign="top"><img src="showcase/sim/quadruped_speeds.gif" width="100%"><br><b>quadruped_speeds</b> <i>(emergent)</i><br>walk to gallop by Froude number</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/horse_load.gif" width="100%"><br><b>horse_load</b> <i>(emergent)</i><br>horse with 0, 90, 180 kg</td><td width="50%" valign="top"><img src="showcase/sim/quad_species_tails.gif" width="100%"><br><b>quad_species_tails</b> <i>(emergent)</i><br>balance tail, wag, low tail, curl</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/horse_gait_tail.gif" width="100%"><br><b>horse_gait_tail</b> <i>(emergent)</i><br>5-joint neck nod, hair tail flags and flicks</td><td width="50%" valign="top"><img src="showcase/sim/animals_stairs_log.gif" width="100%"><br><b>animals_stairs_log</b> <i>(emergent)</i><br>stairs and a log, four legs</td></tr>
+</table>
+
+### Birds and snake
+
+<table>
+<tr><td width="50%" valign="top"><img src="showcase/sim/birds_walk.gif" width="100%"><br><b>birds_walk</b> <i>(emergent)</i><br>bird gaits</td><td width="50%" valign="top"><img src="showcase/sim/bird_flight.gif" width="100%"><br><b>bird_flight</b> <i>(kinematic model)</i><br>flapping flight model (beat rate from mass)</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/bird_land_ground.gif" width="100%"><br><b>bird_land_ground</b> <i>(kinematic model)</i><br>landing on the ground: flare, feet first, run out</td><td width="50%" valign="top"><img src="showcase/sim/bird_land_branch.gif" width="100%"><br><b>bird_land_branch</b> <i>(kinematic model)</i><br>landing on a branch: near-stall, toes grip</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/bird_land_water.gif" width="100%"><br><b>bird_land_water</b> <i>(kinematic model)</i><br>landing on water: skid and float</td><td width="50%" valign="top"><img src="showcase/sim/snake_around.gif" width="100%"><br><b>snake_around</b> <i>(kinematic model)</i><br>serpentine motion between walls</td></tr>
+</table>
+
+### Everyday situations (goals for pelvis, hands and feet + IK)
+
+<table>
+<tr><td width="50%" valign="top"><img src="showcase/sim/door_open.gif" width="100%"><br><b>door_open</b> <i>(goal script)</i><br>open a door</td><td width="50%" valign="top"><img src="showcase/sim/sit_stand.gif" width="100%"><br><b>sit_stand</b> <i>(goal script)</i><br>sit on a chair and stand</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/sit_table.gif" width="100%"><br><b>sit_table</b> <i>(goal script)</i><br>sit at a table</td><td width="50%" valign="top"><img src="showcase/sim/bed_lie_rise.gif" width="100%"><br><b>bed_lie_rise</b> <i>(goal script)</i><br>lie down in a bed, get up</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/get_up_floor.gif" width="100%"><br><b>get_up_floor</b> <i>(goal script)</i><br>get up from the floor</td><td width="50%" valign="top"><img src="showcase/sim/ladder_climb.gif" width="100%"><br><b>ladder_climb</b> <i>(goal script)</i><br>ladder</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/rider.gif" width="100%"><br><b>rider</b> <i>(goal script)</i><br>ride a horse</td><td width="50%" valign="top"><img src="showcase/sim/swim_freestyle.gif" width="100%"><br><b>swim_freestyle</b> <i>(kinematic model)</i><br>swim, head above water</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/dive_swim.gif" width="100%"><br><b>dive_swim</b> <i>(kinematic model)</i><br>dive</td><td width="50%" valign="top"><img src="showcase/sim/crowd_squeeze.gif" width="100%"><br><b>crowd_squeeze</b> <i>(emergent)</i><br>squeeze through people: shoulders turn, hands go up</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/bump_head.gif" width="100%"><br><b>bump_head</b> <i>(emergent)</i><br>hit the head on a beam</td><td></td></tr>
+</table>
+
+### Combat as a set of reactions (no scripted duel)
+
+<table>
+<tr><td width="50%" valign="top"><img src="showcase/sim/run_into_wall.gif" width="100%"><br><b>run_into_wall</b> <i>(emergent)</i><br>run into a wall: seen early, late, not at all (arms and knees lengthen the stop)</td><td width="50%" valign="top"><img src="showcase/sim/weapon_reactions.gif" width="100%"><br><b>weapon_reactions</b> <i>(emergent)</i><br>axe vs shield, axe on a bare head, arrows dodged, caught by a shield, taken; shin block</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/hit_reactions_c.gif" width="100%"><br><b>hit_reactions_c</b> <i>(physics, evolved)</i><br>groin (man vs woman) and knee</td><td width="50%" valign="top"><img src="showcase/sim/hit_reactions_a.gif" width="100%"><br><b>hit_reactions_a</b> <i>(emergent)</i><br>hit on head, torso, arm: stagger, doubled over, drop the weapon, clutch</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/hit_reactions_b.gif" width="100%"><br><b>hit_reactions_b</b> <i>(physics, evolved)</i><br>leg: limp; hard head blow: physical fall, lie, get up; blow in the back</td><td width="50%" valign="top"><img src="showcase/sim/dodge_reactions.gif" width="100%"><br><b>dodge_reactions</b> <i>(emergent)</i><br>notice in time: side step, duck, hop, block; too late: hit</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/sim/duel.gif" width="100%"><br><b>duel</b> <i>(emergent)</i><br>two fighters choose targets and reactions on their own</td><td width="50%" valign="top"><img src="showcase/sim/push_recovery.gif" width="100%"><br><b>push_recovery</b> <i>(emergent)</i><br>shoved: recovery steps</td></tr>
+</table>
 
 
 ## Run it

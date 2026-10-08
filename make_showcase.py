@@ -35,6 +35,7 @@ SECTIONS = [
   ("run_into_wall", EMERGENT, "run into a wall: seen early, late, not at all (arms and knees lengthen the stop)"), ("weapon_reactions", EMERGENT, "axe vs shield, axe on a bare head, arrows dodged, caught by a shield, taken; shin block"), ("hit_reactions_c", PHYS, "groin (man vs woman) and knee"), ("hit_reactions_a", EMERGENT, "hit on head, torso, arm: stagger, doubled over, drop the weapon, clutch"), ("hit_reactions_b", PHYS, "leg: limp; hard head blow: physical fall, lie, get up; blow in the back"),
   ("dodge_reactions", EMERGENT, "notice in time: side step, duck, hop, block; too late: hit"), ("duel", EMERGENT, "two fighters choose targets and reactions on their own"), ("push_recovery", EMERGENT, "shoved: recovery steps")]),
 ]
+GALLERY = []
 def items_html(rows, sub):
     s = ""
     for name, label, cap in rows:
@@ -42,11 +43,19 @@ def items_html(rows, sub):
         if not os.path.exists(src): src = os.path.join(runs, "gifs2", name + ".gif")
         if not os.path.exists(src): continue
         os.makedirs(os.path.join(out, sub), exist_ok=True); put(src, os.path.join(out, sub, name + ".gif"))
+        GALLERY.append((sub, name, label, cap))
         s += f'<figure><img loading="lazy" src="{sub}/{name}.gif"><figcaption><b>{html.escape(name)}</b> <span class="tag {label.split()[0]}">{label}</span><br>{html.escape(cap)}</figcaption></figure>\n'
     return s
 body = ""
+MD = []
 for title, sub, rows in SECTIONS:
+    n0 = len(GALLERY)
     body += f"<h2>{html.escape(title)}</h2><div class=grid>\n{items_html(rows, sub)}</div>\n"
+    items = GALLERY[n0:]
+    MD.append(f"### {title}\n")
+    cells = [f'<td width="50%" valign="top"><img src="showcase/{sb}/{nm}.gif" width="100%"><br><b>{nm}</b> <i>({lb})</i><br>{html.escape(cp)}</td>' for (sb, nm, lb, cp) in items]
+    rows_md = ["<tr>" + "".join(cells[i:i + 2]) + ("<td></td>" if len(cells[i:i + 2]) == 1 else "") + "</tr>" for i in range(0, len(cells), 2)]
+    MD.append("<table>\n" + "\n".join(rows_md) + "\n</table>\n")
 # character model and physics
 game = [] if args.no_game else sorted(glob.glob(os.path.join(runs, "game", "*.gif")))
 if game:
@@ -81,4 +90,5 @@ table{{border-collapse:collapse;margin:8px 0}}td,th{{border:1px solid #ccc;paddi
 <p>Green = comes out of general rules (gait from body size, footholds from terrain, reactions chosen by predicting geometry). Yellow = goals for pelvis, hands and feet solved by IK. Purple = hand-built kinematic model. Blue = trained or evolved on a physical body.</p>
 {body}"""
 open(os.path.join(out, "index.html"), "w").write(page)
+open(os.path.join(out, "gallery.md"), "w").write("\n".join(MD))
 print("wrote", os.path.join(out, "index.html"))
