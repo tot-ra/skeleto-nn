@@ -8,6 +8,8 @@ Procedural character motion for **any skeleton**: people, dogs, cats, horses, bi
 
 ## What is in it
 
+* **Condition-adaptive motion with a small neural network** (`adapt/`, [docs/ADAPT.md](docs/ADAPT.md)). Ice, mud, deep snow, rain, wet clothes, frost, wind, smoke, darkness, bleeding wounds, sprains, broken arms, drink, exhaustion and loads are *data* that change physical channels (friction, sink depth, wetness, heat loss, blood loss and wound position, pain per region, ...). One MLP (about 7,000 weights) maps channels and body (person, dog, cat, horse, bird; flying or walking) to generic motor-style knobs (stride, stance width, crouch, trunk lean, arms out, arm hugged, hand pressed on the wound, shiver, flat feet, clearance, limp, tail tuck, fluff, wingbeat rate and amplitude, glide) that drive the planner. It is trained in about 25 s on a CPU by gradient descent through a differentiable model of the *consequences* (slip and fall injury, tripping, balance, heat balance, blood loss, pain, wind, smoke, lift), never on example motions, and reaches 99.9 % of a per-case optimisation. A body-state model (wetness, core cooling, blood lost, fatigue) closes the loop with an interactive environment. New conditions need no retraining; a new channel is a warm-started retrain of about 10 s. The same JSON weights run in a game engine (a GDScript port exists in the Reval Rebel game).
+
 * **A planner for legged bodies** (`planner.py`). Gait (walk, trot, canter, gallop) from the Froude number; feet planted in the world and swung between footholds searched on the terrain (stairs, kerbs, logs are just terrain; a pit is never stepped into); pelvis height from the reach of the stance legs; trunk lean that keeps the centre of mass over the feet (a belly, a pack or armour change posture on their own); ducking under a ceiling; pushes; turning limited by friction and by the size of the body (a horse swings wide, a cat turns on a coin); braking harder than speeding up.
 * **Muscle, energy, flexibility** (`bodies.py`). `muscle` sets the jump and sprint power, `energy` the size of a reserve that drains with effort and refills at rest (a tired body slows and jumps less; a body with surplus energy spends it in hops), `flex` the joint ranges. Personas: child, adult, elder, starved, athlete, pregnant (`PERSONAS`). Weak bodies stand stooped, take short steps and rest on both feet; pregnancy adds a belly, a hollow back, a wide careful stance, a waddle and slower steps.
 * **Anatomy as parameters.** Human: five trunk joints, clavicles, a toe bone in each foot. Quadrupeds: dog, cat, wolf, horse, pig, goat differ in the number of spine joints and the range of the column, neck joints and nod, tail type (balance, wag, low, hair, curl), hoof or paw, hind-limb power, turning radius. Birds, a snake. Outfits (tight or wide skirt, trousers, heavy boots, high heels, chainmail, plate) change joint limits, mass and foot shape.
@@ -25,6 +27,7 @@ Procedural character motion for **any skeleton**: people, dogs, cats, horses, bi
 
 | Part | How it is made | State |
 |---|---|---|
+| Adaptation to ground, weather, injury, state (ice, mud, snow, wet, cold, wind, bleeding, pain, drink, fatigue, load, smoke, dark) for people, quadrupeds and birds | small neural network trained on a differentiable consequence model (`adapt/`) | works; 99.9 % of per-case optimum, 12 tests |
 | Walk, run, stairs, slopes, ducking, turns, jumps, obstacle course, crowds, forest, starts, stick input | planner, emergent from body and terrain | works at stick-figure level |
 | Jump distances, fear, personas, energy, pregnancy, outfits, limping | parameters + self-model | works |
 | Door, chair, table, bed, floor, ladder, rider, pull-ups, mantle, rope | goals + IK | works, authored sequences |
@@ -70,6 +73,16 @@ A reflex evolved for this body keeps the belly off the ground (risk 0.07 against
 ## Showcase
 
 Every GIF below is produced by `python catalog.py gif <name> out.gif`. The label says how the motion is made: **emergent** (general rules from the body and terrain), **goal script** (goals for pelvis, hands and feet + IK), **kinematic model** (hand-built), **physics, evolved**. The same page as HTML: [`showcase/index.html`](showcase/index.html).
+
+### Adapting to the situation: one network for ground, weather, injury and state ([docs/ADAPT.md](docs/ADAPT.md))
+
+<table>
+<tr><td width="50%" valign="top"><img src="showcase/adapt/adapt_ground.gif" width="100%"><br><b>adapt_ground</b> <i>(style network)</i><br>dry, wet cobbles, mud, deep snow, ice, wet ice</td><td width="50%" valign="top"><img src="showcase/adapt/adapt_injury.gif" width="100%"><br><b>adapt_injury</b> <i>(style network)</i><br>bleeding thigh and chest, sprain, broken arm, bruised ribs, drunk, exhausted</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/adapt/adapt_weather.gif" width="100%"><br><b>adapt_weather</b> <i>(style network)</i><br>frost, gale from the side, headwind, night, smoke</td><td width="50%" valign="top"><img src="showcase/adapt/adapt_rain_cold.gif" width="100%"><br><b>adapt_rain_cold</b> <i>(style network)</i><br>rain soaks the body, the core cools, the network answers (body time 40x)</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/adapt/adapt_bleed_time.gif" width="100%"><br><b>adapt_bleed_time</b> <i>(style network)</i><br>a cut at 1 s: hand to the wound, blood lost grows (body time 20x)</td><td width="50%" valign="top"><img src="showcase/adapt/adapt_animals.gif" width="100%"><br><b>adapt_animals</b> <i>(style network)</i><br>dog on ice and in snow, soaked cat, horse in mud, lame horse</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/adapt/adapt_birds_ground.gif" width="100%"><br><b>adapt_birds_ground</b> <i>(style network)</i><br>crow on ice (wings out), soaked, hurt foot</td><td width="50%" valign="top"><img src="showcase/adapt/adapt_birds_flight.gif" width="100%"><br><b>adapt_birds_flight</b> <i>(style network)</i><br>calm, wet plumage, headwind, tailwind, carrying prey, hurt wing</td></tr>
+<tr><td width="50%" valign="top"><img src="showcase/adapt/adapt_unseen.gif" width="100%"><br><b>adapt_unseen</b> <i>(style network)</i><br>conditions written after training, and combinations</td><td></td></tr>
+</table>
 
 ### People: walking, running, terrain, obstacles (one planner, gait from the Froude number)
 
@@ -200,6 +213,10 @@ python catalog.py list                         # all shots
 python catalog.py gif walk_run runs/walk_run.gif
 python catalog.py sheet duel runs/duel.png 8   # contact sheet
 python make_showcase.py                        # rebuild runs/showcase/index.html from runs/gifs3
+python -m adapt.train                          # train the style network (about 25 s, CPU); --init FILE --steps 800 to warm start
+python -m adapt.train --check                  # compare with per-case optimal styles on held-out cases
+python -m adapt.probe --body dog               # what the network does in named situations
+python -m pytest tests/test_adapt.py           # adaptation tests
 for t in tests/test_*.py; do python $t; done   # planner FK equals MuJoCo FK, injury model, jumps, climbing, hits, aids, personas ...
 python reflex.py --gens 300 --pop 28 --procs 8 --out runs/reflex.json
 REFLEX_BODY=pregnant python reflex.py --gens 120 --init results/reflex_fall.json --out runs/reflex_preg.json
@@ -211,7 +228,7 @@ Needs ffmpeg for GIFs. Python 3.10+.
 
 ## From the planner to your engine
 
-There is **no neural network in the runtime path.** The planner is an algorithm and what was learned or evolved is small parameter files: `results/reflex_fall.json` (the fall and landing reflex), `results/reflex_fall_pregnant.json`, `results/slide_controller.json`. The PPO tracker in `train.py` is the only neural network; it did not converge and no weights are published.
+The planner is an algorithm. The one neural network in the runtime path is the style network `results/style_net.json` (an MLP of about 7,000 weights, see [docs/ADAPT.md](docs/ADAPT.md)): its forward pass is a few lines of code in any language (`adapt/net.py` in numpy; a GDScript port runs in the Reval Rebel game). Other learned or evolved parts are small parameter files: `results/reflex_fall.json` (the fall and landing reflex), `results/reflex_fall_pregnant.json`, `results/slide_controller.json`. The PPO tracker in `train.py` did not converge and no weights are published.
 
 To use a motion in an engine, bake it into an ordinary skeletal animation on your rigged character:
 
@@ -225,6 +242,8 @@ python bake_clip.py walk_run my_character.glb walk_run.glb      # needs Blender;
 
 | File | Role |
 |---|---|
+| `adapt/` | condition-adaptive style network: schema, conditions, consequence model, training, physiology, planner driver, flight ([docs/ADAPT.md](docs/ADAPT.md)) |
+| `catalog_adapt.py` | adaptation showcase shots |
 | `skeleton.py`, `bodies.py`, `ik.py` | bones, forward kinematics, parametric bodies, personas and outfits, analytic IK |
 | `planner.py`, `terrain.py`, `nav.py`, `controls.py` | the walker, height-field terrain with ceilings, pits and hidden solids, A*, stick input |
 | `jumper.py`, `climb.py`, `aids.py` | self-model and fear, obstacle runner, fence jumper, starts, play; climbing; crutches |

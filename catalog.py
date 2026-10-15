@@ -302,7 +302,7 @@ def build(name):
     return SHOTS[name]()
 
 if __name__ == "__main__":
-    sys.modules["catalog"] = sys.modules["__main__"]; import catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves, catalog_hang, catalog_attacks
+    sys.modules["catalog"] = sys.modules["__main__"]; import catalog_extra, catalog_home, catalog_birds, catalog_combat, catalog_moves, catalog_hang, catalog_attacks, catalog_adapt
     cmd = sys.argv[1]
     if cmd == "list":
         print("\n".join(SHOTS))

@@ -122,6 +122,7 @@ class Walker:
         self.head_top = self._head_top_rest()
         self._init_stance()
         self.trace = []
+        self.style = {}; self.style_driver = None          # motor style from the condition-adaptive network (adapt/driver.py)
         import hit as _hit; _hit.init(self)
 
     # ----------------------------------------------------------------------------------------
@@ -165,6 +166,8 @@ class Walker:
             off = np.array([0.0, 0.5])
             if self.kind == "bird":
                 duty = max(duty, 0.55) if Fr < 0.8 else duty
+        duty += self.style.get("duty_add", 0.0)
+        lam *= self.style.get("stride", 1.0)
         lam *= self.c.params.get("stride_scale", 1.0) * (1.0 - 0.32 * min(1.0, abs(self.yaw_rate) / 1.0))          # shorter, quicker steps in a turn: the planted feet stay within reach
         f = speed / max(lam, 1e-3)
         return f, float(np.clip(duty, 0.2, 0.8)), off
@@ -208,6 +211,7 @@ class Walker:
         import hit as _hit
         if self.down is not None: return _hit.down_step(self, dt)
         cmd = _hit.modify_cmd(self, cmd, dt)
+        if self.style_driver is not None: cmd = self.style_driver(cmd, dt)
         if self.aids is not None: cmd = self.aids.apply(self, cmd, dt)
         vdes = np.asarray(cmd.v, float) if self.jumpplan is None else np.zeros(2)
         # energy: the reserve drains with effort (squared speed over the sprint speed) and refills at rest; low reserve slows the body down
@@ -307,6 +311,23 @@ class Walker:
         self._pose(cmd, dt, fwd, left)
         return self.snapshot()
 
+    def _neutral_w(self, idx):
+        """Neutral foot position with the stance width of the current style."""
+        n = self.neutral[idx]
+        wd = self.style.get("width", 1.0)
+        return n if wd == 1.0 else np.array([n[0], n[1] * wd])
+
+    def _shiver(self, q):
+        """Shivering: small fast oscillations of trunk, neck and arm joints (legs keep the planted feet)."""
+        a = self.style.get("tremor", 0.0)
+        if a < 0.02: return
+        amp = 0.03 * a
+        for i, b in enumerate(self.sk.bones):
+            if b.group in ("leg", "foot") or i == 0: continue
+            for ax, nm in enumerate("XYZ"):
+                if nm in b.lim:
+                    q[i, ax] += amp * math.sin(2 * math.pi * (8.5 + 1.7 * ((i * 7 + ax * 3) % 5)) * self.t + 1.3 * i + 2.1 * ax)
+
     # ---- gait events --------------------------------------------------------------------
     def _start_gait(self, off, duty):
         """Leave standing: choose phases so that the first leg of the pattern lifts now."""
@@ -341,7 +362,7 @@ class Walker:
         hip_pred = hips[ls.idx] + self.v * ahead
         hd_pred = self.heading + self.yaw_rate * ahead
         cp, sp_ = math.cos(hd_pred), math.sin(hd_pred)
-        nominal_rel = self.neutral[ls.idx] - self.rest_hips[ls.idx][:2]
+        nominal_rel = self._neutral_w(ls.idx) - self.rest_hips[ls.idx][:2]
         Rp = np.array([[cp, -sp_], [sp_, cp]])
         nominal = hip_pred + Rp @ nominal_rel
         # step-length scaling with speed is implicit (hip moves); add a touch of capture-point feedback
@@ -363,6 +384,7 @@ class Walker:
         base = max(ls.lift[2], tgt[2])
         clr = (0.05 + 0.10 * min(1.0, self.speed / 2.0)) * self.reach * (0.7 if self.kind == "quadruped" else 1.0)
         if self.kind == "quadruped": clr *= 0.7
+        clr += 0.14 * self.reach * self.style.get("clearance", 0.0)
         ls.apex = max(base, mx + 0.045 * self.reach) + clr
         ls.apex = max(ls.apex, base + clr)
 
@@ -379,13 +401,13 @@ class Walker:
             ls.u = 0.5
             cth, sth = math.cos(self.heading), math.sin(self.heading)
             Rh = np.array([[cth, -sth], [sth, cth]])
-            want = self.pos + Rh @ self.neutral[ls.idx]
+            want = self.pos + Rh @ self._neutral_w(ls.idx)
             err = np.linalg.norm(ls.planted[:2] - want)
             thresh = 0.30 * self.reach if self.kind != "quadruped" else 0.22 * self.reach
             if len(self.legs) == 4: max_sw = 1
             else: max_sw = 1
             # a leg lifts only when its mirror/diagonal partner is down and it is the worst offender
-            worst = max(np.linalg.norm(l.planted[:2] - (self.pos + Rh @ self.neutral[l.idx])) for l in self.legs if l.stance)
+            worst = max(np.linalg.norm(l.planted[:2] - (self.pos + Rh @ self._neutral_w(l.idx))) for l in self.legs if l.stance)
             if err > thresh and n_swing < max_sw and err >= worst - 1e-6 and not getattr(self, 'freeze_feet', False):
                 ls.stance = False; ls.lo_event = True
                 ls.lift = ls.planted.copy(); ls.lift_yaw = ls.yaw
@@ -416,7 +438,7 @@ class Walker:
         if hike:                                    # stiff leg: swung out and round (circumduction)
             lat = np.array([-math.sin(self.heading), math.cos(self.heading)]) * (1.0 if ls.leg.side == "L" else -1.0)
             xy = xy + lat * hike * math.sin(math.pi * tau); z = z + 0.5 * hike * math.sin(math.pi * tau)
-        amp = self.c.params.get("toe_amp", 1.0)
+        amp = self.c.params.get("toe_amp", 1.0) * (1 - 0.85 * self.style.get("foot_flat", 0.0))
         pitch_up = amp * (-0.55 * (1 - tau) ** 2 + 0.35 * smooth((tau - 0.55) / 0.45) * 1.0 - 0.1 * math.sin(math.pi * tau))
         return np.array([xy[0], xy[1], z]), yaw, pitch_up
 
@@ -433,7 +455,7 @@ class Walker:
         ctr = ls.planted
         ankle_flat = ctr - Rf @ mid
         u = ls.u
-        amp = self.c.params.get("toe_amp", 1.0)
+        amp = self.c.params.get("toe_amp", 1.0) * (1 - 0.85 * self.style.get("foot_flat", 0.0))
         heel_up = amp * math.radians(15) * (1 - smooth(u / 0.18))      # heel strike: toes up, pivot on heel
         toe_off = amp * math.radians(32) * smooth((u - 0.55) / 0.45)   # push-off: heel up, pivot on ball
         alpha = self.c.params.get("heel_pitch", 0.0)
@@ -546,6 +568,7 @@ class Walker:
         pitch_t = lean_speed + slope_pitch + 0.45 * self.crouch * (1 if self.kind == "biped" else 0.3)
         jpitch = self._jump_pitch()
         if jpitch is not None: pitch_t = jpitch
+        pitch_t += self.style.get("trunk_pitch", 0.0)
         if cmd.pelvis is not None and "pitch" in cmd.pelvis: pitch_t = cmd.pelvis["pitch"]
         # sway and gait-coupled yaw/roll from the actual foot excursions
         wL = sum((1 - (ls.u if ls.stance else 1)) * 0 + (1.0 if ls.stance else 0.0) for ls in self.legs if ls.leg.side == "L")
@@ -554,7 +577,7 @@ class Walker:
         sway_w = (wL / nL - wR / nR)
         self.sway = getattr(self, "sway", 0.0); self.sway += (sway_w - self.sway) * min(1.0, 7 * dt)
         turn_roll = float(np.clip(self.yaw_rate * speed / G, -0.35, 0.35))
-        roll_t = (-0.9 if self.kind != "quadruped" else -0.25) * turn_roll + (0.02 * self.sway if self.kind == "biped" else 0.0) + self.inj_roll + self.c.params.get("waddle", 0.0) * self.sway * 2.0
+        roll_t = (-0.9 if self.kind != "quadruped" else -0.25) * turn_roll + (0.02 * self.sway if self.kind == "biped" else 0.0) + self.inj_roll + self.c.params.get("waddle", 0.0) * self.sway * 2.0 + self.style.get("trunk_roll", 0.0)
         self.pitch += (pitch_t - self.pitch) * min(1.0, 6 * dt)
         self.roll += (roll_t - self.roll) * min(1.0, 8 * dt)
         # gait-coupled pelvis yaw: rotate towards the leg that is going forward
@@ -657,6 +680,7 @@ class Walker:
             if leg.toes is not None: q[leg.toes] = [0.0, float(getattr(ls, "toe_bend", 0.0)), 0.0]
         # ---- arms, neck, tail
         self._pose_limbs(q, cmd, dt, fwd, left, speed, root, R_p)
+        self._shiver(q)
         S, E, R = sk.fk(root, R_p, q)
         # balance: move trunk pitch so that the whole-body centre of mass sits over the hips as in the plain body
         self._com_lean(S, E, R, dt)
@@ -863,7 +887,7 @@ class Walker:
                 else:
                     elev = 0.02; prot = 0.0
                     arm_s = getattr(self, "_arm_sy", {}).get(arm.side, 0.0); prot = -0.35 * arm_s
-                q[arm.clav] = [sg * elev, 0.0, -sg * prot]
+                q[arm.clav] = [sg * (elev + 0.35 * self.style.get("shrug", 0.0)), 0.0, -sg * prot]
             S, E, R = sk.fk(root, R_p, q)
         # arms swing against the legs of the same side
         if self.kind == "biped":
@@ -871,7 +895,7 @@ class Walker:
                 opp = [ls for ls in self.legs if ls.leg.side != arm.side][0]
                 pc = opp.planted if opp.stance else self._swing_pose(opp)[0]
                 ex = float((pc[:2] - self.pos) @ fwd) / max(self.reach, 1e-3)
-                amp = (0.15 + 0.55 * min(1.0, speed / 3.0)) * c.params.get("arm_swing", 1.0)
+                amp = (0.15 + 0.55 * min(1.0, speed / 3.0)) * c.params.get("arm_swing", 1.0) * (1 - 0.5 * self.style.get("care", 0.0))
                 u, f, h = arm.chain
                 tgt = None if not cmd.arms else cmd.arms.get(arm.side)
                 if tgt is not None:
@@ -893,6 +917,10 @@ class Walker:
                 pitch_comp = -0.3 * self.pitch
             for k in nk: q[k, 1] = pitch_comp * 0.5 / len(nk) * 1.0
             q[hd, 1] = pitch_comp * 0.5 - 1.2 * self.trunk_wobble[1] * (1 if self.kind == 'biped' else 0.3)
+            hdn = self.style.get("head_down", 0.0) - 0.5 * self.style.get("shrug", 0.0) * (1 if self.kind == 'biped' else 0)
+            if hdn:
+                for k in nk: q[k, 1] += 0.35 * hdn / len(nk)
+                q[hd, 1] += 0.45 * hdn
             if self.kind == "quadruped" and self.head_goal is not None and self.S is not None:      # the head reaches for a point (a bite)
                 base = self.S[nk[0]]; d = np.asarray(self.head_goal, float) - base
                 cy, sy_ = math.cos(self.heading), math.sin(self.heading); dx = d[0] * cy + d[1] * sy_; dy = -d[0] * sy_ + d[1] * cy
@@ -915,7 +943,7 @@ class Walker:
         if c.tail:
             self._pose_tail(q, dt, sw)
         if self.kind == "bird":
-            fold = getattr(self, "wing_fold", 1.0)
+            fold = getattr(self, "wing_fold", 1.0) * (1 - 0.7 * self.style.get("arm_out", 0.0))
             for wi, chain in enumerate(c.wings):
                 sg = 1.0 if wi == 0 else -1.0
                 a_, b_, c_ = chain
@@ -947,7 +975,7 @@ class Walker:
 
     def _pose_tail(self, q, dt, sw):
         c = self.c; tp = self.TAILS[c.params.get("tail_type", "wag")]; n = len(c.tail)
-        mood = getattr(self, "mood", 0.3)
+        mood = getattr(self, "mood", 0.3) * (1 - self.style.get("tail_tuck", 0.0))
         speed_lift = tp["lift"] * smooth(self.Fr / 2.5) if self.mode == "go" else 0.0
         lat_drive = -self.yaw_rate * tp["gain"] * 0.6
         # random flicks (horse swishing flies): an impulse into the lateral velocity of the whole chain
@@ -956,7 +984,7 @@ class Walker:
         amp, hz = tp["wag"]
         for i, b in enumerate(c.tail):
             u = (i + 1) / n
-            base_up = tp["base"] / n * 2.0 * (1.0 if i == 0 else 0.5) + tp["curl"] * u + speed_lift * (0.6 if i == 0 else 0.25) - 0.3 * self.pitch * u
+            base_up = -0.9 * self.style.get("tail_tuck", 0.0) * (1.0 if i == 0 else 0.4) + tp["base"] / n * 2.0 * (1.0 if i == 0 else 0.5) + tp["curl"] * u + speed_lift * (0.6 if i == 0 else 0.25) - 0.3 * self.pitch * u
             lat_t = lat_drive * (0.5 + 0.5 * u)
             lat_t += amp * mood * math.sin(2 * math.pi * hz * self.t - 0.5 * i) * (0.6 + 0.4 * u) if hz > 0 else 0.0
             if self.mode == "go": lat_t += tp["sway"] * math.sin(2 * math.pi * self.phase + 0.7 * i) * sw

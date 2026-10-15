@@ -78,6 +78,7 @@ def modify_cmd(w, cmd, dt):
     for r in REGIONS: w.pain[r] *= math.exp(-dt / _spec(r)["tau"])
     for r, floor in getattr(w, "chronic", {}).items(): w.pain[r] = max(w.pain[r], floor)          # pain that does not go away
     if w.S is None or w.down is not None: return cmd
+    if getattr(w, "style_driver", None) is not None: return cmd      # pain is a channel of the style network (adapt/driver.py)
     p = w.pain; c = w.c; sk = w.sk
     f, l = _fl(w); f3 = np.append(f, 0.0); l3 = np.append(l, 0.0)
     cap = (1 - 0.6 * max(p["torso"], p["head"])) * (1 - 0.65 * max(p["leg_L"], p["leg_R"])) * (1 - 0.75 * p["groin"])

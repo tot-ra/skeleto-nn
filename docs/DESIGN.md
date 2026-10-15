@@ -71,8 +71,13 @@ A leg can be sore (chronic pain makes the stance on it shorter and the trunk lea
 
 **Air.** Wings are strips of a flat plate with a cambered lift curve (slope 2 pi up to the stall at 17 degrees, then a flat plate), the tail is a plate, the body drags. The bird must be balanced by its geometry (the wing root sits near the centre of mass, the tail provides the restoring moment); the generator adds feedback of tail and wing angle of attack on pitch error and rate and of differential flapping on roll, a burst/glide gate, a leg push for take-off and a flare for landing. **Result: gliding about 3 s from 6 m; landing hits hard; take-off is not learned.** The next steps would be a better aerodynamic model (downwash, unsteady lift) and a staged curriculum.
 
+## 7e. Adapting to the situation (`adapt/`)
+
+A small MLP maps physical channels (friction, sink, wetness, insulation, temperature, core cooling, wind, bleeding and wound position, pain per region, fatigue, dizziness, load, darkness, smoke) and the body (kind, mass, leg length, flying, Froude number) to 24 generic style knobs that the planner applies (section 2 reads them from `Walker.style`; arm knobs become IK goals). It is trained by gradient descent through a differentiable model of consequences (slip and fall injury, tripping, balance, wind moment, heat balance, blood loss, pain, smoke, lift, effort, speed) in about 25 s. Situations are data (`conditions.py`), and a body-state model (`physiology.py`) closes the loop with the environment. When a driver is attached, the hand-written pain responses of section 4 (hand to the hurt place, limp) are replaced by the network's answer to the same pain channels. Full description: [ADAPT.md](ADAPT.md).
+
 ## 8. Verification
 
+* `tests/test_adapt.py`: numpy and torch forward passes agree; ice, wounds, sprains, a broken arm, cold and wet, wind give the expected styles for people, a dog and a crow; a condition added after training works; an old weight file loads into a wider schema; rain cools and hugging slows it; pressure slows blood loss; on ice the planner takes shorter steps and in a neutral situation it is unchanged.
 * `tests/test_skeleton.py`, `tests/test_physics.py`: forward kinematics of the planner equal MuJoCo's for the human, dog and bird.
 * `tests/test_env.py`, `tests/test_reflex.py`: the tracking environment and the reflex run. `tests/test_injury.py`, `test_jump.py`, `test_hit.py`, `test_combat.py`, `test_climb.py` (the legs never cross), `test_aids.py`, `test_sit_table.py` (no bone enters the tabletop).
 * Every shot in the showcase is rendered by `catalog.py`; `reflex_eval.py` evaluates the reflex on 240 held-out scenarios and compares it with a stiff body and a hand-made pose.
