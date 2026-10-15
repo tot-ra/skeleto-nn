@@ -104,6 +104,15 @@ and wider; a crow with a hurt wing flaps less; with a tailwind it glides more.
   on 2,000 held-out cases: it reaches 99.9 % of the possible cost reduction (cost from 10.3 with the
   neutral style to 1.69 with the network, against 1.63 for the per-case optimum).
 
+## Running it in an engine
+
+`python -m adapt.export_engine OUT_DIR` writes `style_net.json` (weights with the input and output schema),
+`motion_conditions.json` (the condition registry, body regions, region -> pain channel) and
+`style_net_golden.json` (bodies, conditions, channels, expected raw and calibrated styles, and a ten-minute
+physiology run), so a port can prove it computes the same numbers. The Reval Rebel game runs a GDScript
+port (forward pass 0.14 ms; 40 creatures 0.34 ms per frame with caching) on its humanoid rigs, skinned
+animals and flying birds; a condition list may also carry measured values (`{"air_temp": -6.0}`).
+
 ## Honest limits
 
 * The teacher is a reduced-order model with order-of-magnitude constants, not a muscle simulation.

@@ -88,11 +88,16 @@ def _blend(neutral, target, k):
 
 
 def channels_from(active, base: dict | None = None) -> dict:
-    """``active`` is a list of ``name`` or ``(name, intensity)`` or ``(name, intensity, options)``.
+    """``active`` is a list of ``name``, ``(name, intensity)``, ``(name, intensity, options)`` or a dict of
+    measured channel values (``{"air_temp": -6.0}``, applied in order like a condition).
 
     Returns a full channel dict (unknown channels keep their neutral value)."""
     ch = dict(base) if base is not None else neutral_channels()
     for item in active:
+        if isinstance(item, dict):                      # measured values straight from the world: {"air_temp": -6.0}
+            for key, val in item.items():
+                if key in CH: ch[key] = float(val)
+            continue
         if isinstance(item, str):
             name, k, opt = item, 1.0, {}
         elif len(item) == 2:
