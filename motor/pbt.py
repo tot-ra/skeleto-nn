@@ -78,6 +78,8 @@ def main():
     ap.add_argument("--members", type=int, default=3); ap.add_argument("--workers", type=int, default=5)
     ap.add_argument("--round-min", type=float, default=20.0); ap.add_argument("--rounds", type=int, default=9)
     ap.add_argument("--replace", type=int, default=1, help="members replaced per round")
+    ap.add_argument("--reset-curriculum", action="store_true", help="first round: keep the weights, restart harness and goals")
+    ap.add_argument("--assist0", type=float, default=1.0); ap.add_argument("--speed0", type=float, default=0.8)
     args = ap.parse_args()
     root = os.path.join("runs", "motor", args.name); os.makedirs(root, exist_ok=True)
     hist_path = os.path.join(root, "history.json")
@@ -88,7 +90,8 @@ def main():
     else:
         settings = [{k: float(np.clip(v * math.exp(rng.uniform(-0.6, 0.6)) if m else v, *MUTABLE[k]))
                      for k, v in DEFAULTS.items()} for m in range(args.members)]
-    for rnd in range(len(history), len(history) + args.rounds):
+    first = len(history)
+    for rnd in range(first, first + args.rounds):
         t0 = time.time(); procs = []
         for m, st in enumerate(settings):
             name = f"{args.name}/m{m}"
@@ -96,9 +99,12 @@ def main():
             cmd = [sys.executable, "-m", "motor.ppo", "--family", args.family, "--name", name, "--workers", str(args.workers),
                    "--hours", str(args.round_min / 60.0), "--lr", f"{st['lr']:.6g}", "--fade", f"{st['fade']:.6g}",
                    "--sym", f"{st['sym']:.4g}", "--alive", f"{st['alive']:.4g}",
-                   "--fall-cost", f"{st['fall_cost']:.4g}", "--cost-scale", f"{st['cost_scale']:.4g}"]
+                   "--fall-cost", f"{st['fall_cost']:.4g}", "--cost-scale", f"{st['cost_scale']:.4g}",
+                   "--assist0", str(args.assist0), "--speed0", str(args.speed0)]
             if os.path.exists(ckpt):
                 cmd += ["--init", ckpt]
+                if args.reset_curriculum and rnd == first:
+                    cmd += ["--reset-curriculum"]
             log = open(os.path.join(root, f"m{m}.log"), "a")
             procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
         for p in procs:

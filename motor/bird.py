@@ -30,6 +30,7 @@ SPECIES = ("crow", "gull", "heron", "sparrow", "duck")
 class BirdEnv(FamilyEnv):
     family = "bird"
     BODY_DIM = 7
+    MAX_SPEED = 4.0
 
     # ------------------------------------------------------------------ family hooks
     def default_body(self):
@@ -141,14 +142,17 @@ class BirdEnv(FamilyEnv):
         grounded = pc.data.ncon > 0                          # stage 1: any touch of the ground ends a flight
         upside_down = float(R[2, 2]) < -0.2
         fell = unstable or grounded or upside_down or p[2] < 0.15 * self.wingspan()
-        if fell:
+        stalled = not fell and self._stalled(goal, sp)
+        if fell or stalled:
             r -= self.fall_cost
+        done = fell or stalled
         trunc = self.steps >= self.max_len
         self.ep_ret += r; self.ep_goal += goal
-        info = dict(trunc=trunc and not fell, costs=costs, goal_now=goal, speed=float(np.linalg.norm(pc.data.qvel[0:3])))
-        if fell or trunc:
+        info = dict(trunc=trunc and not done, costs=costs, goal_now=goal, speed=float(np.linalg.norm(pc.data.qvel[0:3])),
+                    stalled=stalled)
+        if done or trunc:
             info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps)
-        return self.obs(), r, fell, info
+        return self.obs(), r, done, info
 
     def stride_pose(self, rng, speed):
         return {}

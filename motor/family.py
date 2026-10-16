@@ -92,6 +92,15 @@ class FamilyEnv:
     def stride_pose(self, rng, speed): return {}
     def speed_unit(self): return 1.0
 
+    MAX_SPEED = 3.0      # the curriculum never asks for more (in speed units): a run for people, a gallop for horses
+    STALL_GOAL = 0.15    # a moving goal met this little for about a second ends the episode, as a fall does
+
+    def _stalled(self, goal, sp):
+        """Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns
+        ALIVE every step while trying to walk risks the fall cost, so the safest policy ignores the goal."""
+        self.goal_ema += (goal - self.goal_ema) / CTRL_HZ
+        return sp > 0.2 and self.steps > 1.5 * CTRL_HZ and self.goal_ema < self.STALL_GOAL
+
     # ------------------------------------------------------------------ setup
     def __init__(self, seed=0, spread=1.0, act_scale=0.7, max_len=450, alive=None, fall_cost=None, cost_scale=1.0):
         self.rng = np.random.default_rng(seed)
@@ -174,7 +183,7 @@ class FamilyEnv:
         self.pc.set_state(np.array([0, 0, self.c.z0 + 0.01]), Rz, np.clip(q0, self.pc.lo, self.pc.hi), root_vel=v0)
         # muscle state: the current target as a share of the range, starting from the pose the body starts in
         self.prev_a = np.clip(np.clip(q0, self.pc.lo, self.pc.hi) / np.maximum(self.act_scale, 1e-6), -1, 1)
-        self.steps = 0; self.ep_ret = 0.0; self.ep_goal = 0.0
+        self.steps = 0; self.ep_ret = 0.0; self.ep_goal = 0.0; self.goal_ema = 1.0
         self.strength = 1.0
         return self.obs()
 
@@ -282,11 +291,14 @@ class FamilyEnv:
             pc.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number = 0
             r = -2.0 / CTRL_HZ
         fell = bad or unstable or p[2] < 0.5 * self.c.z0 or tilt > 1.2
-        if fell:
+        stalled = not fell and self._stalled(goal, sp)
+        if fell or stalled:
             r -= self.fall_cost
+        done = fell or stalled
         trunc = self.steps >= self.max_len
         self.ep_ret += r; self.ep_goal += goal
-        info = dict(trunc=trunc and not fell, costs=costs, goal_now=goal, speed=float(np.linalg.norm(pc.data.qvel[0:2])))
-        if fell or trunc:
+        info = dict(trunc=trunc and not done, costs=costs, goal_now=goal, speed=float(np.linalg.norm(pc.data.qvel[0:2])),
+                    stalled=stalled)
+        if done or trunc:
             info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps)
-        return self.obs(), r, fell, info
+        return self.obs(), r, done, info

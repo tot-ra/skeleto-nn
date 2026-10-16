@@ -28,6 +28,7 @@ def canonical(spec):
 class QuadrupedEnv(FamilyEnv):
     family = "quadruped"
     BODY_DIM = 16
+    MAX_SPEED = 2.0      # Froude: a gallop
 
     def default_body(self):
         return canonical(QUADS["dog"])

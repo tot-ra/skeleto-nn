@@ -104,8 +104,23 @@ def test_bird_flies_under_the_harness_and_falls_without_it():
     for assist, expect_fall in ((1.0, False), (0.0, True)):
         env.assist = assist; env.reset(); fell = False
         for _ in range(150):
-            _o, _r, d, _info = env.step(np.zeros(env.act_dim))
+            _o, _r, d, info = env.step(np.zeros(env.act_dim))
             if d:
-                fell = True
+                fell = info["fell"]          # held up but not flying ends the episode too, as a stall
                 break
         assert fell == expect_fall
+
+
+def test_standing_still_when_asked_to_walk_ends_the_episode_but_standing_when_asked_to_stand_does_not():
+    env = BipedEnv(seed=2)
+    for goal, should_end in ((np.array([1.2, 0.0]), True), (np.zeros(2), False)):
+        env.moving_start = 0.0
+        env.reset(sores={k: 0.0 for k in SORES}, profile=dict(ev.DEFAULT_WEIGHTS), **{**CALM, "goal": goal})
+        env.assist = 1.0
+        ended = False
+        for _ in range(90):
+            _o, _r, done, info = env.step(np.zeros(env.act_dim))
+            if done:
+                ended = info["stalled"] and not info["fell"]
+                break
+        assert ended == should_end

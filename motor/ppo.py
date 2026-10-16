@@ -82,6 +82,7 @@ def main():
     ap.add_argument("--alive", type=float, default=None); ap.add_argument("--fall-cost", type=float, default=None)
     ap.add_argument("--cost-scale", type=float, default=1.0, help="multiplies every evaluation cost")
     ap.add_argument("--hidden", type=int, default=512)
+    ap.add_argument("--reset-curriculum", action="store_true", help="with --init: restart harness, goal speeds and spread")
     ap.add_argument("--speed0", type=float, default=0.8, help="goal speeds at the start of the curriculum (m/s)")
     ap.add_argument("--fade", type=float, default=0.0015, help="harness lost per iteration regardless of success")
     args = ap.parse_args()
@@ -110,7 +111,9 @@ def main():
         ck = torch.load(args.init, weights_only=False)
         pi.load_state_dict(ck["pi"]); vf.load_state_dict(ck["vf"]); logstd.data = ck["logstd"]
         mean, var, cnt = ck["mean"], ck["var"], ck["cnt"]; assist = ck.get("assist", 0.0); it0 = ck.get("it", 0)
-        max_speed = ck.get("max_speed", 4.0); spread = ck.get("spread", 1.0)
+        max_speed = ck.get("max_speed", ref.MAX_SPEED); spread = ck.get("spread", 1.0)
+        if args.reset_curriculum:            # keep the weights, start the harness and the goals over
+            assist, max_speed, spread = args.assist0, args.speed0, args.spread
     m_perm = torch.tensor(ref.m_perm); m_sign = torch.tensor(ref.m_sign, dtype=torch.float32)
 
     def export():
@@ -181,7 +184,7 @@ def main():
         assist = max(0.0, assist - args.fade)
         if n_ep and goal > 0.5 and fell < 0.3:
             assist = max(0.0, assist - 0.01)
-            max_speed = min(4.0, max_speed + 0.03)
+            max_speed = min(ref.MAX_SPEED, max_speed + 0.03)
             spread = min(1.0, spread + 0.01)
         elif n_ep and fell > 0.7 and assist < 0.3:
             assist = min(args.assist0, assist + 0.01)

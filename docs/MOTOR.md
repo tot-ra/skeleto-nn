@@ -75,6 +75,10 @@ Curriculum:
   one thigh forward, a quadruped in a trot pose), so the body has to step or fall from the first moment.
 * **Harness:** it holds the root up and upright, never pushes toward the goal, and fades with time as well as with
   success, so standing still under it never becomes a home.
+* **Stalls end episodes:** a moving goal met this little (`STALL_GOAL`) for about a second ends the episode with the
+  fall cost. Standing still when asked to move is a dead end, not a safe choice.
+* **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
+  `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 
 **Population-based training** (`motor/pbt.py`): several members train side by side; every round (15 minutes) each is
 scored on fixed situations *without the harness*, and the worst is replaced by a copy of the best with mutated
@@ -98,9 +102,13 @@ nothing here is used by a game yet. The first two runs (GIFs in the README, `sho
 | 1 | reward = goal minus costs; harness held the pelvis up and pushed it toward the goal velocity | to stiffen, lean and be pushed; it fell like a plank as the harness faded to 40 % |
 | 2 | plus a reward for staying upright and a fall cost; the goal pays for partial progress; the harness only holds, never pushes | to stand still under the full harness (0.04 m/s when asked for 1.3 m/s); the harness never faded because the goal was never met, and without it the policy falls within 2 s |
 
-Both are the usual local optima of reinforcement learning without reference motion, and both were made worse by
-the vibration energy that muscle activation now removes. The curriculum, moving starts, activation and population
-training above are the answer; runs with them are in progress for bipeds and quadrupeds.
+| 3 | population training (3 bipeds, 2 quadrupeds, 16 rounds, about 4 h); curriculum, moving starts, activation | to stand perfectly on its own, in every situation and at any asked speed (0.00 m/s when asked for 1.3 m/s); from a moving start it falls within 1 s. Scores flat at 0.36 to 0.38 |
+
+All three are the usual local optima of reinforcement learning without reference motion. Run 3 had two causes:
+the curriculum had run away under an earlier goal score that paid standing still as a slow walk (quadrupeds were
+asked for up to 4 Froude, twice a gallop), and staying up earned the alive reward every step while trying to walk
+risked the fall cost. Run 4 (in progress, birds included) ends stalled episodes, caps goal speeds per family and
+starts the curriculum over from run 3's weights.
 
 ## Limits
 
