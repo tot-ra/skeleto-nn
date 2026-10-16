@@ -1,6 +1,8 @@
 # ☠️ skeleto-nn
 
-Procedural character motion for **any skeleton**: people, dogs, cats, horses, birds, snakes. No animation clips and no script per situation for locomotion: a body is a tree of bones with joint limits, masses and a few anatomical and physiological numbers (muscle power, energy, flexibility, a heavy belly, clothing), and one planner makes it walk, run, jump, climb, duck, react to blows and fall. What is learned or evolved is always scored by one pain / bone-injury model.
+Procedural character motion for **any skeleton**: people, 🐕 🐈‍⬛ 🐎 🦅 🐍 
+
+No animation clips and no script per situation for locomotion: a body is a tree of bones with joint limits, masses and a few anatomical and physiological numbers (muscle power, energy, flexibility, a heavy belly, clothing), and one planner makes it walk, run, jump, climb, duck, react to blows and fall. What is learned or evolved is always scored by one pain / bone-injury model.
 
 **The neural network:** a small MLP (32-64-64-24, about 7,000 weights) adapts how any of these bodies moves to its situation: ice, mud, snow, rain and wet clothes, frost, wind, smoke, darkness, bleeding wounds, sprains, broken bones, drink, exhaustion. It is trained in about 25 s on a CPU, without motion-capture data. The trained weights are [`results/style_net.json`](results/style_net.json); the forward pass is `adapt/net.py` (numpy), so it ports to any engine (a GDScript port runs in the Reval Rebel game). Details: [docs/ADAPT.md](docs/ADAPT.md).
 
