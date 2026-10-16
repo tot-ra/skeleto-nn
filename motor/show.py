@@ -1,0 +1,88 @@
+"""Render a trained family policy in fixed review situations (deterministic: the mean action, no harness).
+
+    python -m motor.show runs/motor/biped_s1/ckpt.pt [out_dir] [--assist 0.4]   (harness level, default 0)
+
+Writes one GIF per situation plus ``summary.json`` with the episode length, whether it fell, the mean goal score
+and the mean of every evaluation term.
+"""
+from __future__ import annotations
+import os
+os.environ.setdefault("MUJOCO_GL", "glfw")
+import json, sys
+import numpy as np
+
+from bodies import HumanBody
+from motor.ppo import make_env, mlp_np
+from motor import evaluate as ev
+
+NO_SORES = {"leg_L": 0.0, "leg_R": 0.0, "arm_L": 0.0, "arm_R": 0.0, "torso": 0.0, "head": 0.0}
+SITUATIONS = [
+    ("stand", dict(goal=(0.0, 0.0)), "standing still"),
+    ("walk", dict(goal=(1.3, 0.0)), "walk 1.3 m/s"),
+    ("run", dict(goal=(3.2, 0.0)), "run 3.2 m/s"),
+    ("turn", dict(goal=(0.0, 1.2)), "walk to the left"),
+    ("ice", dict(goal=(1.3, 0.0), friction=0.1), "walk on ice"),
+    ("sprain", dict(goal=(1.3, 0.0), sores={**NO_SORES, "leg_L": 0.9}), "sprained left ankle"),
+    ("gale", dict(goal=(1.3, 0.0), wind=(0.0, -14.0, 0.0)), "gale from the left"),
+    ("pack", dict(goal=(1.3, 0.0), body=HumanBody(mass=95.0, pack=20.0)), "20 kg pack"),
+    ("child", dict(goal=(1.0, 0.0), body=HumanBody(height=1.2, mass=26.0, muscle=0.9, strength=0.9, flex=1.2)), "child"),
+    ("elder", dict(goal=(0.8, 0.0), body=HumanBody(mass=68.0, muscle=0.55, strength=0.55, flex=0.75)), "weak elder"),
+]
+
+
+def load(path):
+    import torch
+    ck = torch.load(path, weights_only=False)
+    lay = lambda sd, n: [(sd[f"{k}.weight"].numpy().T, sd[f"{k}.bias"].numpy()) for k in n]
+    names = sorted({k.rsplit(".", 1)[0] for k in ck["pi"]}, key=lambda s: int(s))
+    return ck, lay(ck["pi"], names)
+
+
+def run(env, pi, ck, kw, T=300, assist=0.0):
+    mean, std = ck["mean"], np.sqrt(ck["var"] + 1e-6)
+    args = dict(body=HumanBody(), friction=1.0, wind=np.zeros(3), sores=dict(NO_SORES), profile=dict(ev.DEFAULT_WEIGHTS))
+    args.update({k: (np.array(v, float) if k in ("goal", "wind") else v) for k, v in kw.items()})
+    o = env.reset(**args)
+    env.assist = assist
+    frames, costs, goals, speeds, fell = [], [], [], [], False
+    for t in range(T):
+        a = mlp_np(np.clip((o - mean) / std, -10, 10).astype(np.float32), pi)
+        o, _r, d, info = env.step(a)
+        frames.append(env.pc.bone_ends())
+        costs.append(info["costs"]); goals.append(info["goal_now"]); speeds.append(info["speed"])
+        if d:
+            fell = True
+            break
+    n = len(costs)
+    mean_cost = {k: float(np.mean([c[k] for c in costs])) for k in costs[0]}
+    return frames, dict(steps=n, fell=fell, goal=float(np.mean(goals)), speed=float(np.mean(speeds[30:] or speeds)), costs=mean_cost)
+
+
+def main():
+    from render import Scene, Actor, caption, save_gif
+    argv = [a for a in sys.argv[1:]]
+    assist = 0.0
+    if "--assist" in argv:
+        k = argv.index("--assist"); assist = float(argv[k + 1]); del argv[k:k + 2]
+    path = argv[0]; out = argv[1] if len(argv) > 1 else os.path.join(os.path.dirname(path), "show")
+    os.makedirs(out, exist_ok=True)
+    ck, pi = load(path)
+    env = make_env(ck["family"], seed=0)
+    summary = {}
+    for name, kw, title in SITUATIONS:
+        frames, res = run(env, pi, ck, kw, assist=assist)
+        sc = Scene(None, [Actor(env.c, "a", base=(0.85, 0.6, 0.45))], 480, 300)
+        imgs = []
+        for k, (S, E, R) in enumerate(frames[::2]):
+            sc.pose(sc.actors[0], S, E, R)
+            look = np.array([S[0][0], S[0][1], 0.9 * env.c.z0])
+            imgs.append(caption(sc.render(look, 4.0, 120, -12), title, f"t={2 * k / 30:.1f}s"))
+        sc.close()
+        save_gif(imgs, os.path.join(out, name + ".gif"), fps=15)
+        summary[name] = res
+        print(name, "steps", res["steps"], "fell", res["fell"], "goal %.2f speed %.2f" % (res["goal"], res["speed"]), {k: round(v, 3) for k, v in res["costs"].items() if v})
+    json.dump(summary, open(os.path.join(out, "summary.json"), "w"), indent=1)
+
+
+if __name__ == "__main__":
+    main()
