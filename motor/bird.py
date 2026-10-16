@@ -127,7 +127,7 @@ class BirdEnv(FamilyEnv):
         goal_v = np.array([self.goal_world[0], self.goal_world[1], self.climb]) / u
         err = v - goal_v
         sp = float(np.linalg.norm(goal_v[:2]))
-        goal = 0.7 * math.exp(-float(err @ err) / (0.25 + 0.15 * sp * sp))
+        goal = 0.7 * math.exp(-float(err @ err) / (0.05 + 0.1 * sp * sp))
         goal += 0.3 * float(np.clip(float(v[:2] @ (goal_v[:2] / max(sp, 1e-6))) / max(sp, 1e-6), 0.0, 1.0))
         # in the air the capture point means nothing: balance is scored by tilt alone, through the term's weight
         weights = {t: w * self.cost_scale for t, w in self.profile.items()}

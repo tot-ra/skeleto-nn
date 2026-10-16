@@ -265,7 +265,8 @@ class FamilyEnv:
         goal_v = self.goal_world / self.speed_unit()
         err = v - goal_v
         sp = float(np.linalg.norm(goal_v))
-        goal = 0.7 * math.exp(-float(err @ err) / (0.25 + 0.15 * sp * sp))
+        # the tolerance grows with the wanted speed, but standing still must not earn much of a slow walk's goal
+        goal = 0.7 * math.exp(-float(err @ err) / (0.05 + 0.1 * sp * sp))
         if sp > 0.1:
             goal += 0.3 * float(np.clip(float(v @ (goal_v / sp)) / sp, 0.0, 1.0))
             fwd = R[:2, 0] / (np.linalg.norm(R[:2, 0]) + 1e-9)
