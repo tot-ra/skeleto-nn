@@ -12,7 +12,7 @@ code or clip. A new kind of ground, weather or injury is a line of data, and usu
 1. **Situations are data that change physical channels** (`adapt/conditions.py`). "Ice" lowers the
    friction to 0.09 and the air to -5 C; "deep snow" makes the feet sink 0.45 leg lengths; "bleeding"
    opens a wound at a place on the body with a rate and some pain; "gale" adds wind from a direction.
-   There are 25 channels (`adapt/schema.py`): friction, sink, wetness, insulation, air temperature,
+   There are 24 channels (`adapt/schema.py`): friction, sink, wetness, insulation, air temperature,
    core cooling, wind ahead and sideways, bleeding rate, blood lost, wound position (x, y, z on the
    body), pain in each leg and arm, the trunk and the head, fatigue, dizziness, load, darkness, smoke.
 2. **The network sees channels, never names.** Input: the channels plus the body (biped, quadruped
@@ -21,7 +21,7 @@ code or clip. A new kind of ground, weather or injury is a line of data, and usu
    stance width, crouch, trunk pitch and roll, arms held out, each arm hugged to the body, each hand
    pressed on the wound point, head down, shoulders raised, shiver, flat-footed placement, swing
    clearance, limp side, caution, tail tuck, fur or feather fluff, wingbeat rate, amplitude and glide
-   share. A 32-64-64-24 MLP, about 7,000 weights; one evaluation is about 7,000 multiply-adds, so a
+   share. A 31-64-64-24 MLP, about 7,800 weights; one evaluation is about 7,800 multiply-adds, so a
    game can update hundreds of creatures a few times a second.
 3. **It is trained on consequences, not on example motions** (`adapt/model.py`). A differentiable
    reduced-order model scores a style in a situation by what would physically follow: the required
@@ -104,12 +104,55 @@ and wider; a crow with a hurt wing flaps less; with a tailwind it glides more.
   on 2,000 held-out cases: it reaches 99.9 % of the possible cost reduction (cost from 10.3 with the
   neutral style to 1.69 with the network, against 1.63 for the per-case optimum).
 
+## Jumping by context (`adapt/leap.py`)
+
+A second network decides jumps from the same channels. What lies ahead is a profile: every quarter leg
+length for five leg lengths, the height of whatever is solid there relative to the feet and the depth of
+water on it. One MLP (41 inputs: the body, the 24 channels and ten numbers about one landing place, such
+as its height and water, the highest and lowest thing passed over, where the first edge is and how much
+room there is after landing; two hidden layers of 96) is evaluated for every sample as a landing place
+and gives a score against staying put and a jump program: a step before take-off, the arc height over
+the highest point passed, hands on the obstacle, tucked legs, how deep the landing gives, a roll,
+lowering oneself from the edge first, arms out, trunk lean. The best place wins, or staying.
+
+It is trained the same way, through a differentiable model of consequences (`cost`): the take-off speed
+the legs can give (weakened by pain, blood loss, fatigue, a load, sinking feet) plus what the arms can
+pull on a top within reach; the take-off slipping where friction is low; the feet clearing what lies
+between (the hands and tucked legs help); the landing force (drop height over the stroke of the knees, a
+roll or the water) against a bone tolerance that is lower with a sore leg and higher for small and
+four-legged bodies; slipping or running off a narrow top; cold water, deep water with a load, a useless
+arm or blood loss; effort, time and the ground gained. A first version with one flat network over the
+whole profile reached only 30 to 60 % of the possible gain and mostly refused; scoring each landing
+place with one shared network reaches 91 % (`python -m adapt.leap --check`: cost 0.198 against 0.187 for
+a per-case optimisation and 0.30 for staying; same jump-or-stay decision in 95 % of 600 held-out cases).
+Training: `python -m adapt.leap` (12,000 steps of 3,072 random bodies, situations and scenes, about 12
+minutes on a CPU).
+
+`python -m adapt.leap --probe` (a 58 kg, 0.86 m leg teenager who wants across):
+
+| scene | normal | ice | sprained ankle | heavy load |
+|---|---|---|---|---|
+| churchyard wall 0.85 m | vault (hands 0.78), lands 2.3 m on | refuse | refuse | refuse |
+| wall 1.3 m | vault (hands 0.98) | refuse | refuse | refuse |
+| wall 2.2 m | refuse | refuse | refuse | refuse |
+| ledge up 1.4 m | pull up onto (hands 1.0) | refuse | pull up onto | refuse |
+| drop 1 m | jump down, full knee give | refuse | jump down | jump down |
+| drop 2.5 m, drop 6 m onto stone | refuse | refuse | refuse | refuse |
+| quay 2 m over deep water | jump into water | refuse | jump into water | refuse |
+| cliff 8 m over shallow water | refuse | refuse | refuse | refuse |
+
+Quadrupeds are in the same network (a dog with a jump gain of 2.5 at a 0.6 m fence is an export golden
+case). Limits: the hang-drop exists in the program but never wins over a refusal at the drops tested;
+there is no fall: a chosen jump is assumed to succeed; birds fly instead.
+
 ## Running it in an engine
 
 `python -m adapt.export_engine OUT_DIR` writes `style_net.json` (weights with the input and output schema),
 `motion_conditions.json` (the condition registry, body regions, region -> pain channel) and
 `style_net_golden.json` (bodies, conditions, channels, expected raw and calibrated styles, and a ten-minute
-physiology run), so a port can prove it computes the same numbers. The Reval Rebel game runs a GDScript
+physiology run), so a port can prove it computes the same numbers. It also writes `leap_net.json` and `leap_net_golden.json`
+(scenes in metres with the expected decision, knobs and arc). The Reval Rebel game runs the jump network for
+its hero (vault a churchyard wall, jump off a deck into the sea, refuse a bank). The Reval Rebel game runs a GDScript
 port (forward pass 0.14 ms; 40 creatures 0.34 ms per frame with caching) on its humanoid rigs, skinned
 animals and flying birds; a condition list may also carry measured values (`{"air_temp": -6.0}`).
 

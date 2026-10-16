@@ -7,6 +7,8 @@ Writes
   motion_conditions.json  the condition registry, body regions and region -> pain channel map
   style_net_golden.json   cases (body, conditions, channels) with the expected raw and calibrated style,
                           and a physiology run, so an engine port can assert it computes the same numbers
+  leap_net.json           the jump network (``adapt/leap.py``)
+  leap_net_golden.json    scenes (profiles in metres) with the expected decision, knobs and arc
 """
 from __future__ import annotations
 import json, math, os, shutil, sys
@@ -17,6 +19,7 @@ from .physiology import BodyState, Exposure
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NET = os.path.join(HERE, "results", "style_net.json")
+LEAP = os.path.join(HERE, "results", "leap_net.json")
 
 GOLDEN = [
     ("biped", 70.0, 0.9, False, 0.25, []),
@@ -62,12 +65,35 @@ def golden(net: StyleNet):
     return dict(cases=cases, physiology=dict(env=env, style=st, power=0.3, rain=1.0, press_even_steps=0.9, dt=1.0, wound=dict(region="thigh", side="L", rate=0.8, pain=0.5), trace=trace))
 
 
+def leap_golden():
+    from . import leap as L
+    net = L.LeapNet(LEAP); cases = []
+    sits = [[], ["ice"], [["sprain", 1.0, {"side": "L"}]], ["heavy_load"]]
+    for conds in sits:
+        ch = channels_from(_conds(conds))
+        for name, feats, _ in L.SCENES:
+            z, w, thin = L.profile(0.86, *feats)
+            d = net.decide("biped", 58.0, 0.86, 0.0, 1.0, 0.9, ch, z, w, ~thin)
+            cases.append(dict(scene=name, conditions=conds, channels=ch, kind="biped", mass=58.0, leg=0.86, speed=0.0, gain=1.0,
+                              urgency=0.9, z=z.tolist(), w=w.tolist(), standable=(~thin).tolist(),
+                              expect={k: v for k, v in d.items() if k != "logits"}))
+    z, w, thin = L.profile(0.5, ("wall", 0.4, 0.6, 0.2, 0.0))
+    ch = channels_from([])
+    d = net.decide("quadruped", 25.0, 0.5, 2.0, 2.5, 0.7, ch, z, w, ~thin)
+    cases.append(dict(scene="dog at a 0.6 m fence", conditions=[], channels=ch, kind="quadruped", mass=25.0, leg=0.5, speed=2.0, gain=2.5,
+                      urgency=0.7, z=z.tolist(), w=w.tolist(), standable=(~thin).tolist(), expect={k: v for k, v in d.items() if k != "logits"}))
+    return dict(cases=cases)
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     shutil.copy(NET, os.path.join(out, "style_net.json"))
     json.dump(dict(conditions=CONDITIONS, regions={k: list(v) for k, v in REGIONS.items()}, region_pain=REGION_PAIN),
               open(os.path.join(out, "motion_conditions.json"), "w"), indent=1)
     json.dump(golden(StyleNet(NET)), open(os.path.join(out, "style_net_golden.json"), "w"), indent=1)
+    if os.path.exists(LEAP):
+        shutil.copy(LEAP, os.path.join(out, "leap_net.json"))
+        json.dump(leap_golden(), open(os.path.join(out, "leap_net_golden.json"), "w"), indent=1)
     print("wrote", out)
 
 
