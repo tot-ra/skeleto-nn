@@ -2,6 +2,20 @@
 
 Procedural character motion for **any skeleton**: people, dogs, cats, horses, birds, snakes. No animation clips and no script per situation for locomotion: a body is a tree of bones with joint limits, masses and a few anatomical and physiological numbers (muscle power, energy, flexibility, a heavy belly, clothing), and one planner makes it walk, run, jump, climb, duck, react to blows and fall. What is learned or evolved is always scored by one pain / bone-injury model.
 
+**The neural network:** a small MLP (32-64-64-24, about 7,000 weights) adapts how any of these bodies moves to its situation: ice, mud, snow, rain and wet clothes, frost, wind, smoke, darkness, bleeding wounds, sprains, broken bones, drink, exhaustion. It is trained in about 25 s on a CPU, without motion-capture data. The trained weights are [`results/style_net.json`](results/style_net.json); the forward pass is `adapt/net.py` (numpy), so it ports to any engine (a GDScript port runs in the Reval Rebel game). Details: [docs/ADAPT.md](docs/ADAPT.md).
+
+**How each motion is made.** The repository is a research workbench, and the parts are built in four different ways. Each showcase GIF is labelled with its way:
+
+| label | what it means | neural network? |
+|---|---|---|
+| *style network* | the MLP above changes the planner's style (stride, crouch, arms, limp, wingbeat ...) for the situation | yes, trained |
+| *emergent* | general rules from the body and the terrain: gait from the Froude number, footholds searched on the ground, reactions chosen by predicting pain. Nothing is authored for that one motion | no, algorithm |
+| *goal script* | an authored sequence of goals for pelvis, hands and feet (sit on a chair, climb a ladder), solved by IK | no, authored |
+| *kinematic model* | a hand-built motion model for one kind of movement (swim stroke, flapping flight, a bird landing, a snake): joint angles as functions of a phase | no, hand-built |
+| *physics, evolved* | the body is a MuJoCo ragdoll with muscles and the controller's parameters are found by evolution (CMA-ES) on the injury score: the fall and landing reflex, the slope controller, the physical swimmer and bird. They are parameter files in `results/`, not neural networks; the fall reflex works, swimming and flight do not yet (see the status table) | no, evolved parameters |
+
+The physics experiments are kept as the route to real balance and recovery; what an engine can use today is the planner plus the style network (see [From the planner to your engine](#from-the-planner-to-your-engine)).
+
 ![walk and run](showcase/sim/walk_run.gif)
 
 **The whole showcase (about 90 GIFs) is further down this page, grouped by topic (people, jumping, climbing, fights, cat, dog, horse and rider, birds, water, physical falls); the same page as HTML is [`showcase/index.html`](showcase/index.html).**
@@ -72,7 +86,7 @@ A reflex evolved for this body keeps the belly off the ground (risk 0.07 against
 
 ## Showcase
 
-Every GIF below is produced by `python catalog.py gif <name> out.gif`. The label says how the motion is made: **emergent** (general rules from the body and terrain), **goal script** (goals for pelvis, hands and feet + IK), **kinematic model** (hand-built), **physics, evolved**. The same page as HTML: [`showcase/index.html`](showcase/index.html).
+Every GIF below is produced by `python catalog.py gif <name> out.gif`. The label says how the motion is made (see [How each motion is made](#skeleto-nn) at the top): **style network** (the trained MLP), **emergent** (general rules from the body and terrain), **goal script** (goals for pelvis, hands and feet + IK), **kinematic model** (hand-built), **physics, evolved** (MuJoCo body, controller parameters found by CMA-ES). The same page as HTML: [`showcase/index.html`](showcase/index.html).
 
 ### Adapting to the situation: one network for ground, weather, injury and state ([docs/ADAPT.md](docs/ADAPT.md))
 
