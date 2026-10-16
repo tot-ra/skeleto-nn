@@ -16,7 +16,7 @@ from motor.ppo import make_env, mlp_np
 from motor import evaluate as ev
 
 NO_SORES = {"leg_L": 0.0, "leg_R": 0.0, "arm_L": 0.0, "arm_R": 0.0, "torso": 0.0, "head": 0.0}
-SITUATIONS = [
+BIPED = [
     ("stand", dict(goal=(0.0, 0.0)), "standing still"),
     ("walk", dict(goal=(1.3, 0.0)), "walk 1.3 m/s"),
     ("run", dict(goal=(3.2, 0.0)), "run 3.2 m/s"),
@@ -30,6 +30,24 @@ SITUATIONS = [
 ]
 
 
+def situations(family, env):
+    """(name, reset arguments, title); quadruped goals are in Froude speed units of the body shown."""
+    if family == "biped":
+        return BIPED
+    from bodies import QUADS
+    from motor.quadruped import canonical
+    out = []
+    for sp in ("dog", "cat", "horse", "pig"):
+        body = canonical(QUADS[sp])
+        out += [(f"{sp}_walk", dict(body=body, goal=(0.5, 0.0)), f"{sp}, walk"),
+                (f"{sp}_trot", dict(body=body, goal=(1.0, 0.0)), f"{sp}, trot")]
+    out += [("dog_ice", dict(body=canonical(QUADS["dog"]), goal=(0.6, 0.0), friction=0.1), "dog on ice"),
+            ("dog_lame", dict(body=canonical(QUADS["dog"]), goal=(0.6, 0.0),
+                              sores={"leg_HL": 0.0, "leg_HR": 0.0, "leg_FL": 0.9, "leg_FR": 0.0, "torso": 0.0, "head": 0.0}),
+             "dog, sore front left leg")]
+    return out
+
+
 def load(path):
     import torch
     ck = torch.load(path, weights_only=False)
@@ -40,8 +58,11 @@ def load(path):
 
 def run(env, pi, ck, kw, T=300, assist=0.0):
     mean, std = ck["mean"], np.sqrt(ck["var"] + 1e-6)
-    args = dict(body=HumanBody(), friction=1.0, wind=np.zeros(3), sores=dict(NO_SORES), profile=dict(ev.DEFAULT_WEIGHTS))
+    body = kw.get("body", env.default_body())
+    env._build(body)
+    args = dict(body=body, friction=1.0, wind=np.zeros(3), sores={k: 0.0 for k in env.SORES}, profile=dict(ev.DEFAULT_WEIGHTS))
     args.update({k: (np.array(v, float) if k in ("goal", "wind") else v) for k, v in kw.items()})
+    args["goal"] = args.get("goal", np.zeros(2)) * (env.speed_unit() if env.family != "biped" else 1.0)
     o = env.reset(**args)
     env.assist = assist
     frames, costs, goals, speeds, fell = [], [], [], [], False
@@ -69,7 +90,7 @@ def main():
     ck, pi = load(path)
     env = make_env(ck["family"], seed=0)
     summary = {}
-    for name, kw, title in SITUATIONS:
+    for name, kw, title in situations(ck["family"], env):
         frames, res = run(env, pi, ck, kw, assist=assist)
         sc = Scene(None, [Actor(env.c, "a", base=(0.85, 0.6, 0.45))], 480, 300)
         imgs = []

@@ -83,12 +83,17 @@ class Evaluator:
                     reg = "abdomen"
                 self.region_of_geom[gid] = reg
         self.foot_geoms = set(pc.foot_geoms); self.hand_geoms = set(pc.hand_geoms)
-        self.leg_side = {g: l.side for g, l in zip(pc.foot_geoms, c.legs)}
+        # every foot carries its own sore: "leg_L"/"leg_R" for a biped, "leg_HL" ... "leg_FR" for a quadruped
+        key = lambda l: l.name if l.name.startswith("leg_") else "leg_" + l.name
+        self.leg_side = {g: key(l) for g, l in zip(pc.foot_geoms, c.legs)}
         for l in c.legs:                                     # the toes are part of the foot
-            if l.toes is not None:
-                g = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "g_" + sk.bones[l.toes].name)
+            extra = [l.toes] if l.toes is not None else []
+            if c.kind == "quadruped":                        # a standing dog rests the metapodial near the paw on the ground
+                extra.append(l.chain[-2])
+            for b in extra:
+                g = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "g_" + sk.bones[b].name)
                 if g >= 0:
-                    self.foot_geoms.add(g); self.leg_side[g] = l.side
+                    self.foot_geoms.add(g); self.leg_side[g] = key(l)
         self.arm_side = {}
         for a in c.arms:
             for i in a.chain:
@@ -163,7 +168,7 @@ class Evaluator:
             self.prev_force[r] = reg[r]
         inj /= dt                                            # an event: its expected injuries are spent in this one step
         s = self.sore
-        pain = (s.get("leg_L", 0.0) * foot.get("L", 0.0) + s.get("leg_R", 0.0) * foot.get("R", 0.0)
+        pain = (sum(s.get(k, 0.0) * f for k, f in foot.items())
                 + s.get("torso", 0.0) * (reg["torso"] + reg["abdomen"]) + s.get("head", 0.0) * reg["head"])
         for j, i in enumerate(self.dof_bone):                # a sore arm hurts when it works
             side = self.arm_side.get(int(i))

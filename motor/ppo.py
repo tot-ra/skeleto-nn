@@ -16,7 +16,7 @@ import argparse, json, math, time
 import multiprocessing as mp
 import numpy as np
 
-FAMILIES = {"biped": ("motor.biped", "BipedEnv")}
+FAMILIES = {"biped": ("motor.biped", "BipedEnv"), "quadruped": ("motor.quadruped", "QuadrupedEnv")}
 
 
 def make_env(family, **kw):
@@ -43,7 +43,7 @@ def worker(conn, family, seed, env_kw):
         if msg[0] == "stop":
             break
         if msg[0] == "assist":
-            env.assist, env.spread = msg[1], msg[2]; conn.send(("ok",)); continue
+            env.assist, env.spread, env.max_speed = msg[1], msg[2], msg[3]; conn.send(("ok",)); continue
         _, W, norm, n = msg
         mean, std = norm
         O, A, LP, R, D, V, infos, costs = [], [], [], [], [], [], [], []
@@ -76,14 +76,18 @@ def main():
     ap.add_argument("--hours", type=float, default=3.0); ap.add_argument("--iters", type=int, default=100000)
     ap.add_argument("--lr", type=float, default=2e-4); ap.add_argument("--init", default=None)
     ap.add_argument("--sym", type=float, default=4.0, help="weight of the mirror loss")
-    ap.add_argument("--assist0", type=float, default=1.0); ap.add_argument("--spread", type=float, default=0.3,
-                                                                          help="variety of bodies and situations at the start (grows to 1)")
+    ap.add_argument("--assist0", type=float, default=1.0); ap.add_argument("--spread", type=float, default=0.0,
+                                                                          help="variety of bodies and situations at the start (grows to 1 with success)")
+    ap.add_argument("--alive", type=float, default=None); ap.add_argument("--fall-cost", type=float, default=None)
+    ap.add_argument("--cost-scale", type=float, default=1.0, help="multiplies every evaluation cost")
     ap.add_argument("--hidden", type=int, default=512)
+    ap.add_argument("--speed0", type=float, default=0.8, help="goal speeds at the start of the curriculum (m/s)")
+    ap.add_argument("--fade", type=float, default=0.0015, help="harness lost per iteration regardless of success")
     args = ap.parse_args()
     import torch, torch.nn as nn
-    torch.set_num_threads(4)
+    torch.set_num_threads(2)                 # leave the cores to the simulation workers
     out = os.path.join("runs", "motor", args.name); os.makedirs(out, exist_ok=True)
-    env_kw = dict(spread=args.spread)
+    env_kw = dict(spread=args.spread, alive=args.alive, fall_cost=args.fall_cost, cost_scale=args.cost_scale)
     ref = make_env(args.family, seed=0, **env_kw)
     ctx = mp.get_context("spawn"); conns = []
     for i in range(args.workers):
@@ -100,11 +104,12 @@ def main():
     logstd = nn.Parameter(torch.full((ad,), -2.5))
     opt = torch.optim.Adam(list(pi.parameters()) + list(vf.parameters()) + [logstd], lr=args.lr)
     mean = np.zeros(od, np.float32); var = np.ones(od, np.float32); cnt = 1e-4
-    assist = args.assist0; it0 = 0
+    assist = args.assist0; it0 = 0; max_speed = args.speed0; spread = args.spread
     if args.init:
         ck = torch.load(args.init, weights_only=False)
         pi.load_state_dict(ck["pi"]); vf.load_state_dict(ck["vf"]); logstd.data = ck["logstd"]
         mean, var, cnt = ck["mean"], ck["var"], ck["cnt"]; assist = ck.get("assist", 0.0); it0 = ck.get("it", 0)
+        max_speed = ck.get("max_speed", 4.0); spread = ck.get("spread", 1.0)
     m_perm = torch.tensor(ref.m_perm); m_sign = torch.tensor(ref.m_sign, dtype=torch.float32)
 
     def export():
@@ -113,7 +118,7 @@ def main():
 
     def save(it):
         torch.save(dict(pi=pi.state_dict(), vf=vf.state_dict(), logstd=logstd.data, mean=mean, var=var, cnt=cnt, it=it,
-                        assist=assist, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args)),
+                        assist=assist, max_speed=max_speed, spread=spread, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args)),
                    os.path.join(out, "ckpt.pt"))
 
     log = open(os.path.join(out, "log.csv"), "a"); t_start = time.time()
@@ -121,8 +126,7 @@ def main():
     cost_names = sorted(ref.ev.totals)
     for it in range(it0, it0 + args.iters):
         t0 = time.time()
-        spread = args.spread + (1.0 - args.spread) * (1.0 - assist / max(args.assist0, 1e-6))
-        for c in conns: c.send(("assist", assist, spread))
+        for c in conns: c.send(("assist", assist, spread, max_speed))
         for c in conns: c.recv()
         W = export(); norm = (mean, np.sqrt(var + 1e-6).astype(np.float32))
         for c in conns: c.send(("roll", W, norm, args.steps))
@@ -171,12 +175,17 @@ def main():
         fell = np.mean([i[2] for i in infos]) if n_ep else float("nan")
         goal = np.mean([i[3] for i in infos]) if n_ep else float("nan")
         # curriculum: lower the harness when episodes run long and few fall
-        if n_ep and goal > 0.55 and fell < 0.3:              # only when the goal is met, not merely when it stands
-            assist = max(0.0, assist - 0.02)
-        elif n_ep and fell > 0.8 and assist < args.assist0:
-            assist = min(args.assist0, assist + 0.005)
+        # curriculum: the harness fades with time (so standing still under it never becomes a home) and faster while
+        # the goal is met; goal speeds grow while it is met
+        assist = max(0.0, assist - args.fade)
+        if n_ep and goal > 0.5 and fell < 0.3:
+            assist = max(0.0, assist - 0.01)
+            max_speed = min(4.0, max_speed + 0.03)
+            spread = min(1.0, spread + 0.01)
+        elif n_ep and fell > 0.7 and assist < 0.3:
+            assist = min(args.assist0, assist + 0.01)
         costs = " ".join(f"{k}={v:.3f}" for k, v in zip(cost_names, cm) if k not in ("heat", "breath"))
-        line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} fell={fell:.2f} goal={goal:.3f} assist={assist:.2f} spread={spread:.2f} "
+        line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} fell={fell:.2f} goal={goal:.3f} assist={assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
                 f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs} t={(time.time() - t_start) / 60:.1f}m")
         print(line, flush=True); log.write(line + "\n"); log.flush()
         if it % 10 == 9:

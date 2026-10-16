@@ -65,3 +65,32 @@ def test_a_drop_onto_the_ground_is_scored_as_injury():
 
 def test_profile_vector_is_zero_for_the_default_weights():
     assert np.abs(ev.profile_vector(ev.DEFAULT_WEIGHTS)).max() == 0.0
+
+
+def test_exploration_noise_does_not_cost_more_energy_than_a_brisk_walk():
+    # muscle activation dynamics (50 ms): commands that flip every step must not make the body vibrate
+    from motor.quadruped import QuadrupedEnv
+    for E in (BipedEnv, QuadrupedEnv):
+        env = E(seed=1, spread=0.0)
+        env.reset(goal=np.zeros(2), friction=1.0, wind=np.zeros(3))
+        rng = np.random.default_rng(0); e = []
+        for _ in range(30):
+            _o, _r, _d, info = env.step(rng.normal(0, 0.08, env.act_dim))
+            e.append(info["costs"]["energy"])
+        assert np.mean(e) < ev.SUSTAIN, (E.__name__, np.mean(e))
+
+
+def test_quadruped_mirror_matches_the_reflected_world():
+    from motor.quadruped import QuadrupedEnv
+    env = QuadrupedEnv(seed=3, spread=0.0)
+    env.reset(goal=np.array([0.7, 0.3]), wind=np.array([2.0, 5.0, 0.0]), friction=1.0)
+    rng = np.random.default_rng(0)
+    q = np.clip(rng.normal(0, 0.3, env.J), env.pc.lo, env.pc.hi); qd = rng.normal(0, 1, env.J)
+    env.pc.set_state(np.array([0, 0, 1.0]), np.eye(3), q, np.array([0.5, 0.4, 0.1]), np.array([0.3, 0.2, 0.5]), qd)
+    env.prev_a = rng.normal(0, 0.5, env.J); env.sores_now["leg_FL"] = 0.7
+    o1 = env.obs()
+    env.pc.set_state(np.array([0, 0, 1.0]), np.eye(3), q[env.m_perm] * env.m_sign, np.array([0.5, -0.4, 0.1]),
+                     np.array([-0.3, 0.2, -0.5]), qd[env.m_perm] * env.m_sign)
+    env.prev_a = env.mirror_act(env.prev_a); env.sores_now["leg_FL"] = 0.0; env.sores_now["leg_FR"] = 0.7
+    env.goal_world = env.goal_world * np.array([1, -1]); env.wind.w = env.wind.w * np.array([1, -1, 1])
+    assert np.abs(env.mirror_obs(o1) - env.obs()).max() < 1e-5

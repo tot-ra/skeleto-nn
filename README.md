@@ -64,9 +64,9 @@ first two runs, kept to show where the work stands ([docs/MOTOR.md](docs/MOTOR.m
 | Style network for people, quadrupeds and birds | works; 99.9 % of per-case optimum on held-out cases; tests |
 | Jump network for people and quadrupeds | works; 91 % of per-case optimum, 95 % same decision; numpy equals torch; tests |
 | Motor networks: evaluation system (`motor/evaluate.py`) | works; each term responds to its own consequence (tests) |
-| Motor networks: biped environment, mirror symmetry, PPO with symmetry loss and harness (`motor/biped.py`, `motor/ppo.py`) | works; about 9,000 simulated steps per second on 15 CPU workers |
-| Motor networks: a biped policy that walks | **not yet**: run 1 leaned and was pushed, run 2 stands still (above). Next: a speed curriculum from standing, a harness that fades with time, starts from mid-stride |
-| Quadruped, mixed-body (monkey, bear, kangaroo, cat, penguin), bird and snake motor networks | not started |
+| Motor networks: shared family environment with muscle activation (`motor/family.py`), biped and quadruped families (`motor/biped.py`, `motor/quadruped.py`: dog, cat, wolf, goat, horse, pig, bear on one canonical skeleton), mirror symmetry, PPO with symmetry loss, curriculum and fading harness (`motor/ppo.py`), population-based training where bad runs die off (`motor/pbt.py`) | works; tests |
+| Motor networks: a biped or quadruped policy that walks | **not yet**: run 1 leaned and was pushed, run 2 stands still (above); exploration noise was making the muscles vibrate at 13 to 20 times walking energy, fixed by muscle activation dynamics. Population runs for both families are in progress |
+| Mixed-body (monkey, bear on two legs, kangaroo, penguin), bird and snake motor networks | not started |
 | A distilled pose network that a game runs without physics | not started |
 
 ## Run it
@@ -82,7 +82,8 @@ python -m adapt.probe --body dog                # what the network does in named
 python -m adapt.leap                            # jump network (about 12 min, CPU); --check, --probe
 python -m adapt.export_engine OUT_DIR           # weights, condition registry and golden vectors for ports
 
-python -m motor.ppo --family biped --name biped --workers 15 --hours 4   # motor network
+python -m motor.pbt --family biped --name biped_pbt --members 3 --workers 3   # population training (also --family quadruped)
+python -m motor.ppo --family biped --name biped --workers 15 --hours 4   # a single run
 python -m motor.show runs/motor/biped/ckpt.pt [out_dir] [--assist 0.4]   # GIFs and summary.json, ten review situations
 
 python -m pytest tests/test_adapt.py tests/test_leap.py tests/test_motor.py
