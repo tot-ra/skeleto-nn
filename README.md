@@ -1,4 +1,4 @@
-# skeleto-nn
+# ☠️ skeleto-nn
 
 Procedural character motion for **any skeleton**: people, dogs, cats, horses, birds, snakes. No animation clips and no script per situation for locomotion: a body is a tree of bones with joint limits, masses and a few anatomical and physiological numbers (muscle power, energy, flexibility, a heavy belly, clothing), and one planner makes it walk, run, jump, climb, duck, react to blows and fall. What is learned or evolved is always scored by one pain / bone-injury model.
 
