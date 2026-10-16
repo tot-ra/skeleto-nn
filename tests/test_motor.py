@@ -94,3 +94,18 @@ def test_quadruped_mirror_matches_the_reflected_world():
     env.prev_a = env.mirror_act(env.prev_a); env.sores_now["leg_FL"] = 0.0; env.sores_now["leg_FR"] = 0.7
     env.goal_world = env.goal_world * np.array([1, -1]); env.wind.w = env.wind.w * np.array([1, -1, 1])
     assert np.abs(env.mirror_obs(o1) - env.obs()).max() < 1e-5
+
+
+def test_bird_flies_under_the_harness_and_falls_without_it():
+    from motor.bird import BirdEnv
+    env = BirdEnv(seed=1, spread=0.0)
+    o = env.reset()
+    assert np.abs(env.mirror_obs(env.mirror_obs(o)) - o).max() == 0.0
+    for assist, expect_fall in ((1.0, False), (0.0, True)):
+        env.assist = assist; env.reset(); fell = False
+        for _ in range(150):
+            _o, _r, d, _info = env.step(np.zeros(env.act_dim))
+            if d:
+                fell = True
+                break
+        assert fell == expect_fall

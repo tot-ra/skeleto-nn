@@ -21,6 +21,11 @@ from bodies import HumanBody
 
 def tests(family):
     """(goal velocity in the family's speed units, extra reset arguments); each runs from a standing and a moving start."""
+    if family == "bird":
+        from bodies import BIRDS
+        return [((2.0, 0.0), {}), ((3.0, 0.0), {}), ((2.5, 0.0), {"climb": 0.3}), ((2.5, 0.0), {"climb": -0.3}),
+                ((2.5, 0.6), {}), ((2.5, 0.0), {"wind": np.array([0.0, -6.0, 0.0])}), ((2.5, 0.0), {"body": BIRDS["gull"]}),
+                ((2.5, 0.0), {"body": BIRDS["sparrow"]})]
     if family == "quadruped":
         from bodies import QUADS
         from motor.quadruped import canonical
@@ -52,8 +57,9 @@ def score(ckpt, family="biped", T=240, seed=0):
             env.moving_start = moving
             body = extra.get("body", env.default_body())
             env._build(body)
+            unit = 1.0 if family == "bird" else env.speed_unit()          # the bird env takes goals in speed units
             args = dict(body=body, friction=1.0, wind=np.zeros(3), sores={k: 0.0 for k in env.SORES},
-                        profile=dict(ev.DEFAULT_WEIGHTS), goal=np.array(g, float) * env.speed_unit())
+                        profile=dict(ev.DEFAULT_WEIGHTS), goal=np.array(g, float) * unit)
             args.update({k: v for k, v in extra.items() if k != "body"})
             o = env.reset(**args); env.assist = 0.0
             goals, n = [], 0

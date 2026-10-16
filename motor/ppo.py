@@ -16,7 +16,8 @@ import argparse, json, math, time
 import multiprocessing as mp
 import numpy as np
 
-FAMILIES = {"biped": ("motor.biped", "BipedEnv"), "quadruped": ("motor.quadruped", "QuadrupedEnv")}
+FAMILIES = {"biped": ("motor.biped", "BipedEnv"), "quadruped": ("motor.quadruped", "QuadrupedEnv"),
+            "bird": ("motor.bird", "BirdEnv")}
 
 
 def make_env(family, **kw):

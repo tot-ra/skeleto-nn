@@ -64,9 +64,10 @@ first two runs, kept to show where the work stands ([docs/MOTOR.md](docs/MOTOR.m
 | Style network for people, quadrupeds and birds | works; 99.9 % of per-case optimum on held-out cases; tests |
 | Jump network for people and quadrupeds | works; 91 % of per-case optimum, 95 % same decision; numpy equals torch; tests |
 | Motor networks: evaluation system (`motor/evaluate.py`) | works; each term responds to its own consequence (tests) |
-| Motor networks: shared family environment with muscle activation (`motor/family.py`), biped and quadruped families (`motor/biped.py`, `motor/quadruped.py`: dog, cat, wolf, goat, horse, pig, bear on one canonical skeleton), mirror symmetry, PPO with symmetry loss, curriculum and fading harness (`motor/ppo.py`), population-based training where bad runs die off (`motor/pbt.py`) | works; tests |
+| Motor networks: shared family environment with muscle activation (`motor/family.py`), biped, quadruped and bird families (`motor/biped.py`, `motor/quadruped.py`: dog, cat, wolf, goat, horse, pig, bear on one canonical skeleton; `motor/bird.py`: flight for crow, gull, heron, sparrow, duck), mirror symmetry, PPO with symmetry loss, curriculum and fading harness (`motor/ppo.py`), population-based training where bad runs die off (`motor/pbt.py`) | works; tests |
 | Motor networks: a biped or quadruped policy that walks | **not yet**: run 1 leaned and was pushed, run 2 stands still (above); exploration noise was making the muscles vibrate at 13 to 20 times walking energy, fixed by muscle activation dynamics. Population runs for both families are in progress |
-| Mixed-body (monkey, bear on two legs, kangaroo, penguin), bird and snake motor networks | not started |
+| Bird motor network | environment built (flight); training not started |
+| Mixed-body (monkey, bear on two legs, kangaroo, penguin) and snake motor networks | not started |
 | A distilled pose network that a game runs without physics | not started |
 
 ## Run it

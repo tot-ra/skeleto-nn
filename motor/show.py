@@ -34,6 +34,12 @@ def situations(family, env):
     """(name, reset arguments, title); quadruped goals are in Froude speed units of the body shown."""
     if family == "biped":
         return BIPED
+    if family == "bird":
+        from bodies import BIRDS
+        return [("crow_cruise", dict(goal=(2.5, 0.0)), "crow, cruise"), ("crow_climb", dict(goal=(2.5, 0.0), climb=0.4), "crow, climb"),
+                ("crow_turn", dict(goal=(2.0, 0.8)), "crow, turn"), ("crow_wind", dict(goal=(2.5, 0.0), wind=(0.0, -6.0, 0.0)), "crow, side wind"),
+                ("gull", dict(body=BIRDS["gull"], goal=(2.5, 0.0)), "gull"), ("sparrow", dict(body=BIRDS["sparrow"], goal=(2.5, 0.0)), "sparrow"),
+                ("heron", dict(body=BIRDS["heron"], goal=(2.2, 0.0)), "heron")]
     from bodies import QUADS
     from motor.quadruped import canonical
     out = []
@@ -62,7 +68,7 @@ def run(env, pi, ck, kw, T=300, assist=0.0):
     env._build(body)
     args = dict(body=body, friction=1.0, wind=np.zeros(3), sores={k: 0.0 for k in env.SORES}, profile=dict(ev.DEFAULT_WEIGHTS))
     args.update({k: (np.array(v, float) if k in ("goal", "wind") else v) for k, v in kw.items()})
-    args["goal"] = args.get("goal", np.zeros(2)) * (env.speed_unit() if env.family != "biped" else 1.0)
+    args["goal"] = args.get("goal", np.zeros(2)) * (env.speed_unit() if env.family == "quadruped" else 1.0)
     o = env.reset(**args)
     env.assist = assist
     frames, costs, goals, speeds, fell = [], [], [], [], False

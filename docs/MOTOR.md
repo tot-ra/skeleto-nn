@@ -52,7 +52,12 @@ named sores, a mid-stride start pose and the unit of goal speed.
 | biped | `bodies.human`: 24 bones, 53 joint axes; height 1.1 to 2.0 m, body mass index, muscle, flexibility, sex, a pack, armour, a belly; **no fingers yet** (see Limits) | obs 202, act 53 | m/s |
 | quadruped | `bodies.quadruped` on a canonical skeleton (4 spine, 3 neck, 4 tail joints, four legs of thigh, shank, metapodial, paw or hoof): dog, cat, wolf, goat, horse, pig, bear and variations; a species' total spinal range is spread over the four spine joints, so a cat's back still bends five times as far as a horse's | obs 244, act 64 | sqrt(g x leg length) |
 
-Mixed bodies (monkey, bear on two legs, kangaroo, penguin), birds (with the air model of `air.py`) and snakes are not
+| bird | `bodies.bird`, one skeleton for every species (4 neck, 2 tail joints, three wing and four leg segments a side): crow, gull, heron, sparrow, duck and variations; wings and tail are flat plates in the air of `air.py` (lift with stall, drag, wind); nothing about flapping is authored | obs 211, act 56 | sqrt(g x wingspan) |
+
+Birds start in the air at about the goal velocity (horizontal velocity and a climb rate), 3 to 6 wingspans up; touching
+the ground ends the flight and its force is scored as injury; balance is scored by tilt only (a capture point means
+nothing in the air); the harness carries part of the weight and holds the body level. Take-off, landing, perching,
+walking and swimming birds come later. Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
 
 ## Training (`motor/ppo.py`, `motor/pbt.py`)
