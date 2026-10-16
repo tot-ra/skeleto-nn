@@ -103,8 +103,9 @@ nothing here is used by a game yet. The first two runs (GIFs in the README, `sho
 | 2 | plus a reward for staying upright and a fall cost; the goal pays for partial progress; the harness only holds, never pushes | to stand still under the full harness (0.04 m/s when asked for 1.3 m/s); the harness never faded because the goal was never met, and without it the policy falls within 2 s |
 
 | 3 | population training (3 bipeds, 2 quadrupeds, 16 rounds, about 4 h); curriculum, moving starts, activation | to stand perfectly on its own, in every situation and at any asked speed (0.00 m/s when asked for 1.3 m/s); from a moving start it falls within 1 s. Scores flat at 0.36 to 0.38 |
+| 4 | run 3's weights; stalls end episodes; speed caps; curriculum restarted (2 h) | **biped: the first walk**: upright, alternating steps for the full 10 s at 0.65 m/s when asked for 1.3; turns, ice, a pack, a child's body still fall. Quadruped: still stands; its curriculum ran away again because a stall did not count as a failure (fixed: the curriculum now counts falls and stalls). Birds: fall within 1.5 s without the harness |
 
-All three are the usual local optima of reinforcement learning without reference motion. Run 3 had two causes:
+Runs 1 to 3 are the usual local optima of reinforcement learning without reference motion. Run 3 had two causes:
 the curriculum had run away under an earlier goal score that paid standing still as a slow walk (quadrupeds were
 asked for up to 4 Froude, twice a gallop), and staying up earned the alive reward every step while trying to walk
 risked the fall cost. Run 4 (in progress, birds included) ends stalled episodes, caps goal speeds per family and

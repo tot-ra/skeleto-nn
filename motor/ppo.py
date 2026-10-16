@@ -62,7 +62,8 @@ def worker(conn, family, seed, env_kw):
             R.append(r); D.append(1.0 if (done or info["trunc"]) else 0.0)
             costs.append([info["costs"][t] for t in sorted(info["costs"])])
             if "ep_ret" in info:
-                infos.append((info["ep_ret"], info["ep_len"], info["fell"], info["goal"]))
+                # a stall is a failure for the curriculum too, or standing still raises the goal speeds
+                infos.append((info["ep_ret"], info["ep_len"], info["fell"] or info.get("stalled", False), info["goal"]))
             obs = env.reset() if (done or info["trunc"]) else obs2
         o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
         conn.send(("data", np.array(O, np.float32), np.array(A, np.float32), np.array(LP, np.float32),
@@ -189,7 +190,7 @@ def main():
         elif n_ep and fell > 0.7 and assist < 0.3:
             assist = min(args.assist0, assist + 0.01)
         costs = " ".join(f"{k}={v:.3f}" for k, v in zip(cost_names, cm) if k not in ("heat", "breath"))
-        line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} fell={fell:.2f} goal={goal:.3f} assist={assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
+        line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
                 f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs} t={(time.time() - t_start) / 60:.1f}m")
         print(line, flush=True); log.write(line + "\n"); log.flush()
         if it % 10 == 9:

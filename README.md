@@ -10,7 +10,7 @@ consequences of what they do (injury, pain, strain, energy, fatigue, falls, heat
 |---|---|---|---|---|
 | **Style network** (`adapt/`, [docs/ADAPT.md](docs/ADAPT.md)) | how a body moves in its situation: stride, crouch, lean, arms out or hugged, a hand on a wound, limp, shiver, wingbeat | body, 24 situation channels (friction, sinking feet, wetness, cold, wind, darkness, smoke, blood loss, pain per region, fatigue, load ...) | [`results/style_net.json`](results/style_net.json), MLP 31-64-64-24, about 7,800 weights | works: 99.9 % of a per-case optimisation; trained in about 25 s on a CPU |
 | **Jump network** (`adapt/leap.py`, [docs/ADAPT.md](docs/ADAPT.md#jumping-by-context-adaptleappy)) | whether and how to jump: hop, vault with the hands, pull up onto a ledge, drop, jump into water, or refuse | the ground ahead as a profile (height and water depth every quarter leg length), body, the same 24 channels | [`results/leap_net.json`](results/leap_net.json), MLP scored per landing place, about 14,000 weights | works: 91 % of a per-case optimisation, 95 % the same jump-or-stay decision |
-| **Motor networks**, one per body family (`motor/`, [docs/MOTOR.md](docs/MOTOR.md)) | every joint, 30 times a second | body, environment, goal, the body's state, a motivation profile | none yet | in progress: the evaluation system, the biped environment and the trainer work; **no policy walks yet** (see below) |
+| **Motor networks**, one per body family (`motor/`, [docs/MOTOR.md](docs/MOTOR.md)) | every joint, 30 times a second | body, environment, goal, the body's state, a motivation profile | none yet | in progress: the evaluation system, the environments and the trainer work; the biped walks on flat ground at half the asked speed; quadrupeds and birds not yet (see below) |
 
 The style and jump networks are trained on differentiable consequence models (fast and exact, but reduced-order);
 the motor networks are trained by reinforcement learning in MuJoCo. Their forward passes are a few lines of code in
@@ -46,10 +46,14 @@ The network sets the style; the bodies are drawn by the kinematic baseline walke
 | quay over deep water, summer | jump in | refuse | jump in | refuse |
 | cliff over shallow water | refuse | refuse | refuse | refuse |
 
-### Motor networks: the first biped training runs (not working yet)
+### Motor networks: the biped training runs
 
-Reinforcement learning without reference motion finds cheap but wrong answers first. These are the policies of the
-first two runs, kept to show where the work stands ([docs/MOTOR.md](docs/MOTOR.md) has the details and the fixes):
+Reinforcement learning without reference motion finds cheap but wrong answers first. Runs 1 to 3 found three of
+them; run 4 is the first that walks on its own ([docs/MOTOR.md](docs/MOTOR.md) has the details and the fixes):
+
+<img src="showcase/motor/biped_run4_walk.gif" width="66%"><br><b>run 4</b> (population training, after stalls began
+to end episodes), asked for 1.3 m/s, no harness: an upright walk with alternating steps for the full 10 s, at
+0.65 m/s. Short steps, half the asked speed; turns, ice, a pack, wind and a child's body still fall within 1 to 3 s.
 
 <table>
 <tr><td width="33%" valign="top"><img src="showcase/motor/biped_run1_walk.gif" width="100%"><br><b>run 1</b>, asked to walk at 1.3 m/s, harness at 40 %: the harness pushed toward the goal, so the policy learned to lean stiffly and be pushed; it falls like a plank</td>
@@ -65,8 +69,8 @@ first two runs, kept to show where the work stands ([docs/MOTOR.md](docs/MOTOR.m
 | Jump network for people and quadrupeds | works; 91 % of per-case optimum, 95 % same decision; numpy equals torch; tests |
 | Motor networks: evaluation system (`motor/evaluate.py`) | works; each term responds to its own consequence (tests) |
 | Motor networks: shared family environment with muscle activation (`motor/family.py`), biped, quadruped and bird families (`motor/biped.py`, `motor/quadruped.py`: dog, cat, wolf, goat, horse, pig, bear on one canonical skeleton; `motor/bird.py`: flight for crow, gull, heron, sparrow, duck), mirror symmetry, PPO with symmetry loss, curriculum and fading harness (`motor/ppo.py`), population-based training where bad runs die off (`motor/pbt.py`) | works; tests |
-| Motor networks: a biped or quadruped policy that walks | **not yet**: run 1 leaned and was pushed, run 2 stands still (above); exploration noise was making the muscles vibrate at 13 to 20 times walking energy, fixed by muscle activation dynamics. Population runs for both families are in progress |
-| Bird motor network | environment built (flight); training not started |
+| Motor networks: a biped or quadruped policy that walks | biped: **first walk** (run 4, above), slow and only on flat dry ground; quadruped: stands still (its curriculum ran away twice, fixed); training continues |
+| Bird motor network | training started (population runs); not flying on its own yet |
 | Mixed-body (monkey, bear on two legs, kangaroo, penguin) and snake motor networks | not started |
 | A distilled pose network that a game runs without physics | not started |
 
