@@ -91,7 +91,7 @@ class BirdEnv(FamilyEnv):
     def reset(self, body=None, friction=None, wind=None, sores=None, goal=None, profile=None, climb=None):
         """``goal``: horizontal velocity in speed units (forward, left) relative to the start heading; ``climb`` in units."""
         full = self.spread
-        self.spread = min(full, self.level() + 0.2)          # other species, wind and turns after flapping, not before
+        self.spread = min(full, self.level())                # other species, wind and turns only as fast as level flight
         try:
             return self._reset(body, friction, wind, sores, goal, profile, climb)
         finally:
