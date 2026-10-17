@@ -46,7 +46,7 @@ class BirdEnv(FamilyEnv):
     PHASE_NOISE = 0.6      # share of the exploration noise locked to the wingbeat clock (motor/ppo.py)
     CLIMB_TOL = 0.15       # climb-rate tolerance of the goal score (speed units)
     HOLD_S = 2.0           # a height error is to be made good in about this many seconds
-    ACTION_BOUND = 1.1     # full-range wing strokes sit at the end of the range by design
+    ACTION_BOUND = 1.5     # full-range wing strokes sit at the end of the range by design (1.1 still pulled 26 of 57 outputs and broke the beat)
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
