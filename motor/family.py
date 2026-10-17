@@ -106,6 +106,7 @@ class FamilyEnv:
     MIN_LOGSTD = None     # floor on the exploration noise (log std), if the family needs one
     SOFT_RANGE = {}       # bone group -> share of its range where the joint limit softly resists (physics.build_xml)
     ACTION_BOUND = 1.0    # policy means beyond this are pulled back (motor/ppo.py): beyond 1 the action is clipped
+    GAMMA = 0.99          # reward discount per control step (0.99 at 30 Hz: about 3 s ahead)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
 
     def _stalled(self, goal, sp):

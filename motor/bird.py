@@ -50,6 +50,9 @@ class BirdEnv(FamilyEnv):
     # pull, though it does not change the clipped commands, reshapes the shared hidden layers and broke the wingbeat
     # within a round at every bound tried (1.0, 1.1, 1.5)
     ACTION_BOUND = 100.0
+    # about 11 s ahead (0.99 looks 3 s ahead): flapping costs energy at once, a slow sink only crashes 10 s later, and
+    # with the shorter horizon every fine-tuning unlearned holding height to save energy
+    GAMMA = 0.997
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 

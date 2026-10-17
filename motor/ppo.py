@@ -66,7 +66,7 @@ def worker(conn, family, seed, env_kw):
             O.append(o); A.append(a); LP.append(lp); V.append(v)
             if info["trunc"] and not done:
                 o2 = np.clip((obs2 - mean) / std, -10, 10).astype(np.float32)
-                r = r + 0.99 * float(mlp_np(o2, W["v"])[0])
+                r = r + env.GAMMA * float(mlp_np(o2, W["v"])[0])
             R.append(r); D.append(1.0 if (done or info["trunc"]) else 0.0)
             costs.append([info["costs"][t] for t in sorted(info["costs"])])
             if "ep_ret" in info:
@@ -141,7 +141,7 @@ def main():
                    os.path.join(out, "ckpt.pt"))
 
     log = open(os.path.join(out, "log.csv"), "a"); t_start = time.time()
-    gamma, lam = 0.99, 0.95
+    gamma, lam = ref.GAMMA, 0.95
     cost_names = sorted(ref.ev.totals)
     for it in range(it0, it0 + args.iters):
         t0 = time.time()
