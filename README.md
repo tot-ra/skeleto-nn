@@ -78,14 +78,14 @@ the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
 
 The best network of each family so far, no harness, no clips: every joint from the network. The score is the population test mean (survival share x (0.3 + goal), at most 1.3).
 
-**People**: score 1.12 after 79 rounds (updated 2026-10-17 15:56)
+**People**: score 1.15 after 96 rounds (updated 2026-10-17 20:13)
 
 <table><tr>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.29 m/s, goal 0.92</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_run.gif" width="100%"><br><b>run 3.2 m/s</b>: held 8.0 s, 2.62 m/s, goal 0.71</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_ice.gif" width="100%"><br><b>walk on ice</b>: fell at 1.7 s, 0.45 m/s, goal 0.08</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_pack.gif" width="100%"><br><b>20 kg pack</b>: held 8.0 s, 1.11 m/s, goal 0.70</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: fell at 0.7 s, 1.30 m/s, goal 0.71</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.29 m/s, goal 0.97</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_run.gif" width="100%"><br><b>run 3.2 m/s</b>: held 8.0 s, 2.87 m/s, goal 0.85</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_ice.gif" width="100%"><br><b>walk on ice</b>: fell at 1.2 s, 0.35 m/s, goal 0.05</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_pack.gif" width="100%"><br><b>20 kg pack</b>: held 8.0 s, 1.18 m/s, goal 0.74</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: held 8.0 s, 1.19 m/s, goal 0.93</td>
 </tr></table>
 
 **Four-legged animals**: score 0.84 after 86 rounds (updated 2026-10-17 17:54)

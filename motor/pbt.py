@@ -34,7 +34,7 @@ def tests(family):
                 ((0.7, 0.0), {"friction": 0.15}), ((0.7, 0.0), {"body": canonical(QUADS["cat"])}),
                 ((0.7, 0.0), {"body": canonical(QUADS["horse"])})]
     return [((0.0, 0.0), {}), ((0.8, 0.0), {}), ((1.3, 0.0), {}), ((2.5, 0.0), {}), ((0.0, 1.0), {}),
-            ((1.2, 0.0), {"friction": 0.15}), ((1.0, 0.0), {"body": HumanBody(height=1.4, mass=38.0)}),
+            ((1.2, 0.0), {"friction": 0.15}), ((1.0, 0.0), {"friction": 0.1}), ((1.0, 0.0), {"body": HumanBody(height=1.4, mass=38.0)}),
             ((1.0, 0.0), {"body": HumanBody(mass=95.0, pack=20.0)})]
 
 
