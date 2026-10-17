@@ -85,6 +85,13 @@ class Air:
         axw = np.einsum("nij,nj->ni", R[bd], self.axial[bd]); va = np.sum(v[bd] * axw, axis=1)[:, None] * axw; vn = v[bd] - va
         cx, ca = self.cd[bd, 0][:, None], self.cd[bd, 1][:, None]
         F[bd] = -0.5 * self.rho * (cx * self.A[bd][:, None] * np.linalg.norm(vn, axis=1)[:, None] * vn + ca * self.aarea[bd][:, None] * np.linalg.norm(va, axis=1)[:, None] * va)
-        mag = np.linalg.norm(F, axis=1)[:, None]; F = F * np.minimum(1.0, 60.0 / np.maximum(mag, 1e-9))
+        # Stability: the forces are explicit (once per physics step), so no sample may push harder than would remove half
+        # of its own relative airspeed within one step, sharing its body's mass with the other samples on that body.
+        # Without this, a heron's long, light wing segments flipped their airspeed every step and the simulation blew up.
+        if not hasattr(self, "_mcap"):
+            share = np.bincount(self.bid, minlength=int(self.bid.max()) + 1)[self.bid]
+            self._mcap = 0.5 * m.body_mass[self.bid] / share / m.opt.timestep
+        cap = np.minimum(60.0, self._mcap * sp)[:, None]
+        mag = np.linalg.norm(F, axis=1)[:, None]; F = F * np.minimum(1.0, cap / np.maximum(mag, 1e-9))
         d.qfrc_applied[:] = 0.0
         for k in range(self.N): mujoco.mj_applyFT(m, d, F[k], np.zeros(3), P[k], int(self.bid[k]), d.qfrc_applied)

@@ -1,4 +1,4 @@
-"""The bird family in the air: crow, gull, heron, sparrow, duck and variations, one policy (stage 1: flight).
+"""The bird family in the air: crow, gull, heron, duck and variations (not the sparrow yet, see SPECIES), one policy (stage 1: flight).
 
 The skeleton is the same for every species (``bodies.bird``: four neck joints, two tail joints, three wing segments and
 four leg segments a side), so one network drives all of them; species differ in mass, size, wing, neck, leg and tail
@@ -28,7 +28,9 @@ from physics import CTRL_HZ
 from motor.family import FamilyEnv, G, ACTIVATION_TAU, heading
 from motor import evaluate as ev
 
-SPECIES = ("crow", "gull", "heron", "sparrow", "duck")
+# Not the sparrow yet: it beats at about 13 Hz, and at 30 control steps a second the network has two commands per beat,
+# too few to shape one. Small birds need a faster control rate first.
+SPECIES = ("crow", "gull", "heron", "duck")
 
 
 class BirdEnv(FamilyEnv):

@@ -84,6 +84,11 @@ strength found 0.58 N of net thrust (13 % of the weight), with the shoulder and 
 the beat; at 2x it found 2.49 N (56 %), about a real bird's margin for a climb. The wing joints are now twice as strong
 (`bodies.WING_STRENGTH`), standing in for what flat plates lack: a feathered wing's twist and change of shape.
 
+Two more physics faults turned up in bird training: a heron's wing twist (a long bone turning about itself) was so
+stiff for its tiny inertia that the explicit muscle spring blew the simulation up within a few steps (wing joints now
+get the armature that keeps kp dt^2 / inertia below 1); and the sparrow, beating at about 13 Hz, gets only two network
+commands per beat at 30 control steps a second, so it is left out of training until birds get a faster control rate.
+
 Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
 

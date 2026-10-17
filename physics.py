@@ -59,10 +59,13 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
                     # flight muscles beat at 3 to 10 Hz: a light armature and a fast response (time constant kv/kp of 20 ms,
                     # not the 80 ms of a limb, which passes only 40 % of a 4.5 Hz wingbeat)
                     wing = b.group == "wing"
-                    arm = 0.0003 if wing else 0.002 * (1 + mi)
+                    kp = max(b.tau, 1.0) / 0.35 * kp_scale
+                    # the spring of the muscle is explicit (only its damping is implicit), so a wing joint gets at least
+                    # the armature that keeps kp dt^2 / inertia below 1: a heron's wing twist (a long bone turning about
+                    # itself, very little inertia) was five times past that and blew the simulation up
+                    arm = max(0.0003, kp * DT * DT) if wing else 0.002 * (1 + mi)
                     s += (f'{sp}  <joint name="j_{b.name}_{ax}" type="hinge" axis="{AX[ax][0]:.0f} {AX[ax][1]:.0f} {AX[ax][2]:.0f}" '
                           f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="0"/>\n')
-                    kp = max(b.tau, 1.0) / 0.35 * kp_scale
                     kv = (0.02 if wing else 0.08) * kp
                     acts.append(f'    <position name="a_{b.name}_{ax}" joint="j_{b.name}_{ax}" kp="{kp:.2f}" kv="{kv:.3f}" forcerange="{-b.tau:.1f} {b.tau:.1f}" ctrlrange="{math.radians(lo)*1.05:.4f} {math.radians(hi)*1.05:.4f}"/>\n')
         for c in kids[i]:

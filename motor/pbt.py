@@ -26,8 +26,7 @@ def tests(family):
         # glides first (the curriculum's first stage), then level flight, climbs, turns, wind, other species
         return [((3.0, 0.0), {"climb": -0.45}), ((2.6, 0.0), {"climb": -0.4}), ((3.0, 0.0), {"climb": -0.45, "body": BIRDS["gull"]}),
                 ((3.0, 0.0), {"climb": -0.3}), ((2.8, 0.0), {}), ((3.4, 0.0), {}), ((3.0, 0.0), {"climb": 0.3}), ((3.0, 0.0), {"climb": -0.3}),
-                ((3.0, 0.6), {}), ((3.0, 0.0), {"wind": np.array([0.0, -6.0, 0.0])}), ((3.0, 0.0), {"body": BIRDS["gull"]}),
-                ((3.0, 0.0), {"body": BIRDS["sparrow"]})]
+                ((3.0, 0.6), {}), ((3.0, 0.0), {"wind": np.array([0.0, -6.0, 0.0])}), ((3.0, 0.0), {"body": BIRDS["gull"]})]
     if family == "quadruped":
         from bodies import QUADS
         from motor.quadruped import canonical
