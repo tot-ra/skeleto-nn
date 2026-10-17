@@ -183,11 +183,12 @@ def main():
                 # keep the mean action inside [-1, 1]: the environment clips actions there, and a mean beyond it gets no
                 # gradient from the exploration noise (a walker's arms sat at 1.3 to 1.9, pinned to the end of their
                 # range, and never learned to come down after the range ends were made costly)
-                # gently (weight 0.2) and from a bound per family (``ACTION_BOUND``): a bird's full-range strokes sat at the
+                # gently and from a bound per family (``ACTION_BOUND``): a bird's full-range strokes sat at the
                 # end by design, and a pull of weight 1 from 1.0 took 26 of its 57 outputs off the ends within a round and
                 # broke its wingbeat; a walker's arms need to come back inside 1, where the noise changes the command
-                lbound = (torch.relu(mu.abs() - ref.ACTION_BOUND) ** 2).mean()
-                loss = lpi + 0.5 * lv + args.sym * lsym + 0.2 * lbound
+                # summed over outputs (a mean over all of them diluted the pull on the few out of range about fifty times)
+                lbound = (torch.relu(mu.abs() - ref.ACTION_BOUND) ** 2).sum(-1).mean()
+                loss = lpi + 0.5 * lv + args.sym * lsym + 0.02 * lbound
                 opt.zero_grad(); loss.backward()
                 nn.utils.clip_grad_norm_(list(pi.parameters()) + list(vf.parameters()), 1.0); opt.step()
                 if ref.MIN_LOGSTD is not None:                   # keep exploring where the skill is far away
