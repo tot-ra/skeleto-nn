@@ -114,12 +114,13 @@ class Evaluator:
         self.dof_bone = pc.dof_bone
         self.reset()
 
-    def flight(self, span, elastic, sustain=1.2, beat_s=0.25, reserve_tau=20.0):
+    def flight(self, span, elastic, sustain=1.4, beat_s=0.25, reserve_tau=20.0):
         """A flier. Power unit: FLIGHT_UNIT x m g sqrt(g x wingspan), about what the most efficient wingbeat found by
         search costs in this physics (the flat-plate wing has no downwash, so pushing the air costs far more work than in
         a real wing: a crow's searched beat about 170 W metabolic against a real crow's 10 or so). Sustainable: 1.2 of
-        those; a flight reserve drains three times as fast as a walker's (``reserve_tau``), so a wasteful beat tires the
-        bird within a flight and a glide lets it recover. The wing joints are elastic (``ELASTIC_RETURN``)."""
+        those (1.4 now); a flight reserve drains three times as fast as a walker's (``reserve_tau``), so a wasteful beat tires the
+        bird within a flight and a glide lets it recover (1.2 at first: level flight costs about 1.5, so even a rested bird
+        sank and unlearned flying). The wing joints are elastic (``ELASTIC_RETURN``)."""
         self.p_unit = FLIGHT_UNIT * self.mass * G * math.sqrt(G * span)
         self.reserve_tau = reserve_tau
         self.sustain = sustain; self.elastic = np.asarray(elastic, bool); self.elastic_tau = beat_s

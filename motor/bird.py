@@ -121,7 +121,9 @@ class BirdEnv(FamilyEnv):
         self.phase = rng.uniform(0, 2 * math.pi)
         wing = [self.pc.sk.bones[i].group == "wing" for i, _a in self.pc.dof_list]
         self.ev.flight(self.wingspan(), wing, beat_s=1.0 / self.beat_hz())
-        self.ev.reserve = float(rng.uniform(0.4, 1.0))       # a bird is not always rested: it has to economise when tired
+        # a bird is not always rested: it has to economise when tired (from 0.4 at first: at 73 % strength it could not
+        # hold height at all, and those flights taught only sinking)
+        self.ev.reserve = float(rng.uniform(0.7, 1.0))
         # at about the goal speed: starts at 80 to 100 % of it (below a crow's minimum flying speed at the low end)
         # taught a dive at the start of every flight, 2 to 3 m lost before the wingbeat took over
         v0 = np.array([self.goal_world[0], self.goal_world[1], self.climb]) * rng.uniform(0.95, 1.05)

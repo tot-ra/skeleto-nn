@@ -95,8 +95,9 @@ nothing. An energy audit of a 10 s flight: the muscles did 38 W of work, the air
 height and speed; the rest went into swinging the wings to and fro. Now the wing work is summed over every physics
 sub-step, tendons return 60 % of the braking work (`ELASTIC_RETURN`), and the flight power unit is what the most
 efficient searched wingbeat costs in this physics (`FLIGHT_UNIT`; the flat-plate wing has no downwash, so absolute
-watts are about 15 times a real crow's). Sustainable is 1.2 units, the flight reserve drains in about 20 s at twice
-that, and every flight starts with a reserve of 40 to 100 %: the bird has to balance speed, height and energy. The
+watts are about 15 times a real crow's). Sustainable is 1.4 units (1.2 at first: level flight costs about 1.5, and a
+rested crow sank and unlearned flying), the flight reserve drains in about 20 s at twice that, and every flight starts
+with a reserve of 70 to 100 % (40 % at first: too weak to hold height at all): the bird has to balance speed, height and energy. The
 goal is a height to hold (at the asked climb rate), not only a climb rate, so drifting up is as wrong as sinking.
 Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
 commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
