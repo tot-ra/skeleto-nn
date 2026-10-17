@@ -39,8 +39,10 @@ def tests(family):
 
 
 MUTABLE = {"lr": (5e-5, 1e-3), "fade": (0.0003, 0.006), "sym": (0.5, 10.0),
-           # the reward itself evolves too: how much staying up is worth, what a fall costs, how much comfort weighs
-           "alive": (0.3, 3.0), "fall_cost": (1.0, 15.0), "cost_scale": (0.3, 2.0)}
+           # what staying up is worth and what a fall costs evolve too; the weight of the evaluation costs does not: a
+           # population let to scale it learned to ignore comfort (people at 0.5 kept their arms on their stops at half
+           # the pain), and those costs are the consequences being judged, not a training knob
+           "alive": (0.3, 3.0), "fall_cost": (1.0, 15.0)}
 DEFAULTS = {"lr": 2e-4, "fade": 0.0015, "sym": 4.0, "alive": 1.0, "fall_cost": 5.0, "cost_scale": 1.0}
 
 
@@ -88,7 +90,7 @@ def main():
     history = json.load(open(hist_path)) if os.path.exists(hist_path) else []
     rng = np.random.default_rng(len(history))
     if history:
-        settings = history[-1]["next"]
+        settings = [{**st, "cost_scale": 1.0} for st in history[-1]["next"]]
     else:
         settings = [{k: float(np.clip(v * math.exp(rng.uniform(-0.6, 0.6)) if m else v, *MUTABLE[k]))
                      for k, v in DEFAULTS.items()} for m in range(args.members)]
@@ -121,8 +123,9 @@ def main():
             if loser == best:
                 continue
             shutil.copy(ckpts[best], ckpts[loser])                      # exploit: the copy continues the best policy
-            nxt[loser] = {k: float(np.clip(settings[best][k] * math.exp(rng.choice([-1, 1]) * rng.uniform(0.2, 0.5)),
-                                           *MUTABLE[k])) for k in MUTABLE}  # explore: different settings
+            nxt[loser] = {**settings[best],                       # explore: different settings (the mutable ones)
+                          **{k: float(np.clip(settings[best][k] * math.exp(rng.choice([-1, 1]) * rng.uniform(0.2, 0.5)),
+                                              *MUTABLE[k])) for k in MUTABLE}}
             replaced.append(dict(member=loser, copied=best))
         history.append(dict(round=rnd, minutes=round((time.time() - t0) / 60, 1), settings=settings, scores=scores,
                             best=best, replaced=replaced, next=nxt))
