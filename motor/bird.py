@@ -137,7 +137,13 @@ class BirdEnv(FamilyEnv):
         # trunk is light, and the uncapped damping blew the simulation up as soon as the wings beat
         wv_w = R @ d.qvel[3:6]; K = k * m * G * self.wingspan() * self.HOLD
         c = min(0.15 * K, 0.5 * float(pc.model.body_inertia[pc.bid[0]].min()) / pc.model.opt.timestep)
-        return np.array([0.0, 0.0, max(Fz, 0.0), K * R[1, 2] - c * wv_w[0], -K * R[0, 2] - c * wv_w[1], -c * wv_w[2]])
+        # heading held toward the goal too (a turn is not a push: the speed is still the bird's to make)
+        g = self.goal_world / max(float(np.linalg.norm(self.goal_world)), 1e-6)
+        yaw_err = float(R[0, 0] * g[1] - R[1, 0] * g[0])        # sine of the angle from the body's forward to the goal
+        if R[0, 0] * g[0] + R[1, 0] * g[1] < 0:
+            yaw_err = math.copysign(1.0, yaw_err)
+        return np.array([0.0, 0.0, max(Fz, 0.0), K * R[1, 2] - c * wv_w[0], -K * R[0, 2] - c * wv_w[1],
+                         0.5 * K * yaw_err - c * wv_w[2]])
 
     def step(self, a):
         a = np.clip(np.asarray(a, float), -1, 1)
