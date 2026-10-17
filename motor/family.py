@@ -175,7 +175,7 @@ class FamilyEnv:
         self.sores_now = sores
         self.profile = profile or ev.sample_profile(rng, self.spread)
         if goal is None:
-            speed = 0.0 if rng.random() < 0.15 else rng.uniform(0.3, max(0.4, self.max_speed * self.speed_scale())) * self.speed_unit()
+            speed = 0.0 if rng.random() < 0.15 else rng.uniform(0.3, max(0.4, min(self.MAX_SPEED, self.max_speed * self.speed_scale()))) * self.speed_unit()
             ang = rng.uniform(-math.pi, math.pi) if rng.random() < 0.3 * self.spread else rng.normal(0, 0.05 + 0.25 * self.spread)
             goal = np.array([speed * math.cos(ang), speed * math.sin(ang)])
         self.goal_world = np.array(goal, float)
