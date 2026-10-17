@@ -19,6 +19,9 @@ from motor.family import FamilyEnv, G
 
 CANON = dict(n_spine=4, n_neck=3, tail_n=4)
 SPECIES = ("dog", "cat", "wolf", "goat", "horse", "pig", "bear")
+# drawn by weight: the species that fail most come up more often (in run 6 the horse finished 0 of 13 training
+# episodes, the cat 3 of 16, the goat 8 of 20, the bear and wolf about half)
+SPECIES_WEIGHT = np.array([1.0, 1.6, 1.0, 1.4, 2.2, 1.0, 1.0]); SPECIES_WEIGHT /= SPECIES_WEIGHT.sum()
 
 
 def canonical(spec):
@@ -34,7 +37,7 @@ class QuadrupedEnv(FamilyEnv):
         return canonical(QUADS["dog"])
 
     def sample_body(self, rng, spread):
-        sp = QUADS[SPECIES[int(rng.integers(len(SPECIES)))]] if rng.random() < spread else QUADS["dog"]
+        sp = QUADS[SPECIES[int(rng.choice(len(SPECIES), p=SPECIES_WEIGHT))]] if rng.random() < spread else QUADS["dog"]
         jitter = lambda: math.exp(rng.normal(0, 0.08 * spread))
         sp = dataclasses.replace(sp, mass=sp.mass * jitter() ** 3, scale=sp.scale * jitter(), leg_scale=sp.leg_scale * jitter(),
                                  vigor=float(np.clip(sp.vigor * jitter() ** 2, 0.5, 1.4)))
