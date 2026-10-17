@@ -46,6 +46,21 @@ class QuadrupedEnv(FamilyEnv):
     def make_creature(self, body):
         return quadruped(body)
 
+    # Each species gets its own share of the curriculum's goal speeds, kept per worker: with one shared curriculum the
+    # species that fell most (horse, cat) pulled the goal speeds down for all, and the dog stopped training at speed
+    def speed_scale(self):
+        if not hasattr(self, "sp_scale"):
+            self.sp_scale = {}
+        return self.sp_scale.get(self.c.skel.name, 1.0)
+
+    def episode_done(self, failed, goal):
+        k = self.c.skel.name; s = self.speed_scale()
+        if failed:
+            s = max(0.3, s - 0.05)
+        elif goal > 0.5:
+            s = min(2.0, s + 0.03)
+        self.sp_scale[k] = s
+
     def body_vector(self, sp, c):
         return [math.log(sp.mass / 30.0), math.log(sp.scale), sp.leg_scale - 1.0, sp.cannon - 1.0, sp.spine_flex - 1.0,
                 sp.neck_len - 1.0, sp.tail_len - 1.0, sp.head_len - 1.0, sp.body_len - 1.0, sp.chest_depth - 1.0,

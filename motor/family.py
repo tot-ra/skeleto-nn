@@ -86,6 +86,13 @@ class FamilyEnv:
     # ------------------------------------------------------------------ hooks
     def default_body(self): raise NotImplementedError
     def sample_body(self, rng, spread): raise NotImplementedError
+
+    def speed_scale(self):
+        """Multiplier on the curriculum's goal speeds for the current body (a family may keep one per kind of body)."""
+        return 1.0
+
+    def episode_done(self, failed, goal):
+        """Called at the end of every episode (failed: a fall or a stall; goal: its mean goal score)."""
     def make_creature(self, body): raise NotImplementedError
     def body_vector(self, body, creature): raise NotImplementedError
     def sores(self): raise NotImplementedError
@@ -167,7 +174,7 @@ class FamilyEnv:
         self.sores_now = sores
         self.profile = profile or ev.sample_profile(rng, self.spread)
         if goal is None:
-            speed = 0.0 if rng.random() < 0.15 else rng.uniform(0.3, max(0.4, self.max_speed)) * self.speed_unit()
+            speed = 0.0 if rng.random() < 0.15 else rng.uniform(0.3, max(0.4, self.max_speed * self.speed_scale())) * self.speed_unit()
             ang = rng.uniform(-math.pi, math.pi) if rng.random() < 0.3 * self.spread else rng.normal(0, 0.05 + 0.25 * self.spread)
             goal = np.array([speed * math.cos(ang), speed * math.sin(ang)])
         self.goal_world = np.array(goal, float)
@@ -317,4 +324,5 @@ class FamilyEnv:
                     stalled=stalled)
         if done or trunc:
             info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps)
+            self.episode_done(done, self.ep_goal / self.steps)
         return self.obs(), r, done, info
