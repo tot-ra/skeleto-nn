@@ -89,6 +89,18 @@ stiff for its tiny inertia that the explicit muscle spring blew the simulation u
 get the armature that keeps kp dt^2 / inertia below 1); and the sparrow, beating at about 13 Hz, gets only two network
 commands per beat at 30 control steps a second, so it is left out of training until birds get a faster control rate.
 
+**Flight energy, run 7.** The trained crow beat its wings at the fastest rate allowed (8.7 Hz, twice a crow's),
+because the wing work was counted as fully elastic and averaged over a beat at the control rate: a wasteful beat cost
+nothing. An energy audit of a 10 s flight: the muscles did 38 W of work, the air took 4.8 W, the bird lost 1.1 W of
+height and speed; the rest went into swinging the wings to and fro. Now the wing work is summed over every physics
+sub-step, tendons return 60 % of the braking work (`ELASTIC_RETURN`), and the flight power unit is what the most
+efficient searched wingbeat costs in this physics (`FLIGHT_UNIT`; the flat-plate wing has no downwash, so absolute
+watts are about 15 times a real crow's). Sustainable is 1.2 units, the flight reserve drains in about 20 s at twice
+that, and every flight starts with a reserve of 40 to 100 %: the bird has to balance speed, height and energy. The
+goal is a height to hold (at the asked climb rate), not only a climb rate, so drifting up is as wrong as sinking.
+Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
+commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
+
 Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
 

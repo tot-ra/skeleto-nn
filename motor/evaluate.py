@@ -53,6 +53,9 @@ MUSCLE_EFF = 0.25          # positive work: chemical energy per joule of work
 NEG_EFF = 1.2              # negative work costs about a fifth as much
 ISO = 0.12                 # holding a torque costs energy too (per N m per rad/s of a reference speed)
 RESERVE_TAU = 60.0         # s: how fast a reserve that is drained by twice the sustainable power empties
+FLIGHT_UNIT = 12.0         # flight power unit in m g sqrt(g span): the searched efficient crow wingbeat costs about 1
+ELASTIC_RETURN = 0.6      # elastic (wing) joints: the share of the braking work that tendons and feathers store and
+                           # give back (bird flight muscle: about half to two thirds); the rest is lost
 SUSTAIN = 0.35             # sustainable metabolic power in m g sqrt(g l): about a brisk walk
 
 
@@ -73,7 +76,7 @@ class Evaluator:
         self.mass = pc.total_mass
         self.leg = c.leg_len()
         self.p_unit = self.mass * G * math.sqrt(G * self.leg)          # power unit
-        self.sustain = SUSTAIN
+        self.sustain = SUSTAIN; self.reserve_tau = RESERVE_TAU
         self.elastic = np.zeros(pc.nj, bool); self.elastic_tau = 0.25
         self.sore = dict(sore or {})                                    # {"leg_L": 0..1, "leg_R", "arm_L", "arm_R", "torso", "head"}
         # geom -> region, and which geoms are feet / hands
@@ -111,16 +114,19 @@ class Evaluator:
         self.dof_bone = pc.dof_bone
         self.reset()
 
-    def flight(self, span, elastic, sustain=2.5, beat_s=0.25):
-        """A flier: power in units of m g sqrt(g x wingspan); the flight muscles sustain far more than a walk (crow
-        cruise: about 2 units); the wing joints are elastic: tendons and feathers return the work of swinging the wing
-        back every beat, so their work counts averaged over about one beat (``beat_s``), not instant by instant."""
-        self.p_unit = self.mass * G * math.sqrt(G * span)
+    def flight(self, span, elastic, sustain=1.2, beat_s=0.25, reserve_tau=20.0):
+        """A flier. Power unit: FLIGHT_UNIT x m g sqrt(g x wingspan), about what the most efficient wingbeat found by
+        search costs in this physics (the flat-plate wing has no downwash, so pushing the air costs far more work than in
+        a real wing: a crow's searched beat about 170 W metabolic against a real crow's 10 or so). Sustainable: 1.2 of
+        those; a flight reserve drains three times as fast as a walker's (``reserve_tau``), so a wasteful beat tires the
+        bird within a flight and a glide lets it recover. The wing joints are elastic (``ELASTIC_RETURN``)."""
+        self.p_unit = FLIGHT_UNIT * self.mass * G * math.sqrt(G * span)
+        self.reserve_tau = reserve_tau
         self.sustain = sustain; self.elastic = np.asarray(elastic, bool); self.elastic_tau = beat_s
-        self.pw_avg = np.zeros(len(self.elastic))
+        self.w_pos = np.zeros(len(self.elastic)); self.w_neg = np.zeros(len(self.elastic))
 
     def reset(self):
-        self.pw_avg = np.zeros(len(self.elastic))
+        self.w_pos = np.zeros(len(self.elastic)); self.w_neg = np.zeros(len(self.elastic))
         self.peak = None
         self.reserve = 1.0
         self.prev_force = {r: 0.0 for r in injury.REGIONS}
@@ -153,7 +159,12 @@ class Evaluator:
         return reg, foot, bad
 
     def probe(self):
-        """Call after every physics sub-step: keeps the peak contact force per region and foot (impacts last a few ms)."""
+        """Call after every physics sub-step: keeps the peak contact force per region and foot (impacts last a few ms),
+        and adds up the work of the elastic joints (a wingbeat is too fast to sample at the control rate)."""
+        if self.elastic.any():
+            pc = self.pc
+            pw = pc.data.actuator_force[pc.aid] * pc.data.qvel[pc.vadr] * pc.model.opt.timestep
+            self.w_pos += np.maximum(pw, 0.0); self.w_neg += np.maximum(-pw, 0.0)
         reg, foot, bad = self.contact_forces()
         if self.peak is None:
             self.peak = (reg, foot, bad)
@@ -201,14 +212,18 @@ class Evaluator:
         u = tau / (self.tau_max * strength_scale)
         strain = float(np.sum(self.w_strain * u ** 2))
         pw = tau * qd
-        if self.elastic.any():                               # elastic joints: the work averaged over a beat
-            self.pw_avg += (pw - self.pw_avg) * min(1.0, dt / self.elastic_tau)
-            pw = np.where(self.elastic, self.pw_avg, pw)
-        p_met = (np.sum(np.maximum(pw, 0.0)) / MUSCLE_EFF + np.sum(np.maximum(-pw, 0.0) * ~self.elastic) / NEG_EFF
+        p_met = (np.sum(np.maximum(pw, 0.0) * ~self.elastic) / MUSCLE_EFF + np.sum(np.maximum(-pw, 0.0) * ~self.elastic) / NEG_EFF
                  + ISO * np.sum(np.abs(tau)) * math.sqrt(G / self.leg) * 0.1)
+        if self.elastic.any():
+            # elastic joints, work summed over every physics sub-step: tendons return ELASTIC_RETURN of the braking work
+            # into the next stroke, the muscle does the rest. When all of it was counted as returned, beating twice as
+            # fast as a crow does cost nothing, and the trained crow beat at the fastest rate allowed
+            wp = self.w_pos[self.elastic].sum() / dt; wn = self.w_neg[self.elastic].sum() / dt
+            p_met += max(wp - ELASTIC_RETURN * wn, 0.0) / MUSCLE_EFF + (1.0 - ELASTIC_RETURN) * wn / NEG_EFF
+            self.w_pos[:] = 0.0; self.w_neg[:] = 0.0
         energy = float(p_met / self.p_unit)
         # --- fatigue: the reserve drains above the sustainable power and refills below it
-        self.reserve = float(np.clip(self.reserve - (energy - self.sustain) / (self.sustain * RESERVE_TAU) * dt, 0.0, 1.0))
+        self.reserve = float(np.clip(self.reserve - (energy - self.sustain) / (self.sustain * self.reserve_tau) * dt, 0.0, 1.0))
         fatigue = (1.0 - self.reserve) ** 2
         # --- balance: fall risk. The capture point (centre of mass plus velocity over the pendulum frequency) is where the
         # body must step to stop; walking keeps it within a step of the feet, a fall puts it out of reach.

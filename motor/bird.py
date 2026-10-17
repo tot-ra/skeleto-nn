@@ -45,6 +45,7 @@ class BirdEnv(FamilyEnv):
     MIN_LOGSTD = -2.1
     PHASE_NOISE = 0.6      # share of the exploration noise locked to the wingbeat clock (motor/ppo.py)
     CLIMB_TOL = 0.15       # climb-rate tolerance of the goal score (speed units)
+    HOLD_S = 2.0           # a height error is to be made good in about this many seconds
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
@@ -119,6 +120,7 @@ class BirdEnv(FamilyEnv):
         self.phase = rng.uniform(0, 2 * math.pi)
         wing = [self.pc.sk.bones[i].group == "wing" for i, _a in self.pc.dof_list]
         self.ev.flight(self.wingspan(), wing, beat_s=1.0 / self.beat_hz())
+        self.ev.reserve = float(rng.uniform(0.4, 1.0))       # a bird is not always rested: it has to economise when tired
         # at about the goal speed: starts at 80 to 100 % of it (below a crow's minimum flying speed at the low end)
         # taught a dive at the start of every flight, 2 to 3 m lost before the wingbeat took over
         v0 = np.array([self.goal_world[0], self.goal_world[1], self.climb]) * rng.uniform(0.95, 1.05)
@@ -191,7 +193,11 @@ class BirdEnv(FamilyEnv):
         p, R = pc.root_pose()
         u = self.speed_unit()
         v = pc.data.qvel[0:3] / u
-        goal_v = np.array([self.goal_world[0], self.goal_world[1], self.climb]) / u
+        # the goal is a height to hold (rising or sinking at the asked rate), not only a climb rate: a bird asked to fly
+        # level that drifted up was as wrong as one that sank, but a climb-rate goal never brought it back down
+        alt_ref = self.alt0 + self.climb * self.steps / CTRL_HZ
+        want = self.climb + float(np.clip((alt_ref - p[2]) / self.HOLD_S, -0.5 * u, 0.5 * u))
+        goal_v = np.array([self.goal_world[0], self.goal_world[1], want]) / u
         err = v - goal_v
         sp = float(np.linalg.norm(goal_v[:2]))
         # the climb rate is scored on its own, tightly: inside the speed tolerance a glide sinking 0.05 units faster than
