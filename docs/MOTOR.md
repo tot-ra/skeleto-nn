@@ -140,6 +140,7 @@ fall costs, how much the comfort costs weigh). Bad runs die off; good ones sprea
     python -m motor.pbt --family biped --name biped_pbt --members 3 --workers 3 --round-min 15 --rounds 16
     python -m motor.ppo --family quadruped --name dog --workers 15 --hours 3       # a single run
     python -m motor.show runs/motor/biped_pbt/m0/ckpt.pt [out_dir] [--assist 0.4]  # GIFs and summary.json
+    python -m motor.showcase [--force]       # best network of each family -> showcase/motor/latest + README status
     python -m pytest tests/test_motor.py
 
 About 1,300 to 2,500 simulated steps per second per worker on an M5 Pro; the physics step is more than half of it.

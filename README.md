@@ -73,6 +73,41 @@ the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
 <td width="33%" valign="top"><img src="showcase/motor/biped_run2_walk_no_harness.gif" width="100%"><br><b>run 2</b> without the harness: it falls within 2 s</td></tr>
 </table>
 
+<!-- motor-status:start -->
+### Current state (updated automatically by `python -m motor.showcase`)
+
+The best network of each family so far, no harness, no clips: every joint from the network. The score is the population test mean (survival share x (0.3 + goal), at most 1.3).
+
+**People**: score 1.06 after 71 rounds (updated 2026-10-17 14:05)
+
+<table><tr>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.34 m/s, goal 0.92</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_run.gif" width="100%"><br><b>run 3.2 m/s</b>: held 8.0 s, 2.85 m/s, goal 0.81</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_ice.gif" width="100%"><br><b>walk on ice</b>: fell at 1.9 s, 0.52 m/s, goal 0.12</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_pack.gif" width="100%"><br><b>20 kg pack</b>: held 8.0 s, 1.20 m/s, goal 0.73</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: held 8.0 s, 1.22 m/s, goal 0.91</td>
+</tr></table>
+
+**Four-legged animals**: score 0.73 after 71 rounds (updated 2026-10-17 14:05)
+
+<table><tr>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 1.21 m/s, goal 0.92</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_trot.gif" width="100%"><br><b>dog, trot</b>: held 8.0 s, 1.57 m/s, goal 0.57</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: held 8.0 s, 0.67 m/s, goal 0.80</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: fell at 3.2 s, 0.29 m/s, goal 0.13</td>
+</tr></table>
+
+**Birds**: score 0.99 after 22 rounds (updated 2026-10-17 14:06)
+
+<table><tr>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_cruise.gif" width="100%"><br><b>crow, level flight</b>: held 8.0 s, height 5.4 → 4.2 m, 8.7 m/s, goal 0.78</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_turn.gif" width="100%"><br><b>crow, turn</b>: held 8.0 s, height 5.5 → 4.5 m, 8.8 m/s, goal 0.80</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_climb.gif" width="100%"><br><b>crow, climb</b>: fell at 4.4 s, height 3.2 → 0.1 m, 7.4 m/s, goal 0.24</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_gull.gif" width="100%"><br><b>gull</b>: held 8.0 s, height 9.2 → 1.2 m, 8.2 m/s, goal 0.31</td>
+</tr></table>
+
+<!-- motor-status:end -->
+
 ## Status
 
 | part | state |
