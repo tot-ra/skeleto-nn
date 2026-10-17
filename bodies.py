@@ -410,6 +410,12 @@ BIRDS = {
     "duck": BirdSpec("duck", 1.1, 1.2, 0.55, 1.0, 1.0, 0.7),
 }
 
+# Wing joint strength. The wing is a set of flat plates, without a feathered wing's twist and changes of shape through
+# the beat. At 1x the best searched wingbeat made 0.58 N of net thrust (13 % of a crow's weight), too little margin for
+# flapping to be learned; at 2x it makes 2.49 N (56 %), about a real bird's margin for a climb.
+WING_STRENGTH = 2.0
+
+
 def bird(spec: BirdSpec | str = "crow", name=None) -> Creature:
     sp = BIRDS[spec] if isinstance(spec, str) else spec
     s = 0.40 * sp.scale; mscale = sp.mass
@@ -447,9 +453,9 @@ def bird(spec: BirdSpec | str = "crow", name=None) -> Creature:
     wl = 0.16 * s / 0.4 * sp.wing_len; ch = s / 0.4
     bones += [
         Bone("wing_a_L", "chest", d((0, 1, 0)), wl, m(0.03), 0.02 * s / 0.4, t=0.7, offset=(-0.058 * s / 0.4, 0.03 * s / 0.4, 0.02 * s / 0.4), order="XZY",
-             lim={"X": (-100, 100), "Z": (-90, 100), "Y": (-80, 80)}, side="L", group="wing", tau=6.0 * m(1), shape="box", size=(0.055 * ch, wl / 2, 0.004 * ch)),
-        Bone("wing_b_L", "wing_a_L", d((0, 1, 0)), wl * 0.9, m(0.025), 0.016 * s / 0.4, order="XZY", lim={"X": (-30, 30), "Z": (-165, 20), "Y": (-30, 30)}, side="L", group="wing", tau=3.0 * m(1), shape="box", size=(0.05 * ch, wl * 0.45, 0.003 * ch)),
-        Bone("wing_c_L", "wing_b_L", d((0, 1, 0)), wl * 1.0, m(0.02), 0.012 * s / 0.4, order="XZY", lim={"X": (-40, 40), "Z": (-20, 155), "Y": (-20, 20)}, side="L", group="wing", tau=1.2 * m(1), shape="box", size=(0.04 * ch, wl * 0.5, 0.003 * ch)),
+             lim={"X": (-100, 100), "Z": (-90, 100), "Y": (-80, 80)}, side="L", group="wing", tau=6.0 * WING_STRENGTH * m(1), shape="box", size=(0.055 * ch, wl / 2, 0.004 * ch)),
+        Bone("wing_b_L", "wing_a_L", d((0, 1, 0)), wl * 0.9, m(0.025), 0.016 * s / 0.4, order="XZY", lim={"X": (-30, 30), "Z": (-165, 20), "Y": (-30, 30)}, side="L", group="wing", tau=3.0 * WING_STRENGTH * m(1), shape="box", size=(0.05 * ch, wl * 0.45, 0.003 * ch)),
+        Bone("wing_c_L", "wing_b_L", d((0, 1, 0)), wl * 1.0, m(0.02), 0.012 * s / 0.4, order="XZY", lim={"X": (-40, 40), "Z": (-20, 155), "Y": (-20, 20)}, side="L", group="wing", tau=1.2 * WING_STRENGTH * m(1), shape="box", size=(0.04 * ch, wl * 0.5, 0.003 * ch)),
     ]
     sk = Skeleton(name or sp.name, bones)
     _normalize_mass(sk, sp.mass)

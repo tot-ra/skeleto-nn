@@ -79,6 +79,11 @@ After the fixes a searched open-loop wingbeat (CMA-ES, used only to check feasib
 network) gives net thrust (+0.46 N) with lift above the weight (5.5 N against 4.4 N): sustained flapping flight is
 possible in the simulation, and run 5 trains the bird network from scratch on it.
 
+That margin turned out too thin to learn: gliders trained on it never found a wingbeat. A new search at 1x wing
+strength found 0.58 N of net thrust (13 % of the weight), with the shoulder and outer wing at their torque limit most of
+the beat; at 2x it found 2.49 N (56 %), about a real bird's margin for a climb. The wing joints are now twice as strong
+(`bodies.WING_STRENGTH`), standing in for what flat plates lack: a feathered wing's twist and change of shape.
+
 Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
 
