@@ -38,36 +38,36 @@
   "updated": "2026-10-17 15:56"
  },
  "quadruped": {
-  "round": 70,
-  "score": 0.726,
-  "rounds_total": 71,
+  "round": 85,
+  "score": 0.837,
+  "rounds_total": 86,
   "clips": [
    {
     "name": "dog_walk",
     "title": "dog, walk",
     "gif": "showcase/motor/latest/quadruped_dog_walk.gif",
-    "result": "held 8.0 s, 1.21 m/s, goal 0.92"
+    "result": "held 8.0 s, 1.19 m/s, goal 0.91"
    },
    {
     "name": "dog_trot",
     "title": "dog, trot",
     "gif": "showcase/motor/latest/quadruped_dog_trot.gif",
-    "result": "held 8.0 s, 1.57 m/s, goal 0.57"
+    "result": "held 8.0 s, 1.53 m/s, goal 0.53"
    },
    {
     "name": "cat_walk",
     "title": "cat, walk",
     "gif": "showcase/motor/latest/quadruped_cat_walk.gif",
-    "result": "held 8.0 s, 0.67 m/s, goal 0.80"
+    "result": "held 8.0 s, 0.67 m/s, goal 0.79"
    },
    {
     "name": "horse_walk",
     "title": "horse, walk",
     "gif": "showcase/motor/latest/quadruped_horse_walk.gif",
-    "result": "fell at 3.2 s, 0.29 m/s, goal 0.13"
+    "result": "fell at 3.5 s, 0.52 m/s, goal 0.16"
    }
   ],
-  "updated": "2026-10-17 14:05"
+  "updated": "2026-10-17 17:54"
  },
  "bird": {
   "round": 21,
