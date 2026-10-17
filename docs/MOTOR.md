@@ -130,9 +130,9 @@ Curriculum:
   asked-for path without carrying any weight (carried weight is what drives a glide; carrying 70 % of it stalled
   every glide), holds the body level with a stiffness of m g x wingspan per radian (one scaled by the trunk's inertia
   let it roll over), and when most flights fail it comes back fully (people and quadrupeds: up to 30 %).
-* **Quadruped speeds per species:** each worker keeps a share of the goal speeds per species (up 3 % after a met
-  episode, down 5 % after a fall, 0.3 to 2x), so the species that fall most (horse, cat) no longer pull the goal
-  speeds down for the dog; the hard species are also drawn more often.
+* **Quadruped species drawn by weight:** the species that fall most (horse, cat, goat) come up more often. A goal
+  speed per species (down after every fall, up after a met episode) was tried for eight rounds and dropped: it held
+  every species at the speed where it fell about a third of the time, and the dog stopped training at test speeds.
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 
