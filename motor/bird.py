@@ -44,6 +44,10 @@ class BirdEnv(FamilyEnv):
     def default_body(self):
         return BIRDS["crow"]
 
+    def level(self):
+        """How level the cruise goals are (0: glides, 1: level flight), from the curriculum's speed knob."""
+        return float(np.clip(self.max_speed - 1.0, 0.0, 1.0))
+
     def sample_body(self, rng, spread):
         sp = BIRDS[SPECIES[int(rng.integers(len(SPECIES)))]] if rng.random() < spread else BIRDS["crow"]
         j = lambda: math.exp(rng.normal(0, 0.08 * spread))
@@ -78,6 +82,14 @@ class BirdEnv(FamilyEnv):
     # ------------------------------------------------------------------ episode
     def reset(self, body=None, friction=None, wind=None, sores=None, goal=None, profile=None, climb=None):
         """``goal``: horizontal velocity in speed units (forward, left) relative to the start heading; ``climb`` in units."""
+        full = self.spread
+        self.spread = min(full, self.level() + 0.2)          # other species, wind and turns after flapping, not before
+        try:
+            return self._reset(body, friction, wind, sores, goal, profile, climb)
+        finally:
+            self.spread = full
+
+    def _reset(self, body, friction, wind, sores, goal, profile, climb):
         rng = self.rng
         super().reset(body=body, friction=friction, wind=wind, sores=sores, goal=np.zeros(2), profile=profile)
         u = self.speed_unit()
@@ -87,7 +99,7 @@ class BirdEnv(FamilyEnv):
         if climb is None:
             # curriculum: the first goals are glides (gravity pays for the speed); as the curriculum's speed knob
             # grows they level out, so flapping has to pay for the speed
-            level = float(np.clip(self.max_speed - 1.0, 0.0, 1.0))
+            level = self.level()
             climb = rng.normal(0, 0.05 + 0.25 * self.spread) - (1.0 - level) * self.GLIDE_SINK
         self.climb = float(climb) * u
         # start in the air at about the goal velocity, heading roughly where the goal points

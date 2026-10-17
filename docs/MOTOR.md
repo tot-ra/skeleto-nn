@@ -106,7 +106,9 @@ Curriculum:
 * **Variety shrinks too** when most episodes fail, back to where it started.
 * **Birds glide first:** the first flight goals sink at about a crow's glide ratio (0.45 units), so gravity pays for
   the speed; they level out as the curriculum's speed knob grows (level after one unit of growth), so flapping has to pay.
-  The bird curriculum moves on while fewer than half the flights fail (people and quadrupeds: 30 %). The harness follows the
+  The bird curriculum moves on while fewer than half the flights fail (people and quadrupeds: 30 %).
+  Variety (species, wind, turns) is held at most 0.2 ahead of how level the goals are: harder species made most
+  flights fail, which held the goals at glides, so flapping was never needed. The harness follows the
   asked-for path without carrying any weight (carried weight is what drives a glide; carrying 70 % of it stalled
   every glide), holds the body level with a stiffness of m g x wingspan per radian (one scaled by the trunk's inertia
   let it roll over), and when most flights fail it comes back fully (people and quadrupeds: up to 30 %).
