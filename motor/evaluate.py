@@ -12,7 +12,8 @@ of a *motivation profile*, which is an input of the policy too (an urgent body a
               (``injury.risk``: tolerance per region, a fast load is more brittle); an      region) per event; a certain
               event, so one step carries its whole cost                                     leg fracture ~ 3 s of goal
   pain        load on sore regions (a sprain carries weight, a broken arm moves),            body weights on a sore part,
-              and joints pressed into the end of their range                               plus (depth into the last 10 %)^2
+              joints pressed into the end of their range, and the load on the            plus (depth into the last 10 %)^2,
+              joint-limit constraints (ligaments) wherever it comes from                   plus limit torque / capacity
   strain      muscle torque against its capacity, squared, mass-weighted mean over joints   (tau / tau_max)^2
   energy      metabolic power: positive work / 0.25 efficiency, negative work / 1.2,        m g sqrt(g l)  (l = leg length)
               holding torque (isometric cost)
@@ -191,6 +192,11 @@ class Evaluator:
         lo_d = np.maximum(0.0, (self.rng_lo + 0.05 * span) - q) / (0.05 * span + 1e-6)
         press = np.maximum(0.0, tau) * hi_d ** 2 + np.maximum(0.0, -tau) * lo_d ** 2
         pain += float(np.sum(press / self.tau_max))
+        # the load on ligaments and the stretched opposing muscles at the end of a soft range, whoever puts it there
+        # (the body's own muscle, gravity, momentum): a joint held at its stop hurts in proportion to that load. Only
+        # soft-range joints: a straight knee or a locked hip resting on its ligaments is how one stands
+        if pc.soft_mask.any():
+            pain += float(np.sum(pc.limit_torque()[pc.soft_mask] / self.tau_max[pc.soft_mask]))
         # --- strain and energy
         u = tau / (self.tau_max * strength_scale)
         strain = float(np.sum(self.w_strain * u ** 2))

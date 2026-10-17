@@ -13,7 +13,7 @@ DT = 1.0 / (CTRL_HZ * SUBSTEPS)
 def mat2quat(R):
     q = np.zeros(4); mujoco.mju_mat2Quat(q, np.asarray(R, float).reshape(9)); return q
 
-def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0):
+def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None):
     sk = creature.skel
     kids = sk.children
     foot_idx = {l.chain[-1] for l in creature.legs}
@@ -64,8 +64,17 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
                     # the armature that keeps kp dt^2 / inertia below 1: a heron's wing twist (a long bone turning about
                     # itself, very little inertia) was five times past that and blew the simulation up
                     arm = max(0.0003, kp * DT * DT) if wing else 0.002 * (1 + mi)
+                    # soft end of range (``soft_range``: bone group -> share of the range): the limit acts from that far
+                    # inside it and stiffens toward the stop, as stretched ligaments and the opposing muscles do; a joint
+                    # can no longer rest on its stop for free (the arms of a trained walker hung on their stops, held out
+                    # backwards). Not for legs: a straight knee or an extended hip locked on its ligaments is how one stands
+                    soft = ""
+                    share = (soft_range or {}).get(b.group, 0.0)
+                    if share > 0:
+                        mg = math.radians(share * (hi - lo))           # margin and width are not converted from degrees
+                        soft = f' margin="{mg:.4f}" solreflimit="0.04 1" solimplimit="0.05 0.95 {mg:.4f} 0.5 2"'
                     s += (f'{sp}  <joint name="j_{b.name}_{ax}" type="hinge" axis="{AX[ax][0]:.0f} {AX[ax][1]:.0f} {AX[ax][2]:.0f}" '
-                          f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="0"/>\n')
+                          f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="0"{soft}/>\n')
                     kv = (0.02 if wing else 0.08) * kp
                     acts.append(f'    <position name="a_{b.name}_{ax}" joint="j_{b.name}_{ax}" kp="{kp:.2f}" kv="{kv:.3f}" forcerange="{-b.tau:.1f} {b.tau:.1f}" ctrlrange="{math.radians(lo)*1.05:.4f} {math.radians(hi)*1.05:.4f}"/>\n')
         for c in kids[i]:
@@ -94,9 +103,10 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
     return xml
 
 class PhysChar:
-    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0):
+    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None):
         self.c = creature; self.sk = creature.skel
-        self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction, terrain_friction=friction))
+        self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
+                                                              terrain_friction=friction, soft_range=soft_range))
         self.data = mujoco.MjData(self.model)
         m = self.model; sk = self.sk
         self.bid = [m.body(b.name).id for b in sk.bones]
@@ -120,6 +130,8 @@ class PhysChar:
         self.lo = np.array([math.radians(sk.bones[i].lim["XYZ"[a]][0]) for i, a in self.dof_list])
         self.hi = np.array([math.radians(sk.bones[i].lim["XYZ"[a]][1]) for i, a in self.dof_list])
         self.tau = np.array([sk.bones[i].tau for i, a in self.dof_list])
+        # joints with a soft end of range (their limit load is a ligament load, scored as pain)
+        self.soft_mask = np.array([(soft_range or {}).get(sk.bones[i].group, 0.0) > 0 for i, a in self.dof_list])
         self.foot_geoms = [m.geom("g_" + sk.bones[l.chain[-1]].name).id for l in creature.legs]
         self.hand_geoms = [m.geom("g_" + sk.bones[a.chain[-1]].name).id for a in creature.arms]
         self.leg_sites = [(m.site(f"s_{l.name}_heel").id, m.site(f"s_{l.name}_ball").id) for l in creature.legs]
@@ -162,6 +174,18 @@ class PhysChar:
     def root_pose(self):
         d = self.data
         return d.qpos[0:3].copy(), d.xmat[self.bid[0]].reshape(3, 3).copy()
+
+    def limit_torque(self):
+        """Torque of the joint-limit constraints per joint axis (the load on ligaments at the end of the range)."""
+        d = self.data; m = self.model; out = np.zeros(self.nj)
+        if not hasattr(self, "_jdof"):
+            self._jdof = {int(m.dof_jntid[a]): k for k, a in enumerate(self.vadr)}
+        lim = np.nonzero(d.efc_type[:d.nefc] == mujoco.mjtConstraint.mjCNSTR_LIMIT_JOINT)[0]
+        for e in lim:
+            k = self._jdof.get(int(d.efc_id[e]))
+            if k is not None:
+                out[k] += abs(float(d.efc_force[e]))
+        return out
 
     def qvec(self): return self.data.qpos[self.qadr].copy()
     def qdvec(self): return self.data.qvel[self.vadr].copy()

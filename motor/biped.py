@@ -45,6 +45,7 @@ def body_vector(b: HumanBody, leg):
 class BipedEnv(FamilyEnv):
     family = "biped"
     BODY_DIM = 9
+    SOFT_RANGE = {"arm": 0.2}   # the last fifth of an arm joint's range resists: arms cannot hang on their stops
 
     def default_body(self):
         return HumanBody()
