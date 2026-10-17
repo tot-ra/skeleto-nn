@@ -143,8 +143,15 @@ class BirdEnv(FamilyEnv):
         if not hasattr(self, "climb"):
             return np.concatenate([o, [0.0, 0.0, 0.0, 1.0]]).astype(np.float32)
         p, _R = self.pc.root_pose()
-        return np.concatenate([o, [p[2] / self.wingspan() - 4.0, self.climb / self.speed_unit(),
+        # the climb rate wanted now, the correction toward the height to hold included: the reward depends on that height,
+        # and with only the asked-for rate observed it could not be predicted, so training drifted away from level flight
+        return np.concatenate([o, [p[2] / self.wingspan() - 4.0, self.want_climb() / self.speed_unit(),
                                    math.sin(self.phase), math.cos(self.phase)]]).astype(np.float32)
+
+    def want_climb(self):
+        u = self.speed_unit(); p, _R = self.pc.root_pose()
+        alt_ref = self.alt0 + self.climb * self.steps / CTRL_HZ
+        return self.climb + float(np.clip((alt_ref - p[2]) / self.HOLD_S, -0.5 * u, 0.5 * u))
 
     def obs_layout(self):
         out = super().obs_layout()
@@ -204,9 +211,7 @@ class BirdEnv(FamilyEnv):
         v = pc.data.qvel[0:3] / u
         # the goal is a height to hold (rising or sinking at the asked rate), not only a climb rate: a bird asked to fly
         # level that drifted up was as wrong as one that sank, but a climb-rate goal never brought it back down
-        alt_ref = self.alt0 + self.climb * self.steps / CTRL_HZ
-        want = self.climb + float(np.clip((alt_ref - p[2]) / self.HOLD_S, -0.5 * u, 0.5 * u))
-        goal_v = np.array([self.goal_world[0], self.goal_world[1], want]) / u
+        goal_v = np.array([self.goal_world[0], self.goal_world[1], self.want_climb()]) / u
         err = v - goal_v
         sp = float(np.linalg.norm(goal_v[:2]))
         # the climb rate is scored on its own, tightly: inside the speed tolerance a glide sinking 0.05 units faster than

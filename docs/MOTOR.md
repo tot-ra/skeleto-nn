@@ -99,6 +99,12 @@ watts are about 15 times a real crow's). Sustainable is 1.4 units (1.2 at first:
 rested crow sank and unlearned flying), the flight reserve drains in about 20 s at twice that, and every flight starts
 with a reserve of 70 to 100 % (40 % at first: too weak to hold height at all): the bird has to balance speed, height and energy. The
 goal is a height to hold (at the asked climb rate), not only a climb rate, so drifting up is as wrong as sinking.
+Every fine-tuning on these rules unlearned level flight within a round, whatever else was changed (learning rate,
+value warm-up, a longer horizon, the action-bound pull): the reward depended on the height to hold, but the bird only
+saw its absolute height and the asked-for climb rate, so it could not predict its own reward. It now observes the
+climb rate wanted at this moment (the correction toward the height included); ten minutes of training from the last
+level flier then kept it flying level and brought it back to its height instead of overshooting it. Birds also look
+about 11 s ahead (`GAMMA` 0.997; a slow sink crashes long after the energy it saves) and get no action-bound pull.
 Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
 commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
 
