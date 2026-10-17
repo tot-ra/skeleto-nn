@@ -264,6 +264,11 @@ class QuadSpec:
     neck_nod: float = 0.06              # head/neck nod amplitude at a walk (rad)
     neck_speed_drop: float = 0.1        # how far the neck stretches forward and down at speed (rad)
     tail_type: str = "wag"              # wag | balance | hair | curl | none
+    neck_rise: float = 1.0              # how steeply the neck rises from the withers (1: a dog's; a horse's rises far more)
+    head_drop: float = 0.35             # how far the head slants down from the end of the neck
+    hind_scale: float = 1.0             # hind-leg length relative to the fore (a cat's hind legs are longer)
+    tail_mass: float = 1.0              # tail mass and muscle relative to a dog's (a cat balances with its tail)
+    tail_power: float = 1.0
     foot_type: str = "paw"              # paw | hoof
     vigor: float = 1.0                  # muscle power for the body size (0.5 old, 1 adult, 1.4 strong)
     turn_rate: float = 3.0              # fastest turn on the spot (rad/s)
@@ -277,9 +282,10 @@ class QuadSpec:
 # jump_gain is the muscle side of the story: relative hind-limb power (cat ~3.4 sqrt(g L), dog ~2.2, horse ~1.35, pig ~1.0).
 QUADS = {
     "dog": QuadSpec("dog", 30.0, 1.0),
-    "cat": QuadSpec("cat", 4.5, 0.58, tail_n=6, leg_scale=0.95, spine_flex=1.7, tail_len=1.3, neck_len=0.8, head_len=0.7, body_len=1.05,
+    "cat": QuadSpec("cat", 4.5, 0.58, tail_n=6, leg_scale=0.95, spine_flex=1.7, tail_len=1.5, hind_scale=1.15, tail_mass=1.6, tail_power=2.5, neck_len=0.8, head_len=0.7, body_len=1.05,
                     turn_rate=4.5, min_radius=0.45, n_neck=3, neck_rom=110.0, neck_nod=0.04, neck_speed_drop=0.05, tail_type="balance", n_spine=8, ext_rom=45.0, flex_rom=75.0, lat_rom=95.0, twist_rom=45.0, core_power=1.5, jump_gain=3.4, jump_pitch=1.05),
-    "horse": QuadSpec("horse", 500.0, 2.45, tail_n=5, leg_scale=1.22, cannon=1.45, spine_flex=0.35, neck_len=1.3, tail_len=0.8, head_len=1.2, body_len=0.95, chest_depth=0.78,
+    "horse": QuadSpec("horse", 500.0, 2.45, tail_n=5, leg_scale=1.22, cannon=1.45, spine_flex=0.35, neck_len=1.9, tail_len=0.8, head_len=1.2, body_len=0.95, chest_depth=1.35,
+                      neck_rise=2.2, head_drop=1.0,
                       turn_rate=1.2, min_radius=5.5, n_neck=5, neck_rom=140.0, neck_nod=0.14, neck_speed_drop=0.30, tail_type="hair", foot_type="hoof", n_spine=3, ext_rom=9.0, flex_rom=14.0, lat_rom=16.0, twist_rom=6.0, core_power=0.9, jump_gain=1.2, jump_pitch=0.3),
     "goat": QuadSpec("goat", 45.0, 0.95, leg_scale=1.0, cannon=1.15, spine_flex=0.9, neck_len=0.85, tail_len=0.3, tail_n=2, head_len=0.9, body_len=0.95,
                      n_spine=5, ext_rom=35.0, flex_rom=45.0, lat_rom=45.0, twist_rom=18.0, core_power=1.2, jump_gain=2.8, jump_pitch=0.6, n_neck=4, neck_rom=100.0, neck_nod=0.09, tail_type="wag_low", foot_type="hoof"),
@@ -317,23 +323,25 @@ def quadruped(spec: QuadSpec | str = "dog", load: float = 0.0, name=None, missin
     neck_bones = []; prev_n = "chest"
     for k in range(nn):
         nm = "neck" if k == 0 else f"neck{k}"
-        neck_bones.append(Bone(nm, prev_n, d((1, 0, 0.7 if k == 0 else 0.35)), 0.20 * s * sp.neck_len / nn, m(1.8 / nn), cd * 0.55, t=0.95 if k == 0 else 1.0, order="YXZ", lim=dict(nlim), group="neck", tau=60 * tau / nn)); prev_n = nm
+        neck_bones.append(Bone(nm, prev_n, d((1, 0, (0.7 if k == 0 else 0.35) * sp.neck_rise)), 0.20 * s * sp.neck_len / nn, m(1.8 / nn), cd * 0.55, t=0.95 if k == 0 else 1.0, order="YXZ", lim=dict(nlim), group="neck", tau=60 * tau / nn)); prev_n = nm
     bones = [
         Bone("pelvis", None, X, Lp, m(5.0), cd, group="trunk"),
         *spine_bones,
         *neck_bones,
-        Bone("head", prev_n, d((1, 0, -0.35)), 0.20 * s * sp.head_len, m(2.0), 0.05 * s, order="YXZ", lim={"Y": (-45, 45), "X": (-30, 30), "Z": (-50, 50)}, group="head", tau=30 * tau),
+        Bone("head", prev_n, d((1, 0, -sp.head_drop)), 0.20 * s * sp.head_len, m(2.0), 0.05 * s, order="YXZ", lim={"Y": (-45, 45), "X": (-30, 30), "Z": (-50, 50)}, group="head", tau=30 * tau),
     ]
     prev = "pelvis"; tl = 0.09 * s * sp.tail_len * 4 / sp.tail_n
     for k in range(sp.tail_n):
-        bones.append(Bone(f"tail{k}", prev, d((-1, 0, 0.35 if k == 0 else 0.0)), tl, m(0.35 / sp.tail_n * 4), 0.02 * s, t=0.0 if k == 0 else 1.0,
-                          offset=(0, 0, 0.02 * s) if k == 0 else (0, 0, 0), order="YXZ", lim={"Y": (-60, 60), "Z": (-60, 60), "X": (-20, 20)}, group="tail", tau=8 * tau))
+        bones.append(Bone(f"tail{k}", prev, d((-1, 0, 0.35 if k == 0 else 0.0)), tl, m(0.35 / sp.tail_n * 4 * sp.tail_mass), 0.02 * s * sp.tail_mass ** 0.5,
+                          t=0.0 if k == 0 else 1.0, offset=(0, 0, 0.02 * s) if k == 0 else (0, 0, 0), order="YXZ",
+                          lim={"Y": (-60, 60), "Z": (-60, 60), "X": (-20, 20)}, group="tail", tau=8 * tau * sp.tail_power))
         prev = f"tail{k}"
     cn = sp.cannon
     # hind leg: femur, tibia, metatarsus, paw (digitigrade zig-zag)
-    hind = [("thigh", d((0.40, 0, -0.92)), 0.22 * ls, 4.0, {"Y": (-80, 60), "X": (-25, 25), "Z": (-25, 25)}, 260),
-            ("shank", d((-0.60, 0, -0.80)), 0.21 * ls, 1.4, {"Y": (-70, 90)}, 150),
-            ("meta", d((0.05, 0, -1.0)), 0.12 * ls * cn, 0.5, {"Y": (-100, 55)}, 70),
+    lh = ls * sp.hind_scale
+    hind = [("thigh", d((0.40, 0, -0.92)), 0.22 * lh, 4.0, {"Y": (-80, 60), "X": (-25, 25), "Z": (-25, 25)}, 260),
+            ("shank", d((-0.60, 0, -0.80)), 0.21 * lh, 1.4, {"Y": (-70, 90)}, 150),
+            ("meta", d((0.05, 0, -1.0)), 0.12 * lh * cn, 0.5, {"Y": (-100, 55)}, 70),
             ("paw", X, 0.075 * s, 0.3, {"Y": (-45, 70), "X": (-10, 10)}, 40)]
     fore = [("thigh", d((-0.20, 0, -0.98)), 0.17 * ls, 3.0, {"Y": (-80, 80), "X": (-30, 30), "Z": (-25, 25)}, 260),
             ("shank", d((0.20, 0, -0.98)), 0.20 * ls, 1.2, {"Y": (-30, 140)}, 150),
