@@ -58,6 +58,11 @@ no harness, no clips, every joint from the network:
 <td width="33%" valign="top"><img src="showcase/motor/quad_run5_dog_walk.gif" width="100%"><br><b>dog walk</b>: 1.0 m/s for the full 10 s (head carried low)</td></tr>
 </table>
 
+<img src="showcase/motor/bird_run6_crow_flight.gif" width="50%"><br><b>crow, first flapping flight</b> (run 6, no
+harness, height in the caption): asked to fly level at 2.8 units (about 8.5 m/s), it loses about 1.5 m in the first
+2 s, then beats its wings and climbs slowly (3.8 m to 6.5 m by 10 s). Every joint, the wingbeat included, is the
+network's. The neck held straight up is not penalised yet; side wind, gull and heron still fall.
+
 The same biped network also walks on ice, with a sprained ankle, in a gale, as a child and as an elder; it still
 falls when turning from a walk and under a 20 kg pack. The quadruped network walks as a dog, a lame dog and a cat;
 the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
@@ -77,7 +82,7 @@ the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
 | Motor networks: evaluation system (`motor/evaluate.py`) | works; each term responds to its own consequence (tests) |
 | Motor networks: shared family environment with muscle activation (`motor/family.py`), biped, quadruped and bird families (`motor/biped.py`, `motor/quadruped.py`: dog, cat, wolf, goat, horse, pig, bear on one canonical skeleton; `motor/bird.py`: flight for crow, gull, heron, sparrow, duck), mirror symmetry, PPO with symmetry loss, curriculum and fading harness (`motor/ppo.py`), population-based training where bad runs die off (`motor/pbt.py`) | works; tests |
 | Motor networks: a biped or quadruped policy that walks | biped (run 5, above): walks and runs at the asked speed on flat ground, on ice, hurt, in wind, as a child or an elder; turns from a walk and a heavy pack still fall. Quadruped: dog, lame dog and cat walk; horse, pig and ice fall. Training continues |
-| Bird motor network | the air model was corrected so flapping flight is possible (run 5); the first network learned to beat as slowly as allowed and fall; now trained glides first, then level flight; not flying on its own yet |
+| Bird motor network | the crow flies by flapping, on its own, for 15 s (run 6, above); it climbs slowly when asked to hold height; side wind, gull and heron still fall; the sparrow waits for a faster control rate |
 | Mixed-body (monkey, bear on two legs, kangaroo, penguin) and snake motor networks | not started |
 | A distilled pose network that a game runs without physics | not started |
 
