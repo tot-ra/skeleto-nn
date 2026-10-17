@@ -94,6 +94,9 @@ def main():
     ap.add_argument("--alive", type=float, default=None); ap.add_argument("--fall-cost", type=float, default=None)
     ap.add_argument("--cost-scale", type=float, default=1.0, help="multiplies every evaluation cost")
     ap.add_argument("--hidden", type=int, default=512)
+    ap.add_argument("--vwarm", type=int, default=0,
+                    help="first iterations train only the value function (after the reward changed: a critic fitted to the "
+                         "old reward gave misleading advantages and the policy unlearned a good skill before it caught up)")
     ap.add_argument("--reset-curriculum", action="store_true", help="with --init: restart harness, goal speeds and spread")
     ap.add_argument("--speed0", type=float, default=0.8, help="goal speeds at the start of the curriculum (m/s)")
     ap.add_argument("--fade", type=float, default=0.0015, help="harness lost per iteration regardless of success")
@@ -189,6 +192,8 @@ def main():
                 # summed over outputs (a mean over all of them diluted the pull on the few out of range about fifty times)
                 lbound = (torch.relu(mu.abs() - ref.ACTION_BOUND) ** 2).sum(-1).mean()
                 loss = lpi + 0.5 * lv + args.sym * lsym + 0.02 * lbound
+                if it - it0 < args.vwarm:
+                    loss = 0.5 * lv
                 opt.zero_grad(); loss.backward()
                 nn.utils.clip_grad_norm_(list(pi.parameters()) + list(vf.parameters()), 1.0); opt.step()
                 if ref.MIN_LOGSTD is not None:                   # keep exploring where the skill is far away

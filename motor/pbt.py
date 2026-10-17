@@ -84,6 +84,7 @@ def main():
     ap.add_argument("--replace", type=int, default=1, help="members replaced per round")
     ap.add_argument("--reset-curriculum", action="store_true", help="first round: keep the weights, restart harness and goals")
     ap.add_argument("--assist0", type=float, default=1.0); ap.add_argument("--speed0", type=float, default=0.8)
+    ap.add_argument("--vwarm", type=int, default=0, help="first round: iterations that train only the value function")
     args = ap.parse_args()
     root = os.path.join("runs", "motor", args.name); os.makedirs(root, exist_ok=True)
     hist_path = os.path.join(root, "history.json")
@@ -109,6 +110,8 @@ def main():
                 cmd += ["--init", ckpt]
                 if args.reset_curriculum and rnd == first:
                     cmd += ["--reset-curriculum"]
+                if args.vwarm and rnd == first:
+                    cmd += ["--vwarm", str(args.vwarm)]
             log = open(os.path.join(root, f"m{m}.log"), "a")
             procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
         for p in procs:
