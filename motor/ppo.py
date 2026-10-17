@@ -39,6 +39,11 @@ def worker(conn, family, seed, env_kw):
     rng = np.random.default_rng(seed + 7)
     obs = env.reset()
     conn.send(("ready", env.obs_dim, env.act_dim))
+    # Exploration locked to a rhythm (birds: the wingbeat clock): part of the noise is A sin(phase) + B cos(phase) with
+    # A, B drawn per episode, so each step's noise is still N(0, std^2) but over an episode it is a coherent beat.
+    # Noise independent at every step never added up to a wingbeat.
+    share = getattr(env, "PHASE_NOISE", 0.0)
+    AB = rng.standard_normal((2, env.act_dim))
     while True:
         msg = conn.recv()
         if msg[0] == "stop":
@@ -51,7 +56,10 @@ def worker(conn, family, seed, env_kw):
         for _ in range(n):
             o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
             mu = mlp_np(o, W["pi"]); ls = W["logstd"]
-            a = mu + np.exp(ls) * rng.standard_normal(mu.shape)
+            eps = rng.standard_normal(mu.shape)
+            if share > 0:
+                eps = math.sqrt(1 - share) * eps + math.sqrt(share) * (AB[0] * math.sin(env.phase) + AB[1] * math.cos(env.phase))
+            a = mu + np.exp(ls) * eps
             lp = float(-0.5 * np.sum(((a - mu) / np.exp(ls)) ** 2 + 2 * ls + math.log(2 * math.pi)))
             v = float(mlp_np(o, W["v"])[0])
             obs2, r, done, info = env.step(a)
@@ -64,7 +72,10 @@ def worker(conn, family, seed, env_kw):
             if "ep_ret" in info:
                 # a stall is a failure for the curriculum too, or standing still raises the goal speeds
                 infos.append((info["ep_ret"], info["ep_len"], info["fell"] or info.get("stalled", False), info["goal"]))
-            obs = env.reset() if (done or info["trunc"]) else obs2
+            if done or info["trunc"]:
+                obs = env.reset(); AB = rng.standard_normal((2, env.act_dim))
+            else:
+                obs = obs2
         o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
         conn.send(("data", np.array(O, np.float32), np.array(A, np.float32), np.array(LP, np.float32),
                    np.array(R, np.float32), np.array(D, np.float32), np.array(V, np.float32),
