@@ -41,6 +41,7 @@ class BirdEnv(FamilyEnv):
     FAIL_OK = 0.5          # a flight ends at any touch of the ground, so more of them fail while the goals are met
     MIN_LOGSTD = -1.6      # exploration noise at least 0.2: a glider's noise of 0.08 never found a wingbeat
     PHASE_NOISE = 0.6      # share of the exploration noise locked to the wingbeat clock (motor/ppo.py)
+    CLIMB_TOL = 0.15       # climb-rate tolerance of the goal score (speed units)
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
@@ -188,7 +189,9 @@ class BirdEnv(FamilyEnv):
         goal_v = np.array([self.goal_world[0], self.goal_world[1], self.climb]) / u
         err = v - goal_v
         sp = float(np.linalg.norm(goal_v[:2]))
-        goal = 0.7 * math.exp(-float(err @ err) / (0.05 + 0.1 * sp * sp))
+        # the climb rate is scored on its own, tightly: inside the speed tolerance a glide sinking 0.05 units faster than
+        # asked lost under 1 % of the score, so holding height never paid and flapping was never learned
+        goal = 0.7 * math.exp(-float(err[:2] @ err[:2]) / (0.05 + 0.1 * sp * sp)) * math.exp(-(float(err[2]) / self.CLIMB_TOL) ** 2)
         goal += 0.3 * float(np.clip(float(v[:2] @ (goal_v[:2] / max(sp, 1e-6))) / max(sp, 1e-6), 0.0, 1.0))
         # in the air the capture point means nothing: balance is scored by tilt alone, through the term's weight
         weights = {t: w * self.cost_scale for t, w in self.profile.items()}

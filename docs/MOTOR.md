@@ -123,7 +123,9 @@ Curriculum:
   and the goals stopped about a tenth of the way from a glide to level flight.
   More noise made the wings move but not beat: noise drawn independently every step does not add up to a rhythm.
   So 60 % of a bird's exploration noise is locked to its wingbeat clock (A sin(phase) + B cos(phase), A and B drawn
-  per episode): every step's noise is still N(0, std^2), but over an episode it is a coherent wingbeat to try. The harness follows the
+  per episode): every step's noise is still N(0, std^2), but over an episode it is a coherent wingbeat to try.
+  The climb rate is scored on its own, with a tolerance of 0.15 units: inside the speed tolerance a glide sinking
+  0.05 units faster than asked lost under 1 % of the goal score, so holding height never paid until the ground was hit. The harness follows the
   asked-for path without carrying any weight (carried weight is what drives a glide; carrying 70 % of it stalled
   every glide), holds the body level with a stiffness of m g x wingspan per radian (one scaled by the trunk's inertia
   let it roll over), and when most flights fail it comes back fully (people and quadrupeds: up to 30 %).
