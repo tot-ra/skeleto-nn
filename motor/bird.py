@@ -36,6 +36,7 @@ class BirdEnv(FamilyEnv):
     BODY_DIM = 7
     MAX_SPEED = 4.0
     ASSIST_RECOVER = 1.0   # a flier that cannot yet stay up gets the whole harness back (stall ends a hover under it)
+    FAIL_OK = 0.5          # a flight ends at any touch of the ground, so more of them fail while the goals are met
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
@@ -86,7 +87,7 @@ class BirdEnv(FamilyEnv):
         if climb is None:
             # curriculum: the first goals are glides (gravity pays for the speed); as the curriculum's speed knob
             # grows they level out, so flapping has to pay for the speed
-            level = float(np.clip((self.max_speed - 1.0) / 2.0, 0.0, 1.0))
+            level = float(np.clip(self.max_speed - 1.0, 0.0, 1.0))
             climb = rng.normal(0, 0.05 + 0.25 * self.spread) - (1.0 - level) * self.GLIDE_SINK
         self.climb = float(climb) * u
         # start in the air at about the goal velocity, heading roughly where the goal points
