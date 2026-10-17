@@ -36,7 +36,7 @@ def situations(family, env):
         return BIPED
     if family == "bird":
         from bodies import BIRDS
-        return [("crow_cruise", dict(goal=(2.5, 0.0)), "crow, cruise"), ("crow_climb", dict(goal=(2.5, 0.0), climb=0.4), "crow, climb"),
+        return [("crow_glide", dict(goal=(3.0, 0.0), climb=-0.45), "crow, glide"), ("crow_cruise", dict(goal=(2.5, 0.0)), "crow, cruise"), ("crow_climb", dict(goal=(2.5, 0.0), climb=0.4), "crow, climb"),
                 ("crow_turn", dict(goal=(2.0, 0.8)), "crow, turn"), ("crow_wind", dict(goal=(2.5, 0.0), wind=(0.0, -6.0, 0.0)), "crow, side wind"),
                 ("gull", dict(body=BIRDS["gull"], goal=(2.5, 0.0)), "gull"), ("sparrow", dict(body=BIRDS["sparrow"], goal=(2.5, 0.0)), "sparrow"),
                 ("heron", dict(body=BIRDS["heron"], goal=(2.2, 0.0)), "heron")]
@@ -102,7 +102,7 @@ def main():
         imgs = []
         for k, (S, E, R) in enumerate(frames[::2]):
             sc.pose(sc.actors[0], S, E, R)
-            look = np.array([S[0][0], S[0][1], 0.9 * env.c.z0])
+            look = np.array([S[0][0], S[0][1], S[0][2] if env.family == "bird" else 0.9 * env.c.z0])  # follow a flier up
             imgs.append(caption(sc.render(look, 4.0, 120, -12), title, f"t={2 * k / 30:.1f}s"))
         sc.close()
         save_gif(imgs, os.path.join(out, name + ".gif"), fps=15)
