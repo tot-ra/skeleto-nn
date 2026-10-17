@@ -294,7 +294,9 @@ QUADS = {
 def quadruped(spec: QuadSpec | str = "dog", load: float = 0.0, name=None, missing: str = "", peg: str = "") -> Creature:
     sp = QUADS[spec] if isinstance(spec, str) else spec
     s = sp.scale; mscale = sp.mass / 30.0
-    tau = mscale ** (2 / 3.) * 1.0
+    # joint torque = muscle force (cross-section, mass^2/3) x lever arm (length): with force alone a horse's neck
+    # muscles could not hold up its head
+    tau = mscale ** (2 / 3.) * s
     d = lambda v: nrm(v)
     ls = s * sp.leg_scale
     cd = 0.11 * s * sp.chest_depth
