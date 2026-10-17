@@ -103,6 +103,10 @@ Curriculum:
   ended as a stall halfway round.
 * **Slow, reversible curriculum:** goal speeds grow by 0.005 units per successful iteration and shrink when most
   episodes fail (falls and stalls both count).
+* **Variety shrinks too** when most episodes fail, back to where it started.
+* **Birds glide first:** the first flight goals sink at about a crow's glide ratio (0.45 units), so gravity pays for
+  the speed; they level out as the curriculum's speed knob grows, so flapping has to pay. The harness follows the
+  asked-for path, and when most flights fail it comes back fully (people and quadrupeds: up to 30 %).
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 
@@ -120,8 +124,9 @@ About 1,300 to 2,500 simulated steps per second per worker on an M5 Pro; the phy
 
 ## Status
 
-Stage 1 (evaluation system, biped and quadruped environments, trainer, population training, renderer) is built and tested. No policy walks yet, and
-nothing here is used by a game yet. The first two runs (GIFs in the README, `showcase/motor/`):
+Stage 1 (evaluation system, biped, quadruped and bird environments, trainer, population training, renderer) is built and
+tested. The biped and the quadruped walk on their own; birds do not fly yet. Nothing here is used by a game yet. Runs
+so far (GIFs in the README, `showcase/motor/`):
 
 | run | setup | what it learned |
 |---|---|---|
@@ -129,7 +134,8 @@ nothing here is used by a game yet. The first two runs (GIFs in the README, `sho
 | 2 | plus a reward for staying upright and a fall cost; the goal pays for partial progress; the harness only holds, never pushes | to stand still under the full harness (0.04 m/s when asked for 1.3 m/s); the harness never faded because the goal was never met, and without it the policy falls within 2 s |
 | 3 | population training (3 bipeds, 2 quadrupeds, 16 rounds, about 4 h); curriculum, moving starts, activation | to stand perfectly on its own, in every situation and at any asked speed (0.00 m/s when asked for 1.3 m/s); from a moving start it falls within 1 s. Scores flat at 0.36 to 0.38 |
 | 4 | run 3's weights; stalls end episodes; speed caps; curriculum restarted (4 h) | **biped: the first walk**: upright, alternating steps for the full 10 s at 0.65 m/s when asked for 1.3; turns, ice, a pack, a child's body still fall. Quadruped: still stands; its curriculum ran away again because a stall did not count as a failure (fixed: the curriculum now counts falls and stalls). Birds: fall within 1.5 s without the harness. After 4 h: the biped survives the full test at every forward speed (about 1 m/s when asked for 1.3, 1.3 to 1.5 when asked for 2.5), on ice and as a 1.4 m person; the quadruped walks at 0.5 to 0.8 Froude and on ice; both fail sideways goals (the stall rule ended them while turning; fixed) and the quadruped fails the cat and horse |
-| 5 | turning counts as progress, slower curriculum; birds from scratch on the corrected air model with a wingbeat clock | in progress |
+| 5 | turning counts as progress, slower curriculum; birds from scratch on the corrected air model with a wingbeat clock (3 h) | **biped:** walks at 1.36 m/s when asked for 1.3 and runs at 2.87 when asked for 3.2, for the full 10 s; also on ice, with a sprained ankle, in a gale, as a child and as an elder; a turn from a walk and a 20 kg pack still fall. **Quadruped:** dog (1.0 m/s), lame dog and cat walk for the full 10 s, head carried low; horse, pig and a dog on ice fall; its curriculum stalled at the slowest goals because the full variety of species made most episodes fail. **Birds:** the network beat its wings as slowly as allowed, lost speed under the harness and flipped without it (score 0.24 falling to 0.09); the harness never came back above 30 % |
+| 6 | birds glide first (goals sink at a glide ratio of 7 and level out as the curriculum grows), the harness follows the asked-for path and comes back fully when flights fail; quadruped variety shrinks when most episodes fail; pack test added for people | in progress |
 
 Runs 1 to 3 are the usual local optima of reinforcement learning without reference motion. Run 3 had two causes:
 the curriculum had run away under an earlier goal score that paid standing still as a slow walk (quadrupeds were

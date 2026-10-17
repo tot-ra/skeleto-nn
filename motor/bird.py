@@ -35,6 +35,8 @@ class BirdEnv(FamilyEnv):
     family = "bird"
     BODY_DIM = 7
     MAX_SPEED = 4.0
+    ASSIST_RECOVER = 1.0   # a flier that cannot yet stay up gets the whole harness back (stall ends a hover under it)
+    GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
     # ------------------------------------------------------------------ family hooks
     def default_body(self):
@@ -80,12 +82,18 @@ class BirdEnv(FamilyEnv):
         if goal is None:                                   # cruise: forward speed in units, a little sideways at most
             # no slower than a bird's minimum flying speed (a crow: about 7.5 m/s, 2.5 units)
             goal = np.array([rng.uniform(2.6, 3.0 + 0.8 * self.spread), rng.normal(0, 0.1 + 0.4 * self.spread)])
-        self.climb = float(climb if climb is not None else rng.normal(0, 0.05 + 0.25 * self.spread)) * u
+        if climb is None:
+            # curriculum: the first goals are glides (gravity pays for the speed); as the curriculum's speed knob
+            # grows they level out, so flapping has to pay for the speed
+            level = float(np.clip((self.max_speed - 1.0) / 2.0, 0.0, 1.0))
+            climb = rng.normal(0, 0.05 + 0.25 * self.spread) - (1.0 - level) * self.GLIDE_SINK
+        self.climb = float(climb) * u
         # start in the air at about the goal velocity, heading roughly where the goal points
         yaw = rng.uniform(-math.pi, math.pi)
         Rz = np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0], [0, 0, 1.0]])
         self.goal_world = Rz[:2, :2] @ (np.asarray(goal, float) * u)
-        self.alt0 = self.wingspan() * rng.uniform(3.0, 6.0)
+        # high enough that the whole episode's asked-for sink still ends in the air
+        self.alt0 = self.wingspan() * rng.uniform(3.0, 6.0) + max(0.0, -self.climb) * self.max_len / CTRL_HZ
         self.phase = rng.uniform(0, 2 * math.pi)
         wing = [self.pc.sk.bones[i].group == "wing" for i, _a in self.pc.dof_list]
         self.ev.flight(self.wingspan(), wing, beat_s=1.0 / self.beat_hz())
@@ -118,7 +126,8 @@ class BirdEnv(FamilyEnv):
         pc = self.pc; d = pc.data
         p, R = pc.root_pose()
         m = pc.total_mass; k = self.assist
-        Fz = k * (0.7 * m * G + m * (6.0 * (self.alt0 - p[2]) - 3.0 * d.qvel[2]))
+        alt = self.alt0 + self.climb * self.steps / CTRL_HZ    # the harness follows the asked-for climb or glide
+        Fz = k * (0.7 * m * G + m * (6.0 * (alt - p[2]) - 3.0 * (d.qvel[2] - self.climb)))
         wv_w = R @ d.qvel[3:6]; I = m * self.wingspan() ** 2 * 0.02
         return np.array([0.0, 0.0, max(Fz, 0.0), k * I * (40.0 * R[1, 2] - 8.0 * wv_w[0]),
                          k * I * (-40.0 * R[0, 2] - 8.0 * wv_w[1]), k * I * (-3.0 * wv_w[2])])

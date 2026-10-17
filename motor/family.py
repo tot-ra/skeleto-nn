@@ -94,6 +94,7 @@ class FamilyEnv:
 
     MAX_SPEED = 3.0      # the curriculum never asks for more (in speed units): a run for people, a gallop for horses
     STALL_GOAL = 0.15    # a moving goal met this little for about a second ends the episode, as a fall does
+    ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
 
     def _stalled(self, goal, sp):
         """``goal``: the progress toward the goal this step (the goal score, or turning toward it). Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns

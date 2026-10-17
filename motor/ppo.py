@@ -191,7 +191,8 @@ def main():
             spread = min(1.0, spread + 0.003)
         elif n_ep and fell > 0.6:
             max_speed = max(args.speed0, max_speed - 0.01)
-            if assist < 0.3:
+            spread = max(args.spread, spread - 0.003)
+            if assist < ref.ASSIST_RECOVER:                  # how far the harness comes back is the family's
                 assist = min(args.assist0, assist + 0.01)
         costs = " ".join(f"{k}={v:.3f}" for k, v in zip(cost_names, cm) if k not in ("heat", "breath"))
         line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "

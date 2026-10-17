@@ -23,7 +23,7 @@ def tests(family):
     """(goal velocity in the family's speed units, extra reset arguments); each runs from a standing and a moving start."""
     if family == "bird":
         from bodies import BIRDS
-        return [((2.8, 0.0), {}), ((3.4, 0.0), {}), ((3.0, 0.0), {"climb": 0.3}), ((3.0, 0.0), {"climb": -0.3}),
+        return [((3.0, 0.0), {"climb": -0.45}), ((2.8, 0.0), {}), ((3.4, 0.0), {}), ((3.0, 0.0), {"climb": 0.3}), ((3.0, 0.0), {"climb": -0.3}),
                 ((3.0, 0.6), {}), ((3.0, 0.0), {"wind": np.array([0.0, -6.0, 0.0])}), ((3.0, 0.0), {"body": BIRDS["gull"]}),
                 ((3.0, 0.0), {"body": BIRDS["sparrow"]})]
     if family == "quadruped":
@@ -33,7 +33,8 @@ def tests(family):
                 ((0.7, 0.0), {"friction": 0.15}), ((0.7, 0.0), {"body": canonical(QUADS["cat"])}),
                 ((0.7, 0.0), {"body": canonical(QUADS["horse"])})]
     return [((0.0, 0.0), {}), ((0.8, 0.0), {}), ((1.3, 0.0), {}), ((2.5, 0.0), {}), ((0.0, 1.0), {}),
-            ((1.2, 0.0), {"friction": 0.15}), ((1.0, 0.0), {"body": HumanBody(height=1.4, mass=38.0)})]
+            ((1.2, 0.0), {"friction": 0.15}), ((1.0, 0.0), {"body": HumanBody(height=1.4, mass=38.0)}),
+            ((1.0, 0.0), {"body": HumanBody(mass=95.0, pack=20.0)})]
 
 
 MUTABLE = {"lr": (5e-5, 1e-3), "fade": (0.0003, 0.006), "sym": (0.5, 10.0),
