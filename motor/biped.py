@@ -46,6 +46,9 @@ class BipedEnv(FamilyEnv):
     family = "biped"
     BODY_DIM = 9
     SOFT_RANGE = {"arm": 0.2}   # the last fifth of an arm joint's range resists: arms cannot hang on their stops
+    # exploration floor 0.10: with the 0.06 a walker had settled to, the arms kept the pose they had learned on their stops
+    # for rounds after the stops became soft and costly; nothing ever tried lowering them
+    MIN_LOGSTD = -2.3
 
     def default_body(self):
         return HumanBody()
