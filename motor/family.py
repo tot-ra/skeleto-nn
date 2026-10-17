@@ -96,7 +96,7 @@ class FamilyEnv:
     STALL_GOAL = 0.15    # a moving goal met this little for about a second ends the episode, as a fall does
 
     def _stalled(self, goal, sp):
-        """Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns
+        """``goal``: the progress toward the goal this step (the goal score, or turning toward it). Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns
         ALIVE every step while trying to walk risks the fall cost, so the safest policy ignores the goal."""
         self.goal_ema += (goal - self.goal_ema) / CTRL_HZ
         return sp > 0.2 and self.steps > 1.5 * CTRL_HZ and self.goal_ema < self.STALL_GOAL
@@ -114,13 +114,13 @@ class FamilyEnv:
         self.SORES = tuple(self.sores())
         self._build(self.default_body())
         self.obs_dim = len(self.reset())
-        self.act_dim = self.pc.nj
 
     def _build(self, body):
         self.b = body
         self.c = self.make_creature(body)
         self.pc = PhysChar(self.c)
         self.J = self.pc.nj
+        self.act_dim = self.J
         self.base_force = self.pc.model.actuator_forcerange[self.pc.aid].copy()
         sc = np.maximum(np.abs(self.pc.lo), np.abs(self.pc.hi)) * self.act_scale_base
         for j, (i, _a) in enumerate(self.pc.dof_list):
@@ -138,6 +138,7 @@ class FamilyEnv:
             perm[j] = index[(mirror_name(sk.bones[i].name), a)]
             sign[j] = -1.0 if a in (0, 2) else 1.0            # rotations about X and Z flip in a reflection through y = 0
         self.m_perm, self.m_sign = perm, sign
+        self.a_perm, self.a_sign = perm, sign                 # actions mirror like joints unless a family adds outputs
         names = [l.name for l in self.c.legs]
         self.leg_perm = np.array([names.index(mirror_name(n, names)) for n in names])
         self.sore_perm = np.array([self.SORES.index(mirror_name(k, self.SORES)) for k in self.SORES])
@@ -229,8 +230,8 @@ class FamilyEnv:
         return m
 
     def mirror_act(self, a):
-        sign = self.m_sign if not hasattr(a, "clone") else __import__("torch").tensor(self.m_sign, dtype=a.dtype)
-        return a[..., self.m_perm] * sign
+        sign = self.a_sign if not hasattr(a, "clone") else __import__("torch").tensor(self.a_sign, dtype=a.dtype)
+        return a[..., self.a_perm] * sign
 
     # ------------------------------------------------------------------ step
     def _harness(self):
@@ -276,12 +277,24 @@ class FamilyEnv:
         sp = float(np.linalg.norm(goal_v))
         # the tolerance grows with the wanted speed, but standing still must not earn much of a slow walk's goal
         goal = 0.7 * math.exp(-float(err @ err) / (0.05 + 0.1 * sp * sp))
+        progress = goal
         if sp > 0.1:
             goal += 0.3 * float(np.clip(float(v @ (goal_v / sp)) / sp, 0.0, 1.0))
             fwd = R[:2, 0] / (np.linalg.norm(R[:2, 0]) + 1e-9)
-            goal *= 0.75 + 0.25 * max(0.0, float(fwd @ (goal_v / sp)))
+            facing = float(fwd @ (goal_v / sp))
+            goal *= 0.75 + 0.25 * max(0.0, facing)
+            progress = goal
+            if facing < 0.9:
+                # turning toward a goal behind or beside the body is progress too: without this a body that turns
+                # on the spot before it sets off scores nothing and is ended as a stall halfway round
+                side = fwd[0] * goal_v[1] - fwd[1] * goal_v[0]            # > 0: the goal is to the left
+                yaw_rate = float((R @ pc.data.qvel[3:6])[2])                # the free joint gives it in the body frame
+                turn = float(np.clip(math.copysign(1.0, side) * yaw_rate / 0.8, 0.0, 1.0))
+                goal += 0.2 * turn
+                progress = max(progress, turn)
         else:
             goal += 0.3
+            progress = goal
         weights = {t: w * self.cost_scale for t, w in self.profile.items()}
         r, costs, bad = self.ev.step(a, 1.0 / CTRL_HZ, weights, goal * 2.0 + self.alive, self.strength)
         self.prev_a = act
@@ -291,7 +304,7 @@ class FamilyEnv:
             pc.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number = 0
             r = -2.0 / CTRL_HZ
         fell = bad or unstable or p[2] < 0.5 * self.c.z0 or tilt > 1.2
-        stalled = not fell and self._stalled(goal, sp)
+        stalled = not fell and self._stalled(progress, sp)
         if fell or stalled:
             r -= self.fall_cost
         done = fell or stalled

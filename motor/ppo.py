@@ -115,7 +115,7 @@ def main():
         max_speed = ck.get("max_speed", ref.MAX_SPEED); spread = ck.get("spread", 1.0)
         if args.reset_curriculum:            # keep the weights, start the harness and the goals over
             assist, max_speed, spread = args.assist0, args.speed0, args.spread
-    m_perm = torch.tensor(ref.m_perm); m_sign = torch.tensor(ref.m_sign, dtype=torch.float32)
+    m_perm = torch.tensor(ref.a_perm); m_sign = torch.tensor(ref.a_sign, dtype=torch.float32)
 
     def export():
         lay = lambda m: [(l.weight.detach().numpy().T.copy(), l.bias.detach().numpy().copy()) for l in m if isinstance(l, nn.Linear)]
@@ -183,12 +183,16 @@ def main():
         # curriculum: the harness fades with time (so standing still under it never becomes a home) and faster while
         # the goal is met; goal speeds grow while it is met
         assist = max(0.0, assist - args.fade)
+        # goal speeds and variety grow slowly while the goal is met (fast growth ran past what the body could learn
+        # twice) and shrink back when most episodes fail
         if n_ep and goal > 0.5 and fell < 0.3:
             assist = max(0.0, assist - 0.01)
-            max_speed = min(ref.MAX_SPEED, max_speed + 0.03)
-            spread = min(1.0, spread + 0.01)
-        elif n_ep and fell > 0.7 and assist < 0.3:
-            assist = min(args.assist0, assist + 0.01)
+            max_speed = min(ref.MAX_SPEED, max_speed + 0.005)
+            spread = min(1.0, spread + 0.003)
+        elif n_ep and fell > 0.6:
+            max_speed = max(args.speed0, max_speed - 0.01)
+            if assist < 0.3:
+                assist = min(args.assist0, assist + 0.01)
         costs = " ".join(f"{k}={v:.3f}" for k, v in zip(cost_names, cm) if k not in ("heat", "breath"))
         line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
                 f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs} t={(time.time() - t_start) / 60:.1f}m")

@@ -8,7 +8,11 @@ goal make worthwhile.
 
 Goal: a velocity to hold in the air, horizontal (in the heading frame) and a climb rate, in units of
 sqrt(g x wingspan) (a crow's cruise of about 10 m/s is about 3.3 units). Episodes start in the air at about the goal
-velocity, 3 to 6 wingspans up; touching the ground ends the episode (its contact force is scored as injury).
+velocity, 3 to 6 wingspans up; cruise goals run from 2.6 units (just above the minimum flying speed) up; touching the ground ends the episode (its contact force is scored as injury).
+
+The network reads a wingbeat clock (sine and cosine of a phase) and sets, as one extra output, how fast the phase
+advances (half to twice the species' natural beat frequency, which scales inversely with wingspan); what the wings
+do at each phase, and whether they beat at all, is the network's.
 
 Not yet: take-off, landing, perching, walking and hopping, swimming birds.
 """
@@ -44,6 +48,15 @@ class BirdEnv(FamilyEnv):
     def make_creature(self, body):
         return bird(body)
 
+    def _build(self, body):
+        super()._build(body)
+        J = self.J                                            # one extra output: the wingbeat frequency
+        self.a_perm = np.append(self.m_perm, J); self.a_sign = np.append(self.m_sign, 1.0)
+        self.act_dim = J + 1
+
+    def beat_hz(self):
+        return 4.5 * 0.9 / self.wingspan()                   # a crow (0.9 m) beats at about 4.5 Hz, a sparrow at 15
+
     def body_vector(self, sp, c):
         return [math.log(sp.mass / 0.45), math.log(sp.scale), sp.leg_scale - 1.0, sp.neck_len - 1.0, sp.wing_len - 1.0,
                 sp.tail_len - 1.0, math.log(self.wingspan(c))]
@@ -65,13 +78,17 @@ class BirdEnv(FamilyEnv):
         super().reset(body=body, friction=friction, wind=wind, sores=sores, goal=np.zeros(2), profile=profile)
         u = self.speed_unit()
         if goal is None:                                   # cruise: forward speed in units, a little sideways at most
-            goal = np.array([rng.uniform(1.5, max(1.6, 1.5 + 2.0 * self.max_speed / 4.0)), rng.normal(0, 0.1 + 0.4 * self.spread)])
+            # no slower than a bird's minimum flying speed (a crow: about 7.5 m/s, 2.5 units)
+            goal = np.array([rng.uniform(2.6, 3.0 + 0.8 * self.spread), rng.normal(0, 0.1 + 0.4 * self.spread)])
         self.climb = float(climb if climb is not None else rng.normal(0, 0.05 + 0.25 * self.spread)) * u
         # start in the air at about the goal velocity, heading roughly where the goal points
         yaw = rng.uniform(-math.pi, math.pi)
         Rz = np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0], [0, 0, 1.0]])
         self.goal_world = Rz[:2, :2] @ (np.asarray(goal, float) * u)
         self.alt0 = self.wingspan() * rng.uniform(3.0, 6.0)
+        self.phase = rng.uniform(0, 2 * math.pi)
+        wing = [self.pc.sk.bones[i].group == "wing" for i, _a in self.pc.dof_list]
+        self.ev.flight(self.wingspan(), wing, beat_s=1.0 / self.beat_hz())
         v0 = np.array([self.goal_world[0], self.goal_world[1], self.climb]) * rng.uniform(0.8, 1.0)
         self.pc.set_state(np.array([0, 0, self.alt0]), Rz, self.pc.qvec(), root_vel=v0)
         self.air = AIR.Air(self.pc, wind=self.wind.w)
@@ -81,14 +98,16 @@ class BirdEnv(FamilyEnv):
     def obs(self):
         o = super().obs()
         if not hasattr(self, "climb"):
-            return np.concatenate([o, [0.0, 0.0]]).astype(np.float32)
+            return np.concatenate([o, [0.0, 0.0, 0.0, 1.0]]).astype(np.float32)
         p, _R = self.pc.root_pose()
-        return np.concatenate([o, [p[2] / self.wingspan() - 4.0, self.climb / self.speed_unit()]]).astype(np.float32)
+        return np.concatenate([o, [p[2] / self.wingspan() - 4.0, self.climb / self.speed_unit(),
+                                   math.sin(self.phase), math.cos(self.phase)]]).astype(np.float32)
 
     def obs_layout(self):
         out = super().obs_layout()
         k = max(sl.stop for sl in out.values())
         out["alt"] = slice(k, k + 2)
+        out["clock"] = slice(k + 2, k + 4)                    # the same for both wings: unchanged by the mirror
         return out
 
     # ------------------------------------------------------------------ step: air forces, flight goal
@@ -106,6 +125,8 @@ class BirdEnv(FamilyEnv):
 
     def step(self, a):
         a = np.clip(np.asarray(a, float), -1, 1)
+        self.phase = (self.phase + 2 * math.pi * self.beat_hz() * math.exp(0.7 * a[self.J]) / CTRL_HZ) % (2 * math.pi)
+        a = a[:self.J]
         pc = self.pc
         self.strength = 0.55 + 0.45 * self.ev.reserve
         pc.model.actuator_forcerange[pc.aid] = self.base_force * self.strength

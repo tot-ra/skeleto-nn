@@ -124,3 +124,41 @@ def test_standing_still_when_asked_to_walk_ends_the_episode_but_standing_when_as
                 ended = info["stalled"] and not info["fell"]
                 break
         assert ended == should_end
+
+
+def test_air_lifts_a_crow_at_cruise_and_a_beating_wing_pushes_forward():
+    """The corrected air model: a crow glides near a real bird's lift-to-drag ratio, and a downstroke leans the wing's
+    force forward (thrust from lift perpendicular to the relative wind); without both, no network could learn to fly."""
+    import mujoco, air as AIR
+    from bodies import bird
+    from physics import PhysChar
+    pc = PhysChar(bird("crow")); ar = AIR.Air(pc); d = pc.data; W = pc.total_mass * 9.81
+
+    def force(root_vel, pitch_deg=0.0):
+        p = np.radians(pitch_deg); R = np.array([[np.cos(p), 0, -np.sin(p)], [0, 1, 0], [np.sin(p), 0, np.cos(p)]])
+        pc.set_state(np.array([0, 0, 5.0]), R, np.zeros(pc.nj), root_vel=np.array(root_vel, float))
+        rows = []; orig = mujoco.mj_applyFT
+        mujoco.mj_applyFT = lambda m, dd, F, T, P, b, q: rows.append(F.copy())
+        try:
+            ar.apply()
+        finally:
+            mujoco.mj_applyFT = orig
+        return sum(rows)
+    pitch = next(p for p in np.arange(-5, 20, 0.25) if force([9.0, 0, 0], p)[2] >= W)
+    F = force([9.0, 0, 0], pitch)
+    assert F[2] / -F[0] > 4.5                                   # glide ratio (a crow: about 8; legs hang here)
+    assert force([9.0, 0, -2.0])[0] > force([9.0, 0, 0.0])[0] + 0.3   # sinking (a downstroke) leans the force forward
+
+
+def test_bird_has_a_wingbeat_clock_and_mirrors():
+    from motor.bird import BirdEnv
+    env = BirdEnv(seed=0, spread=0.0)
+    o = env.reset()
+    assert env.act_dim == env.J + 1
+    a = np.random.default_rng(1).normal(size=env.act_dim)
+    assert np.abs(env.mirror_act(env.mirror_act(a)) - a).max() == 0.0
+    assert env.mirror_act(a)[-1] == a[-1]                      # the beat frequency is the same for both wings
+    L = env.obs_layout()
+    assert np.allclose(env.mirror_obs(o)[L["clock"]], o[L["clock"]])
+    p0 = env.phase; env.step(np.zeros(env.act_dim))
+    assert abs((env.phase - p0) % (2 * np.pi) - 2 * np.pi * env.beat_hz() / 30) < 1e-6

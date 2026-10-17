@@ -23,9 +23,9 @@ def tests(family):
     """(goal velocity in the family's speed units, extra reset arguments); each runs from a standing and a moving start."""
     if family == "bird":
         from bodies import BIRDS
-        return [((2.0, 0.0), {}), ((3.0, 0.0), {}), ((2.5, 0.0), {"climb": 0.3}), ((2.5, 0.0), {"climb": -0.3}),
-                ((2.5, 0.6), {}), ((2.5, 0.0), {"wind": np.array([0.0, -6.0, 0.0])}), ((2.5, 0.0), {"body": BIRDS["gull"]}),
-                ((2.5, 0.0), {"body": BIRDS["sparrow"]})]
+        return [((2.8, 0.0), {}), ((3.4, 0.0), {}), ((3.0, 0.0), {"climb": 0.3}), ((3.0, 0.0), {"climb": -0.3}),
+                ((3.0, 0.6), {}), ((3.0, 0.0), {"wind": np.array([0.0, -6.0, 0.0])}), ((3.0, 0.0), {"body": BIRDS["gull"]}),
+                ((3.0, 0.0), {"body": BIRDS["sparrow"]})]
     if family == "quadruped":
         from bodies import QUADS
         from motor.quadruped import canonical

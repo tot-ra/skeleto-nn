@@ -2,10 +2,11 @@
 
 Every wing bone is cut into a few strips. A strip is a plate with area chord x width and a normal (the bone's local z). With the velocity of the
 air relative to the strip (the strip's own velocity: the body's flight plus the flapping) and the angle of attack alpha between the plate and
-that velocity, the force is
-    N = 0.5 rho A |v|^2 C_N(alpha),  C_N = 1.2 sin(a) + (2 pi - 1.2) sin(a) exp(-(a/0.2)^4)    (lift slope 2 pi up to the stall at ~11 degrees, then a flat plate),
-acting along the plate normal against the normal velocity, plus a small skin drag along the plate. Lift, induced drag and stall are not
-put in by hand: they come out of the plate being tilted to the flow. The body is a few drag samples (Cd 0.5 on the frontal area). The
+that velocity: below the stall (about 35 degrees for a beating wing) the force is lift perpendicular to the relative wind (2 pi sin a, saturating at 1.6) with induced drag (C_L^2 / (pi AR e)); after it, a flat
+plate's force along its normal; a small skin drag along the plate either way. Lift perpendicular to the wind, not to the plate, is
+what makes a beating wing push forward (the Knoller-Betz effect). The body is a drag sample per bone: bare legs are thin cylinders
+(Cd 1.0 on the real tarsus, 0.3 on the thicker capsule drawn); the feathered trunk, thighs, neck and head are a streamlined body (Cd 0.3 across, 0.08 end-on), which keeps
+the whole bird's lift-to-drag ratio near a real crow's instead of a bundle of sticks'. The
 wing downwash is not modelled (a lone wing sees undisturbed air); thrust comes from the flapping strips seeing a velocity that tilts the
 force forward. The forces are applied at the strip centres through applyFT every physics sub-step."""
 from __future__ import annotations
@@ -14,11 +15,14 @@ import numpy as np
 import mujoco
 
 RHO_AIR = 1.2
+STALL = 0.6       # rad: about 35 degrees; a beating wing holds a leading-edge vortex far past the steady stall
+CLMAX = 1.6       # lift coefficient it saturates at (flapping birds and bats: 1.5 to 2, Muijres et al. 2012)
+ASPECT = 6.0      # aspect ratio of a whole bird wing (crow, gull 6 to 9): sets the induced drag of a strip
 
 class Air:
     def __init__(self, pc, rho=RHO_AIR, strips=4, wind=(0.0, 0.0, 0.0)):
         self.pc = pc; self.rho = rho; self.wind = np.array(wind, float); sk = pc.sk
-        body, pt, area, normal, kind, camber, axial, aarea = [], [], [], [], [], [], [], []
+        body, pt, area, normal, kind, camber, axial, aarea, cd = [], [], [], [], [], [], [], [], []
         for i, b in enumerate(sk.bones):
             L = float(sk.length[i]); dvec = sk.dir[i]
             if b.group == "wing" or b.group == "tail":
@@ -28,11 +32,17 @@ class Air:
                 if b.group == "tail": chord = 0.13
                 for k in range(n):
                     s = (k + 0.5) / n
-                    body.append(i); pt.append(dvec * L * s); area.append(chord * L / n); normal.append(np.array([0.0, 0.0, 1.0])); kind.append(1); camber.append(0.08 if b.group == "wing" else 0.0); axial.append(dvec); aarea.append(0.0)
+                    body.append(i); pt.append(dvec * L * s); area.append(chord * L / n); normal.append(np.array([0.0, 0.0, 1.0])); kind.append(1); camber.append(0.08 if b.group == "wing" else 0.0); axial.append(dvec); aarea.append(0.0); cd.append((0.0, 0.0))
             else:
                 r = max(float(b.radius), 0.008)
                 body.append(i); pt.append(dvec * L * 0.5); area.append(2 * r * L); normal.append(np.zeros(3)); kind.append(0); camber.append(0.0); axial.append(dvec); aarea.append(math.pi * r * r)
+                # the thigh is inside the feathers; the bare shank and foot capsules are drawn about 3x thicker than a
+                # crow's tarsus, so their cylinder drag is scaled to the real thickness
+                feathered = b.group in ("trunk", "neck", "head") or b.name.startswith("thigh")
+                cd.append((0.3, 0.08) if feathered else (0.3, 0.1))
         self.body = np.array(body); self.pt = np.array(pt); self.A = np.array(area); self.n = np.array(normal); self.kind = np.array(kind); self.camber = np.array(camber); self.axial = np.array(axial); self.aarea = np.array(aarea)
+        self.cd = np.array(cd, float)
+        self.wing = np.array([sk.bones[i].group == "wing" and k == 1 for i, k in zip(body, kind)])
         self.bid = np.array([pc.bid[i] for i in body]); self.root = pc.bid[0]; self.N = len(body)
 
     def apply(self):
@@ -49,14 +59,32 @@ class Air:
             cam = self.camber[pl]                                         # a cambered wing lifts a little at zero angle of attack
             a_eff = np.arcsin(np.clip(-s, -1, 1)) + cam                   # signed: + = the flow hits the underside
             alpha = np.abs(a_eff)
-            cn = 1.2 * np.sin(alpha) + (2 * math.pi - 1.2) * np.sin(alpha) * np.exp(-(alpha / 0.30) ** 4)
-            FN = (0.5 * self.rho * self.A[pl] * spp * spp * cn * np.sign(a_eff))[:, None] * nw
+            # a beating wing keeps its lift far past the steady stall angle (a leading-edge vortex: lift coefficients of
+            # 1.5 to 2 up to 35 to 45 degrees, Dickinson et al. 1999); the lift saturates at CLMAX, the stall comes at STALL
+            att = np.exp(-(alpha / STALL) ** 4)                             # 1 in attached flow, 0 after the stall
+            # a folded wing has less area: the feathers slide over each other, so a strip's area is its spanwise
+            # extent (its bone across the body); a wing swept or folded back on the upstroke lifts less
+            Rr = d.xmat[self.root].reshape(3, 3)
+            across = np.abs(np.einsum("nij,nj->ni", R[pl], self.axial[pl]) @ Rr[:, 1])
+            area = self.A[pl] * np.where(self.wing[pl], np.maximum(0.15, across), 1.0)
+            q = 0.5 * self.rho * area * spp * spp
+            vh = vp / spp[:, None]
+            # attached flow: lift perpendicular to the relative wind (with the leading-edge suction of a real wing, the force
+            # leans forward when the wing beats down: that is where the thrust of flapping comes from) and induced drag
+            ld = nw - np.sum(nw * vh, axis=1)[:, None] * vh
+            ld = ld / (np.linalg.norm(ld, axis=1)[:, None] + 1e-9) * np.sign(a_eff)[:, None]
+            cl = CLMAX * np.tanh(2 * math.pi * np.sin(alpha) / CLMAX) * att
+            cdi = cl * cl / (math.pi * ASPECT * 0.8)
+            # separated flow: a flat plate, the force along its normal
+            cn = 1.2 * np.sin(alpha) * (1.0 - att)
+            FN = (q * cl)[:, None] * ld - (q * cdi)[:, None] * vh + (q * cn * np.sign(a_eff))[:, None] * nw
             vt = vp - (s * spp)[:, None] * nw
-            FT = -0.5 * self.rho * 0.02 * self.A[pl][:, None] * spp[:, None] * vt
+            FT = -0.5 * self.rho * 0.02 * area[:, None] * spp[:, None] * vt
             F[pl] = FN + FT
         bd = ~pl
         axw = np.einsum("nij,nj->ni", R[bd], self.axial[bd]); va = np.sum(v[bd] * axw, axis=1)[:, None] * axw; vn = v[bd] - va
-        F[bd] = -0.5 * self.rho * (1.0 * self.A[bd][:, None] * np.linalg.norm(vn, axis=1)[:, None] * vn + 0.25 * self.aarea[bd][:, None] * np.linalg.norm(va, axis=1)[:, None] * va)
+        cx, ca = self.cd[bd, 0][:, None], self.cd[bd, 1][:, None]
+        F[bd] = -0.5 * self.rho * (cx * self.A[bd][:, None] * np.linalg.norm(vn, axis=1)[:, None] * vn + ca * self.aarea[bd][:, None] * np.linalg.norm(va, axis=1)[:, None] * va)
         mag = np.linalg.norm(F, axis=1)[:, None]; F = F * np.minimum(1.0, 60.0 / np.maximum(mag, 1e-9))
         d.qfrc_applied[:] = 0.0
         for k in range(self.N): mujoco.mj_applyFT(m, d, F[k], np.zeros(3), P[k], int(self.bid[k]), d.qfrc_applied)

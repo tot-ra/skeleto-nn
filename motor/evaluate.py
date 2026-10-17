@@ -72,6 +72,8 @@ class Evaluator:
         self.mass = pc.total_mass
         self.leg = c.leg_len()
         self.p_unit = self.mass * G * math.sqrt(G * self.leg)          # power unit
+        self.sustain = SUSTAIN
+        self.elastic = np.zeros(pc.nj, bool); self.elastic_tau = 0.25
         self.sore = dict(sore or {})                                    # {"leg_L": 0..1, "leg_R", "arm_L", "arm_R", "torso", "head"}
         # geom -> region, and which geoms are feet / hands
         self.region_of_geom = {}
@@ -108,7 +110,16 @@ class Evaluator:
         self.dof_bone = pc.dof_bone
         self.reset()
 
+    def flight(self, span, elastic, sustain=2.5, beat_s=0.25):
+        """A flier: power in units of m g sqrt(g x wingspan); the flight muscles sustain far more than a walk (crow
+        cruise: about 2 units); the wing joints are elastic: tendons and feathers return the work of swinging the wing
+        back every beat, so their work counts averaged over about one beat (``beat_s``), not instant by instant."""
+        self.p_unit = self.mass * G * math.sqrt(G * span)
+        self.sustain = sustain; self.elastic = np.asarray(elastic, bool); self.elastic_tau = beat_s
+        self.pw_avg = np.zeros(len(self.elastic))
+
     def reset(self):
+        self.pw_avg = np.zeros(len(self.elastic))
         self.peak = None
         self.reserve = 1.0
         self.prev_force = {r: 0.0 for r in injury.REGIONS}
@@ -184,11 +195,14 @@ class Evaluator:
         u = tau / (self.tau_max * strength_scale)
         strain = float(np.sum(self.w_strain * u ** 2))
         pw = tau * qd
-        p_met = (np.sum(np.maximum(pw, 0.0)) / MUSCLE_EFF + np.sum(np.maximum(-pw, 0.0)) / NEG_EFF
+        if self.elastic.any():                               # elastic joints: the work averaged over a beat
+            self.pw_avg += (pw - self.pw_avg) * min(1.0, dt / self.elastic_tau)
+            pw = np.where(self.elastic, self.pw_avg, pw)
+        p_met = (np.sum(np.maximum(pw, 0.0)) / MUSCLE_EFF + np.sum(np.maximum(-pw, 0.0) * ~self.elastic) / NEG_EFF
                  + ISO * np.sum(np.abs(tau)) * math.sqrt(G / self.leg) * 0.1)
         energy = float(p_met / self.p_unit)
         # --- fatigue: the reserve drains above the sustainable power and refills below it
-        self.reserve = float(np.clip(self.reserve - (energy - SUSTAIN) / (SUSTAIN * RESERVE_TAU) * dt, 0.0, 1.0))
+        self.reserve = float(np.clip(self.reserve - (energy - self.sustain) / (self.sustain * RESERVE_TAU) * dt, 0.0, 1.0))
         fatigue = (1.0 - self.reserve) ** 2
         # --- balance: fall risk. The capture point (centre of mass plus velocity over the pendulum frequency) is where the
         # body must step to stop; walking keeps it within a step of the feet, a fall puts it out of reach.

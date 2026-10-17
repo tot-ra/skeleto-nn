@@ -57,7 +57,29 @@ named sores, a mid-stride start pose and the unit of goal speed.
 Birds start in the air at about the goal velocity (horizontal velocity and a climb rate), 3 to 6 wingspans up; touching
 the ground ends the flight and its force is scored as injury; balance is scored by tilt only (a capture point means
 nothing in the air); the harness carries part of the weight and holds the body level. Take-off, landing, perching,
-walking and swimming birds come later. Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
+walking and swimming birds come later.
+
+The bird network also reads a **wingbeat clock** (sine and cosine of a phase) and sets, as one extra output, how fast
+it advances (half to twice the species' natural frequency, 4.5 Hz for a crow); what the wings do at each phase is the
+network's. Cruise goals start at 2.6 units, just above a crow's minimum flying speed.
+
+**Air model fixes (run 5).** The first bird runs could not have learned to fly: the air model made flight impossible.
+Measured with a held crow at 9 to 12 m/s:
+
+| problem | measured | fix (`air.py`, `physics.py`, `motor/evaluate.py`) |
+|---|---|---|
+| every bone a bare cylinder broadside to the air | body drag 2.6 N, glide ratio 1.6 (a crow: about 8) | feathered trunk, thighs, neck and head are a streamlined body; bare legs scaled to a real tarsus: glide ratio 6 to 7 at 8 m/s |
+| the attached-flow force along the plate normal (no leading-edge suction) | a beating wing made no thrust in any pattern | lift perpendicular to the relative wind, induced drag from the aspect ratio: a downstroke leans the force forward (Knoller-Betz) |
+| steady stall at 17 degrees | the tip of a beating wing stalls on every downstroke | a beating wing's leading-edge vortex: lift saturating at C_L 1.6, stall at about 35 degrees (Dickinson 1999, Muijres 2012) |
+| a folded wing kept its full area | the upstroke pulled the bird down as hard as the downstroke lifted it | a strip's area follows its spanwise extent: a wing folded or swept back lifts less |
+| wing joints with a limb's 80 ms response and heavy armature | the shoulder reached 40 % of a 4.5 Hz beat | wing joints: 20 ms response, light armature |
+| energy counted every swing of the wing instant by instant, in walking units | flapping cost about 8 times a walk's sustainable power | flight power units (wingspan), a flier's sustainable power, wing joints elastic (work averaged over a beat) |
+
+After the fixes a searched open-loop wingbeat (CMA-ES, used only to check feasibility; nothing of it is in the
+network) gives net thrust (+0.46 N) with lift above the weight (5.5 N against 4.4 N): sustained flapping flight is
+possible in the simulation, and run 5 trains the bird network from scratch on it.
+
+Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
 
 ## Training (`motor/ppo.py`, `motor/pbt.py`)
@@ -77,6 +99,10 @@ Curriculum:
   success, so standing still under it never becomes a home.
 * **Stalls end episodes:** a moving goal met this little (`STALL_GOAL`) for about a second ends the episode with the
   fall cost. Standing still when asked to move is a dead end, not a safe choice.
+* **Turning is progress:** a body turning toward a goal behind or beside it earns a little goal score and is not
+  ended as a stall halfway round.
+* **Slow, reversible curriculum:** goal speeds grow by 0.005 units per successful iteration and shrink when most
+  episodes fail (falls and stalls both count).
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 
@@ -102,7 +128,8 @@ nothing here is used by a game yet. The first two runs (GIFs in the README, `sho
 | 1 | reward = goal minus costs; harness held the pelvis up and pushed it toward the goal velocity | to stiffen, lean and be pushed; it fell like a plank as the harness faded to 40 % |
 | 2 | plus a reward for staying upright and a fall cost; the goal pays for partial progress; the harness only holds, never pushes | to stand still under the full harness (0.04 m/s when asked for 1.3 m/s); the harness never faded because the goal was never met, and without it the policy falls within 2 s |
 | 3 | population training (3 bipeds, 2 quadrupeds, 16 rounds, about 4 h); curriculum, moving starts, activation | to stand perfectly on its own, in every situation and at any asked speed (0.00 m/s when asked for 1.3 m/s); from a moving start it falls within 1 s. Scores flat at 0.36 to 0.38 |
-| 4 | run 3's weights; stalls end episodes; speed caps; curriculum restarted (2 h) | **biped: the first walk**: upright, alternating steps for the full 10 s at 0.65 m/s when asked for 1.3; turns, ice, a pack, a child's body still fall. Quadruped: still stands; its curriculum ran away again because a stall did not count as a failure (fixed: the curriculum now counts falls and stalls). Birds: fall within 1.5 s without the harness |
+| 4 | run 3's weights; stalls end episodes; speed caps; curriculum restarted (4 h) | **biped: the first walk**: upright, alternating steps for the full 10 s at 0.65 m/s when asked for 1.3; turns, ice, a pack, a child's body still fall. Quadruped: still stands; its curriculum ran away again because a stall did not count as a failure (fixed: the curriculum now counts falls and stalls). Birds: fall within 1.5 s without the harness. After 4 h: the biped survives the full test at every forward speed (about 1 m/s when asked for 1.3, 1.3 to 1.5 when asked for 2.5), on ice and as a 1.4 m person; the quadruped walks at 0.5 to 0.8 Froude and on ice; both fail sideways goals (the stall rule ended them while turning; fixed) and the quadruped fails the cat and horse |
+| 5 | turning counts as progress, slower curriculum; birds from scratch on the corrected air model with a wingbeat clock | in progress |
 
 Runs 1 to 3 are the usual local optima of reinforcement learning without reference motion. Run 3 had two causes:
 the curriculum had run away under an earlier goal score that paid standing still as a slow walk (quadrupeds were
