@@ -101,16 +101,18 @@ def main():
         frames, res = run(env, pi, ck, kw, assist=assist)
         sc = Scene(None, [Actor(env.c, "a", base=(0.85, 0.6, 0.45))], 480, 300)
         imgs = []
-        for k, (S, E, R) in enumerate(frames[::2]):
+        step = 1 if env.family == "bird" else 2                # a 4.5 Hz wingbeat needs every frame
+        for k, (S, E, R) in enumerate(frames[::step]):
             sc.pose(sc.actors[0], S, E, R)
             look = np.array([S[0][0], S[0][1], S[0][2] if env.family == "bird" else 0.9 * env.c.z0])  # follow a flier up
             if env.family == "bird":                        # closer, and the height in the caption: a camera that follows
-                sub = f"t={2 * k / 30:.1f}s  height {S[0][2]:.1f} m"   # a flier hides whether it climbs or sinks
-                imgs.append(caption(sc.render(look, max(1.5, 2.5 * env.wingspan()), 120, -12), title, sub))
+                sub = f"t={k / 30:.1f}s  height {S[0][2]:.1f} m"   # a flier hides whether it climbs or sinks
+                # from above and behind, so both wings show
+                imgs.append(caption(sc.render(look, max(1.5, 2.5 * env.wingspan()), 160, -30), title, sub))
             else:
                 imgs.append(caption(sc.render(look, 4.0, 120, -12), title, f"t={2 * k / 30:.1f}s"))
         sc.close()
-        save_gif(imgs, os.path.join(out, name + ".gif"), fps=15)
+        save_gif(imgs, os.path.join(out, name + ".gif"), fps=30 if env.family == "bird" else 15)
         summary[name] = res
         print(name, "steps", res["steps"], "fell", res["fell"], "goal %.2f speed %.2f" % (res["goal"], res["speed"]), {k: round(v, 3) for k, v in res["costs"].items() if v})
     json.dump(summary, open(os.path.join(out, "summary.json"), "w"), indent=1)
