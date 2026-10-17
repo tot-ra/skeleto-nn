@@ -106,7 +106,9 @@ Curriculum:
 * **Variety shrinks too** when most episodes fail, back to where it started.
 * **Birds glide first:** the first flight goals sink at about a crow's glide ratio (0.45 units), so gravity pays for
   the speed; they level out as the curriculum's speed knob grows, so flapping has to pay. The harness follows the
-  asked-for path, and when most flights fail it comes back fully (people and quadrupeds: up to 30 %).
+  asked-for path without carrying any weight (carried weight is what drives a glide; carrying 70 % of it stalled
+  every glide), holds the body level with a stiffness of m g x wingspan per radian (one scaled by the trunk's inertia
+  let it roll over), and when most flights fail it comes back fully (people and quadrupeds: up to 30 %).
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 

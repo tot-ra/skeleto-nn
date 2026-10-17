@@ -36,6 +36,7 @@ class BirdEnv(FamilyEnv):
     BODY_DIM = 7
     MAX_SPEED = 4.0
     ASSIST_RECOVER = 1.0   # a flier that cannot yet stay up gets the whole harness back (stall ends a hover under it)
+    HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
     # ------------------------------------------------------------------ family hooks
@@ -120,17 +121,23 @@ class BirdEnv(FamilyEnv):
 
     # ------------------------------------------------------------------ step: air forces, flight goal
     def _harness(self):
-        """Curriculum help in the air: part of the weight carried, the body held level; never pushes forward."""
+        """Curriculum help in the air: held on the asked-for path and level; never pushes forward."""
         if self.assist <= 0:
             return None
         pc = self.pc; d = pc.data
         p, R = pc.root_pose()
         m = pc.total_mass; k = self.assist
         alt = self.alt0 + self.climb * self.steps / CTRL_HZ    # the harness follows the asked-for climb or glide
-        Fz = k * (0.7 * m * G + m * (6.0 * (alt - p[2]) - 3.0 * (d.qvel[2] - self.climb)))
-        wv_w = R @ d.qvel[3:6]; I = m * self.wingspan() ** 2 * 0.02
-        return np.array([0.0, 0.0, max(Fz, 0.0), k * I * (40.0 * R[1, 2] - 8.0 * wv_w[0]),
-                         k * I * (-40.0 * R[0, 2] - 8.0 * wv_w[1]), k * I * (-3.0 * wv_w[2])])
+        # no standing weight support: in a glide the weight is what drives the bird forward, and carrying it stalled
+        # every glide; the harness only corrects departures from the path
+        Fz = k * m * (6.0 * (alt - p[2]) - 3.0 * (d.qvel[2] - self.climb))
+        # attitude held with a stiffness of m g x wingspan per radian: the air's torques on a spread wing are of that
+        # order (a stiffness scaled by the body's inertia was ten times too weak and let it roll over)
+        # The damping is explicit (applied each physics sub-step), so it is capped for the trunk alone: a bird's
+        # trunk is light, and the uncapped damping blew the simulation up as soon as the wings beat
+        wv_w = R @ d.qvel[3:6]; K = k * m * G * self.wingspan() * self.HOLD
+        c = min(0.15 * K, 0.5 * float(pc.model.body_inertia[pc.bid[0]].min()) / pc.model.opt.timestep)
+        return np.array([0.0, 0.0, max(Fz, 0.0), K * R[1, 2] - c * wv_w[0], -K * R[0, 2] - c * wv_w[1], -c * wv_w[2]])
 
     def step(self, a):
         a = np.clip(np.asarray(a, float), -1, 1)
