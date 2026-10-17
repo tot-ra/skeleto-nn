@@ -37,6 +37,7 @@ class BirdEnv(FamilyEnv):
     MAX_SPEED = 4.0
     ASSIST_RECOVER = 1.0   # a flier that cannot yet stay up gets the whole harness back (stall ends a hover under it)
     FAIL_OK = 0.5          # a flight ends at any touch of the ground, so more of them fail while the goals are met
+    MIN_LOGSTD = -1.6      # exploration noise at least 0.2: a glider's noise of 0.08 never found a wingbeat
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
