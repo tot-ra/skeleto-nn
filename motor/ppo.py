@@ -180,7 +180,11 @@ def main():
                 raw_o = To[idx] * ns + nm
                 mo = torch.clamp((ref.mirror_obs(raw_o) - nm) / ns, -10, 10)
                 lsym = ((pi(mo)[..., m_perm] * m_sign - mu) ** 2).mean()
-                loss = lpi + 0.5 * lv + args.sym * lsym
+                # keep the mean action inside [-1, 1]: the environment clips actions there, and a mean beyond it gets no
+                # gradient from the exploration noise (a walker's arms sat at 1.3 to 1.9, pinned to the end of their
+                # range, and never learned to come down after the range ends were made costly)
+                lbound = (torch.relu(mu.abs() - 1.0) ** 2).mean()
+                loss = lpi + 0.5 * lv + args.sym * lsym + 1.0 * lbound
                 opt.zero_grad(); loss.backward()
                 nn.utils.clip_grad_norm_(list(pi.parameters()) + list(vf.parameters()), 1.0); opt.step()
                 if ref.MIN_LOGSTD is not None:                   # keep exploring where the skill is far away
