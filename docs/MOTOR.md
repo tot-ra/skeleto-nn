@@ -156,7 +156,10 @@ Curriculum:
 **Population-based training** (`motor/pbt.py`): several members train side by side; every round (15 minutes) each is
 scored on fixed situations *without the harness*, and the worst is replaced by a copy of the best with mutated
 settings: learning rate, harness fade, mirror-loss weight, and the reward itself (what staying up is worth, what a
-fall costs, how much the comfort costs weigh). Bad runs die off; good ones spread. `history.json` records every round.
+fall costs, how much the comfort costs weigh). Bad runs die off; good ones spread. `history.json` records every round. With only two members the review score is too
+noisy to choose between them: the bird population's settings random-walked to the bounds (alive and cost scale at
+their minimum) and the birds unlearned holding height, while the same weights from twenty rounds earlier still held
+it in the same environment. Two-member runs now train apart (`--replace 0`) with default settings.
 
     python -m motor.pbt --family biped --name biped_pbt --members 3 --workers 3 --round-min 15 --rounds 16
     python -m motor.ppo --family quadruped --name dog --workers 15 --hours 3       # a single run
