@@ -116,7 +116,8 @@ Curriculum:
 * **Variety shrinks too** when most episodes fail, back to where it started.
 * **Birds glide first:** the first flight goals sink at about a crow's glide ratio (0.45 units), so gravity pays for
   the speed; they level out as the curriculum's speed knob grows (level after one unit of growth), so flapping has to pay.
-  The bird curriculum moves on while fewer than half the flights fail (people and quadrupeds: 30 %).
+  The bird curriculum moves on while fewer than half the flights fail (people and quadrupeds: 30 %) and the mean goal
+  score is above 0.35 (others: 0.5; the bird's climb rate is scored tightly).
   Variety (species, wind, turns) is held at most 0.2 ahead of how level the goals are: harder species made most
   flights fail, which held the goals at glides, so flapping was never needed.
   Bird exploration noise is kept at 0.2 or more (log std -1.6): with the usual 0.08 the gliders never found a wingbeat

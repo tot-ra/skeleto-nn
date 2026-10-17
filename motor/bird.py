@@ -38,6 +38,7 @@ class BirdEnv(FamilyEnv):
     BODY_DIM = 7
     MAX_SPEED = 4.0
     ASSIST_RECOVER = 1.0   # a flier that cannot yet stay up gets the whole harness back (stall ends a hover under it)
+    GOAL_OK = 0.35         # the climb rate is scored tightly (CLIMB_TOL), so a met flight scores lower than a met walk
     FAIL_OK = 0.5          # a flight ends at any touch of the ground, so more of them fail while the goals are met
     MIN_LOGSTD = -1.6      # exploration noise at least 0.2: a glider's noise of 0.08 never found a wingbeat
     PHASE_NOISE = 0.6      # share of the exploration noise locked to the wingbeat clock (motor/ppo.py)

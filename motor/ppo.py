@@ -198,7 +198,7 @@ def main():
         assist = max(0.0, assist - args.fade)
         # goal speeds and variety grow slowly while the goal is met (fast growth ran past what the body could learn
         # twice) and shrink back when most episodes fail
-        if n_ep and goal > 0.5 and fell < ref.FAIL_OK:
+        if n_ep and goal > ref.GOAL_OK and fell < ref.FAIL_OK:
             assist = max(0.0, assist - 0.01)
             max_speed = min(ref.MAX_SPEED, max_speed + 0.005)
             spread = min(1.0, spread + 0.003)
