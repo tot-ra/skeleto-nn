@@ -1,7 +1,7 @@
 """Publish the current state of every family's motor network: GIFs of the best network so far and a status table in
 the README, between the ``motor-status`` markers.
 
-    python -m motor.showcase [--force]
+    python -m motor.showcase [--force] [--only biped,bird]
 
 For each family it takes the best member of the latest population round (``runs/motor/<run>/history.json``), plays a
 few fixed situations without the harness and writes ``showcase/motor/latest/<family>_<situation>.gif`` and
@@ -92,12 +92,13 @@ def readme_block(status):
 
 def main():
     force = "--force" in sys.argv
+    only = sys.argv[sys.argv.index("--only") + 1].split(",") if "--only" in sys.argv else None
     os.makedirs(OUT, exist_ok=True)
     sp = os.path.join(OUT, "status.json")
     status = json.load(open(sp)) if os.path.exists(sp) else {}
     changed = False
     for family, run_name, names in FAMILIES:
-        if not os.path.exists(os.path.join("runs", "motor", run_name, "history.json")):
+        if not os.path.exists(os.path.join("runs", "motor", run_name, "history.json")) or (only and family not in only):
             continue
         _rnd, _best, score, _n = best_member(run_name)
         old = status.get(family, {}).get("score")
