@@ -119,7 +119,9 @@ class BirdEnv(FamilyEnv):
         self.phase = rng.uniform(0, 2 * math.pi)
         wing = [self.pc.sk.bones[i].group == "wing" for i, _a in self.pc.dof_list]
         self.ev.flight(self.wingspan(), wing, beat_s=1.0 / self.beat_hz())
-        v0 = np.array([self.goal_world[0], self.goal_world[1], self.climb]) * rng.uniform(0.8, 1.0)
+        # at about the goal speed: starts at 80 to 100 % of it (below a crow's minimum flying speed at the low end)
+        # taught a dive at the start of every flight, 2 to 3 m lost before the wingbeat took over
+        v0 = np.array([self.goal_world[0], self.goal_world[1], self.climb]) * rng.uniform(0.95, 1.05)
         self.pc.set_state(np.array([0, 0, self.alt0]), Rz, self.pc.qvec(), root_vel=v0)
         self.air = AIR.Air(self.pc, wind=self.wind.w)
         return self.obs()
