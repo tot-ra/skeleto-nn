@@ -157,6 +157,12 @@ Curriculum:
 * **Quadruped species drawn by weight:** the species that fall most (horse, cat, goat) come up more often. A goal
   speed per species (down after every fall, up after a met episode) was tried for eight rounds and dropped: it held
   every species at the speed where it fell about a third of the time, and the dog stopped training at test speeds.
+* **Arms re-learned from rest:** soft arm ranges, the action-bound pull and full-weight costs moved the arms only
+  slowly: the shoulder command sat at the end of its range, its muscle pressing at 78 % of its strength into the soft
+  stop (the arms were a balance pole: hung down by force, the walker fell in 3 of 4 runs at 3 m/s). With local muscle
+  endurance in the strain cost and the arm rows of the output layer set to zero (the arms start hanging, the rest of
+  the network kept), one round later the arms hang beside the body with the elbows bent 20 degrees and swing 16
+  degrees with the stride; strain fell from 1.4 to 0.4 per second and the walk, run, ice, pack and turn all hold.
 * **Mean actions stay inside [-1, 1]:** the environment clips actions there; a policy mean beyond it gets no
   gradient from the exploration noise. A walker's arm actions sat at 1.3 to 1.9 and the arms stayed on their stops for
   rounds after the stops were made costly; a small loss term now pulls the mean back inside.
