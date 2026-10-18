@@ -78,14 +78,14 @@ the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
 
 The best network of each family so far, no harness, no clips: every joint from the network. The score is the population test mean (survival share x (0.3 + goal), at most 1.3).
 
-**People**: score 1.08 after 131 rounds (updated 2026-10-18 05:24)
+**People**: score 1.20 after 139 rounds (updated 2026-10-18 07:25)
 
 <table><tr>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.25 m/s, goal 0.96</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_run.gif" width="100%"><br><b>run 3.2 m/s</b>: held 8.0 s, 2.78 m/s, goal 0.81</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_ice.gif" width="100%"><br><b>walk on ice</b>: held 8.0 s, 1.04 m/s, goal 0.66</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_pack.gif" width="100%"><br><b>20 kg pack</b>: held 8.0 s, 1.11 m/s, goal 0.68</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: held 8.0 s, 1.21 m/s, goal 0.89</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.32 m/s, goal 0.97</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_run.gif" width="100%"><br><b>run 3.2 m/s</b>: held 8.0 s, 2.86 m/s, goal 0.85</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_ice.gif" width="100%"><br><b>walk on ice</b>: fell at 1.2 s, 0.53 m/s, goal 0.07</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_pack.gif" width="100%"><br><b>20 kg pack</b>: held 8.0 s, 1.22 m/s, goal 0.81</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: held 8.0 s, 1.22 m/s, goal 0.98</td>
 </tr></table>
 
 **Four-legged animals**: score 1.01 after 106 rounds (updated 2026-10-17 23:13)
