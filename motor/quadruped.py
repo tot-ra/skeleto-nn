@@ -11,6 +11,7 @@ cat and a horse alike.
 """
 from __future__ import annotations
 import dataclasses
+import os
 import math
 import numpy as np
 
@@ -18,6 +19,7 @@ from bodies import quadruped, QUADS
 from motor.family import FamilyEnv, G
 
 CANON = dict(n_spine=4, n_neck=3, tail_n=4)
+ONLY = os.environ.get("QUAD_ONLY")   # train on one species only (an experiment)
 SPECIES = ("dog", "cat", "wolf", "goat", "horse", "pig", "bear")
 # drawn by weight: the species that fail most come up more often (in run 6 the horse finished 0 of 13 training
 # episodes, the cat 3 of 16, the goat 8 of 20, the bear and wolf about half)
@@ -37,9 +39,12 @@ class QuadrupedEnv(FamilyEnv):
     PASSIVE = {"neck": 1.5}
 
     def default_body(self):
-        return canonical(QUADS["dog"])
+        return canonical(QUADS[ONLY or "dog"])
 
     def sample_body(self, rng, spread):
+        if ONLY:                                            # an experiment on one species (QUAD_ONLY=horse)
+            sp = QUADS[ONLY]; jitter = lambda: math.exp(rng.normal(0, 0.08 * spread))
+            return canonical(dataclasses.replace(sp, mass=sp.mass * jitter() ** 3, scale=sp.scale * jitter()))
         sp = QUADS[SPECIES[int(rng.choice(len(SPECIES), p=SPECIES_WEIGHT))]] if rng.random() < spread else QUADS["dog"]
         jitter = lambda: math.exp(rng.normal(0, 0.08 * spread))
         sp = dataclasses.replace(sp, mass=sp.mass * jitter() ** 3, scale=sp.scale * jitter(), leg_scale=sp.leg_scale * jitter(),
