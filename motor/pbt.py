@@ -87,6 +87,16 @@ def main():
     ap.add_argument("--vwarm", type=int, default=0, help="first round: iterations that train only the value function")
     args = ap.parse_args()
     root = os.path.join("runs", "motor", args.name); os.makedirs(root, exist_ok=True)
+    # one population per name: a second one started while the first is alive (it happened twice) writes into the same
+    # checkpoints and history
+    lock = os.path.join(root, "pbt.pid")
+    if os.path.exists(lock):
+        try:
+            os.kill(int(open(lock).read().strip()), 0)
+            sys.exit(f"{args.name}: a population is already running (pid in {lock})")
+        except (ProcessLookupError, ValueError):
+            pass
+    open(lock, "w").write(str(os.getpid()))
     hist_path = os.path.join(root, "history.json")
     history = json.load(open(hist_path)) if os.path.exists(hist_path) else []
     rng = np.random.default_rng(len(history))
