@@ -128,6 +128,9 @@ the shared network is rolled out over all species, 40 % of episodes on the horse
 horse specialist or by a frozen copy of the shared network itself) put it in: 240,000 labels later the shared network
 walks the horse for the full 10 s at 1.14 m/s (before: a fall within 5 s at 0.26 m/s), trots it at 1.38 m/s for 4.5 s,
 and walks and trots the dog, cat and pig as before (only the dog on ice got worse: a fall at 5.7 s).
+Two rounds of ordinary training then washed it half out again (the horse back to 0.64 m/s), so quadruped training
+now kickstarts (`--kick horse=<specialist>`): every horse state's specialist action pulls the policy toward it in
+the loss, all the time.
 
 Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.

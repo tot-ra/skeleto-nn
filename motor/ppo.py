@@ -34,7 +34,7 @@ def mlp_np(x, layers, act=np.tanh):
     return x
 
 
-def worker(conn, family, seed, env_kw):
+def worker(conn, family, seed, env_kw, kick=None):
     env = make_env(family, seed=seed, **env_kw)
     rng = np.random.default_rng(seed + 7)
     obs = env.reset()
@@ -43,6 +43,13 @@ def worker(conn, family, seed, env_kw):
     # A, B drawn per episode, so each step's noise is still N(0, std^2) but over an episode it is a coherent beat.
     # Noise independent at every step never added up to a wingbeat.
     share = getattr(env, "PHASE_NOISE", 0.0)
+    # kickstarting: specialists for some bodies ("horse=ckpt"); their action at every state of that body goes back to the
+    # learner, which pulls the policy toward it (a distilled skill washed out of a shared network in two rounds without)
+    teachers = {}
+    for spec in (kick or "").split(","):
+        if "=" in spec:
+            from motor.distill import Teacher
+            name, path = spec.split("=", 1); teachers[name] = Teacher(path)
     AB = rng.standard_normal((2, env.act_dim))
     while True:
         msg = conn.recv()
@@ -53,6 +60,7 @@ def worker(conn, family, seed, env_kw):
         _, W, norm, n = msg
         mean, std = norm
         O, A, LP, R, D, V, infos, costs = [], [], [], [], [], [], [], []
+        K, KM = [], []
         for _ in range(n):
             o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
             mu = mlp_np(o, W["pi"]); ls = W["logstd"]
@@ -62,6 +70,8 @@ def worker(conn, family, seed, env_kw):
             a = mu + np.exp(ls) * eps
             lp = float(-0.5 * np.sum(((a - mu) / np.exp(ls)) ** 2 + 2 * ls + math.log(2 * math.pi)))
             v = float(mlp_np(o, W["v"])[0])
+            t = teachers.get(env.c.skel.name) if teachers else None
+            K.append(t.act(obs) if t is not None else np.zeros_like(mu)); KM.append(t is not None)
             obs2, r, done, info = env.step(a)
             O.append(o); A.append(a); LP.append(lp); V.append(v)
             if info["trunc"] and not done:
@@ -79,7 +89,7 @@ def worker(conn, family, seed, env_kw):
         o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
         conn.send(("data", np.array(O, np.float32), np.array(A, np.float32), np.array(LP, np.float32),
                    np.array(R, np.float32), np.array(D, np.float32), np.array(V, np.float32),
-                   float(mlp_np(o, W["v"])[0]), infos, np.mean(costs, 0)))
+                   float(mlp_np(o, W["v"])[0]), infos, np.mean(costs, 0), np.array(K, np.float32), np.array(KM, bool)))
 
 
 def main():
@@ -94,6 +104,8 @@ def main():
     ap.add_argument("--alive", type=float, default=None); ap.add_argument("--fall-cost", type=float, default=None)
     ap.add_argument("--cost-scale", type=float, default=1.0, help="multiplies every evaluation cost")
     ap.add_argument("--hidden", type=int, default=512)
+    ap.add_argument("--kick", default=None, help="kickstarting teachers, body=ckpt[,body=ckpt]")
+    ap.add_argument("--kick-weight", type=float, default=1.0, help="weight of the pull toward the teachers' actions")
     ap.add_argument("--vwarm", type=int, default=0,
                     help="first iterations train only the value function (after the reward changed: a critic fitted to the "
                          "old reward gave misleading advantages and the policy unlearned a good skill before it caught up)")
@@ -109,7 +121,7 @@ def main():
     ctx = mp.get_context("spawn"); conns = []
     for i in range(args.workers):
         a, b = ctx.Pipe()
-        ctx.Process(target=worker, args=(b, args.family, 1000 + i, env_kw), daemon=True).start(); conns.append(a)
+        ctx.Process(target=worker, args=(b, args.family, 1000 + i, env_kw, args.kick), daemon=True).start(); conns.append(a)
     dims = [c.recv() for c in conns]; od, ad = dims[0][1], dims[0][2]
     print(f"{args.family}: obs {od}, act {ad}, {args.workers} workers", flush=True)
 
@@ -168,6 +180,7 @@ def main():
         mean = (mean + d * bc / tot).astype(np.float32); var = ((var * cnt + bv * bc + d ** 2 * cnt * bc / tot) / tot).astype(np.float32); cnt = tot
         To = torch.tensor(O); Ta = torch.tensor(A); Tlp = torch.tensor(LP)
         Tadv = torch.tensor((ADV - ADV.mean()) / (ADV.std() + 1e-6)); Tret = torch.tensor(RET)
+        TK = torch.tensor(np.concatenate([r[10] for r in res])); TKM = torch.tensor(np.concatenate([r[11] for r in res]))
         nm = torch.tensor(norm[0]); ns = torch.tensor(norm[1])
         N = len(O); mb = 4096; sym_l = 0.0
         for _ in range(5):
@@ -192,6 +205,9 @@ def main():
                 # summed over outputs (a mean over all of them diluted the pull on the few out of range about fifty times)
                 lbound = (torch.relu(mu.abs() - ref.ACTION_BOUND) ** 2).sum(-1).mean()
                 loss = lpi + 0.5 * lv + args.sym * lsym + 0.02 * lbound
+                km = TKM[idx]
+                if km.any():
+                    loss = loss + args.kick_weight * ((mu[km] - TK[idx][km]) ** 2).mean() * km.float().mean()
                 if it - it0 < args.vwarm:
                     loss = 0.5 * lv
                 opt.zero_grad(); loss.backward()

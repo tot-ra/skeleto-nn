@@ -87,6 +87,7 @@ def main():
     ap.add_argument("--reset-curriculum", action="store_true", help="first round: keep the weights, restart harness and goals")
     ap.add_argument("--assist0", type=float, default=1.0); ap.add_argument("--speed0", type=float, default=0.8)
     ap.add_argument("--vwarm", type=int, default=0, help="first round: iterations that train only the value function")
+    ap.add_argument("--kick", default=None, help="kickstarting teachers passed to every round (motor.ppo --kick)")
     args = ap.parse_args()
     root = os.path.join("runs", "motor", args.name); os.makedirs(root, exist_ok=True)
     # one population per name: a second one started while the first is alive (it happened twice) writes into the same
@@ -122,6 +123,8 @@ def main():
                 cmd += ["--init", ckpt]
                 if args.reset_curriculum and rnd == first:
                     cmd += ["--reset-curriculum"]
+                if args.kick:
+                    cmd += ["--kick", args.kick]
                 if args.vwarm and rnd == first:
                     cmd += ["--vwarm", str(args.vwarm)]
             log = open(os.path.join(root, f"m{m}.log"), "a")
