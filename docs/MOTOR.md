@@ -123,8 +123,11 @@ by muscle alone kept its base at 71 % of its strength, and it could not walk; wi
 **The horse and the shared network.** The quadruped network walks the dog, cat and pig but kept the horse almost
 standing (0.2 m/s at any asked speed); drawing the horse three times as often only made the others worse. Trained on
 horses alone (`QUAD_ONLY=horse`), the same network walked the horse within 20 minutes (0.8 to 1.05 m/s for the full
-test). The body can walk; the shared network does not make room for it. The next step is distillation: specialists
-for the species the shared network fails, then one network trained to imitate them and itself.
+test). The body can walk; the shared network does not make room for it. Distillation (`motor/distill.py`, DAgger:
+the shared network is rolled out over all species, 40 % of episodes on the horse, and every state is labelled by the
+horse specialist or by a frozen copy of the shared network itself) put it in: 240,000 labels later the shared network
+walks the horse for the full 10 s at 1.14 m/s (before: a fall within 5 s at 0.26 m/s), trots it at 1.38 m/s for 4.5 s,
+and walks and trots the dog, cat and pig as before (only the dog on ice got worse: a fall at 5.7 s).
 
 Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
