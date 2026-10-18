@@ -112,6 +112,12 @@ real crow's power), so that level flight is not a knife edge that every training
 **Control rate per family.** Birds now command their joints 60 times a second (people and quadrupeds 30; the
 physics runs at 180 Hz either way): at 30, a 4.5 Hz wingbeat got 7 commands and a 9 Hz one 3. Episode lengths, test
 durations and the discount are in seconds, not steps.
+**Downwash.** Induced drag was counted per wing strip from its instantaneous lift coefficient, so every stroke paid as
+if the whole wing were at maximum lift. The wing now sits in one downwash for the whole bird (momentum theory,
+following the lift over about a beat), and the induced drag comes from the lift tilting back in it. The energy unit was
+also recalibrated: it had been a wingbeat searched for thrust alone (about 200 W); a search for the cheapest level
+flight (thrust and lift just enough) finds one at 81 W metabolic for a crow, which is the unit now (`FLIGHT_UNIT` 6).
+A real crow needs about 10 W: the open-loop sine beats of the search and the flat plates leave a factor of eight.
 Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
 commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
 

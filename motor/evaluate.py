@@ -53,7 +53,7 @@ MUSCLE_EFF = 0.25          # positive work: chemical energy per joule of work
 NEG_EFF = 1.2              # negative work costs about a fifth as much
 ISO = 0.12                 # holding a torque costs energy too (per N m per rad/s of a reference speed)
 RESERVE_TAU = 60.0         # s: how fast a reserve that is drained by twice the sustainable power empties
-FLIGHT_UNIT = 12.0         # flight power unit in m g sqrt(g span): the searched efficient crow wingbeat costs about 1
+FLIGHT_UNIT = 6.0          # flight power unit in m g sqrt(g span): the cheapest searched level-flight crow wingbeat costs 1
 # Local muscle endurance (Frey-Law and Avin 2010, a power model fitted across joints): a muscle can hold a share f of
 # its strength for about ET = 20 f^-1.7 seconds (a quarter of the strength: some 3.5 minutes; a tenth: 17 minutes). The
 # load that counts is the sustained one (|tau|/tau_max low-passed over ENDURE_TAU): a stride's legs rest between pushes,
@@ -123,9 +123,9 @@ class Evaluator:
         self.reset()
 
     def flight(self, span, elastic, sustain=1.4, beat_s=0.25, reserve_tau=20.0):
-        """A flier. Power unit: FLIGHT_UNIT x m g sqrt(g x wingspan), about what the most efficient wingbeat found by
-        search costs in this physics (the flat-plate wing has no downwash, so pushing the air costs far more work than in
-        a real wing: a crow's searched beat about 170 W metabolic against a real crow's 10 or so). Sustainable: 1.2 of
+        """A flier. Power unit: FLIGHT_UNIT x m g sqrt(g x wingspan), what the cheapest level-flight wingbeat found by
+        search costs in this physics (with the wing's downwash: about 80 W metabolic for a crow against a real crow's 10
+        or so; before, the unit was a beat searched for thrust alone, 170 to 200 W). Sustainable: 1.2 of
         those (1.4 now); a flight reserve drains three times as fast as a walker's (``reserve_tau``), so a wasteful beat tires the
         bird within a flight and a glide lets it recover (1.2 at first: level flight costs about 1.5, so even a rested bird
         sank and unlearned flying). The wing joints are elastic (``ELASTIC_RETURN``)."""

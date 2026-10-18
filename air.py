@@ -7,8 +7,9 @@ plate's force along its normal; a small skin drag along the plate either way. Li
 what makes a beating wing push forward (the Knoller-Betz effect). The body is a drag sample per bone: bare legs are thin cylinders
 (Cd 1.0 on the real tarsus, 0.3 on the thicker capsule drawn); the feathered trunk, thighs, neck and head are a streamlined body (Cd 0.3 across, 0.08 end-on), which keeps
 the whole bird's lift-to-drag ratio near a real crow's instead of a bundle of sticks'. The
-wing downwash is not modelled (a lone wing sees undisturbed air); thrust comes from the flapping strips seeing a velocity that tilts the
-force forward. The forces are applied at the strip centres through applyFT every physics sub-step."""
+wing's downwash is one velocity for the whole bird (momentum theory: w = L / (2 rho pi b^2/4 V), following the lift over about
+a beat): the plates see the air descending, which tilts their lift back and is the induced drag. Thrust comes from the flapping
+strips seeing a velocity that tilts the force forward. The forces are applied at the strip centres through applyFT every physics sub-step."""
 from __future__ import annotations
 import math
 import numpy as np
@@ -17,7 +18,8 @@ import mujoco
 RHO_AIR = 1.2
 STALL = 0.6       # rad: about 35 degrees; a beating wing holds a leading-edge vortex far past the steady stall
 CLMAX = 1.6       # lift coefficient it saturates at (flapping birds and bats: 1.5 to 2, Muijres et al. 2012)
-ASPECT = 6.0      # aspect ratio of a whole bird wing (crow, gull 6 to 9): sets the induced drag of a strip
+ASPECT = 6.0      # aspect ratio of a whole bird wing (crow, gull 6 to 9)
+DOWNWASH_TAU = 0.2  # s: the induced downwash follows the wings' total lift over about a wingbeat
 
 class Air:
     def __init__(self, pc, rho=RHO_AIR, strips=4, wind=(0.0, 0.0, 0.0)):
@@ -44,12 +46,19 @@ class Air:
         self.cd = np.array(cd, float)
         self.wing = np.array([sk.bones[i].group == "wing" and k == 1 for i, k in zip(body, kind)])
         self.bid = np.array([pc.bid[i] for i in body]); self.root = pc.bid[0]; self.N = len(body)
+        # induced downwash of the whole wing (momentum theory, forward flight): w = L / (2 rho S V), S = pi span^2 / 4
+        wl = [i for i, b in enumerate(sk.bones) if b.group == "wing"]
+        span = sum(float(sk.length[i]) for i in wl)        # both wings' bones, tip to tip
+        self.disk = math.pi * span * span / 4.0; self.w_ind = 0.0
+        self.lifting = self.kind == 1                       # wing and tail plates see the downwash
 
     def apply(self):
         pc = self.pc; m = pc.model; d = pc.data
         R = d.xmat[self.bid].reshape(-1, 3, 3); P = d.xpos[self.bid] + np.einsum("nij,nj->ni", R, self.pt)
         com = d.subtree_com[self.root]; cv = d.cvel[self.bid]
         v = cv[:, 3:] + np.cross(cv[:, :3], P - com) - self.wind
+        # the plates sit in the air their own lift pushes down: relative to it they move up by w
+        v[self.lifting, 2] += self.w_ind
         sp = np.linalg.norm(v, axis=1) + 1e-9
         F = np.zeros((self.N, 3))
         pl = self.kind == 1
@@ -74,7 +83,10 @@ class Air:
             ld = nw - np.sum(nw * vh, axis=1)[:, None] * vh
             ld = ld / (np.linalg.norm(ld, axis=1)[:, None] + 1e-9) * np.sign(a_eff)[:, None]
             cl = CLMAX * np.tanh(2 * math.pi * np.sin(alpha) / CLMAX) * att
-            cdi = cl * cl / (math.pi * ASPECT * 0.8)
+            # no induced drag per strip: it comes from the downwash (the lift tilts back in the descending air). Counted
+            # per strip from its instantaneous lift coefficient it made every stroke pay as if the whole wing were at
+            # maximum lift, and flapping cost about fifteen times a real crow's power
+            cdi = 0.0 * cl
             # separated flow: a flat plate, the force along its normal
             cn = 1.2 * np.sin(alpha) * (1.0 - att)
             FN = (q * cl)[:, None] * ld - (q * cdi)[:, None] * vh + (q * cn * np.sign(a_eff))[:, None] * nw
@@ -95,3 +107,8 @@ class Air:
         mag = np.linalg.norm(F, axis=1)[:, None]; F = F * np.minimum(1.0, cap / np.maximum(mag, 1e-9))
         d.qfrc_applied[:] = 0.0
         for k in range(self.N): mujoco.mj_applyFT(m, d, F[k], np.zeros(3), P[k], int(self.bid[k]), d.qfrc_applied)
+        if self.disk > 0:                                     # the downwash follows the lift over about a beat
+            lift = max(0.0, float(F[self.lifting, 2].sum()))
+            V = max(2.0, float(np.linalg.norm(d.subtree_linvel[self.root] - self.wind)))
+            w = lift / (2 * self.rho * self.disk * V)
+            self.w_ind += (w - self.w_ind) * min(1.0, m.opt.timestep / DOWNWASH_TAU)
