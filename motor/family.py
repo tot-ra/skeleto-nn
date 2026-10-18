@@ -104,6 +104,7 @@ class FamilyEnv:
     FAIL_OK = 0.3        # the curriculum moves on while fewer episodes than this fail
     GOAL_OK = 0.5        # ... and while the mean goal score is above this
     MIN_LOGSTD = None     # floor on the exploration noise (log std), if the family needs one
+    PASSIVE = {}          # bone group -> passive elastic stiffness (joint strengths per radian, physics.build_xml)
     SOFT_RANGE = {}       # bone group -> share of its range where the joint limit softly resists (physics.build_xml)
     ACTION_BOUND = 1.0    # policy means beyond this are pulled back (motor/ppo.py): beyond 1 the action is clipped
     CTRL_HZ = 30          # control steps per second (the network's command rate; physics runs at a fixed 180 Hz)
@@ -135,7 +136,7 @@ class FamilyEnv:
     def _build(self, body):
         self.b = body
         self.c = self.make_creature(body)
-        self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))))
+        self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))), passive=self.PASSIVE)
         self.J = self.pc.nj
         self.act_dim = self.J
         self.base_force = self.pc.model.actuator_forcerange[self.pc.aid].copy()

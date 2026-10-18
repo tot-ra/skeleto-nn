@@ -115,6 +115,11 @@ durations and the discount are in seconds, not steps.
 Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
 commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
 
+**Quadruped anatomy.** The horse has a deep chest, a long neck rising steeply from the withers and a slanted head;
+the cat has longer hind legs and a heavier, stronger tail to balance with. A passive nuchal ligament (a spring of 1.5
+joint strengths per radian in every quadruped's neck, free of energy) carries the head: the horse's raised neck held up
+by muscle alone kept its base at 71 % of its strength, and it could not walk; with the ligament, 46 %.
+
 Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
 

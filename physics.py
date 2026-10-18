@@ -13,7 +13,8 @@ DT = 1.0 / (CTRL_HZ * SUBSTEPS)
 def mat2quat(R):
     q = np.zeros(4); mujoco.mju_mat2Quat(q, np.asarray(R, float).reshape(9)); return q
 
-def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None):
+def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None,
+              passive=None):
     sk = creature.skel
     kids = sk.children
     foot_idx = {l.chain[-1] for l in creature.legs}
@@ -73,8 +74,11 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
                     if share > 0:
                         mg = math.radians(share * (hi - lo))           # margin and width are not converted from degrees
                         soft = f' margin="{mg:.4f}" solreflimit="0.04 1" solimplimit="0.05 0.95 {mg:.4f} 0.5 2"'
+                    # passive elastic support (``passive``: bone group -> stiffness in joint strengths per radian), e.g. the
+                    # nuchal ligament that carries a horse's head: free of energy, it pulls the joint back to its rest angle
+                    stiff = (passive or {}).get(b.group, 0.0) * b.tau
                     s += (f'{sp}  <joint name="j_{b.name}_{ax}" type="hinge" axis="{AX[ax][0]:.0f} {AX[ax][1]:.0f} {AX[ax][2]:.0f}" '
-                          f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="0"{soft}/>\n')
+                          f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="{stiff:.3f}"{soft}/>\n')
                     kv = (0.02 if wing else 0.08) * kp
                     acts.append(f'    <position name="a_{b.name}_{ax}" joint="j_{b.name}_{ax}" kp="{kp:.2f}" kv="{kv:.3f}" forcerange="{-b.tau:.1f} {b.tau:.1f}" ctrlrange="{math.radians(lo)*1.05:.4f} {math.radians(hi)*1.05:.4f}"/>\n')
         for c in kids[i]:
@@ -103,11 +107,11 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
     return xml
 
 class PhysChar:
-    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS):
+    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS, passive=None):
         self.c = creature; self.sk = creature.skel
         self.substeps = substeps                             # physics steps per control step (the physics step DT is fixed)
         self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
-                                                              terrain_friction=friction, soft_range=soft_range))
+                                                              terrain_friction=friction, soft_range=soft_range, passive=passive))
         self.data = mujoco.MjData(self.model)
         m = self.model; sk = self.sk
         self.bid = [m.body(b.name).id for b in sk.bones]

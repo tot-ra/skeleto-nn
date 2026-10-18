@@ -32,6 +32,9 @@ class QuadrupedEnv(FamilyEnv):
     family = "quadruped"
     BODY_DIM = 16
     MAX_SPEED = 2.0      # Froude: a gallop
+    # the nuchal ligament: an elastic band along the top of the neck carries the head for free (a horse's long, raised neck
+    # held up by muscle alone kept its base at 71 % of its strength, at the limit a quarter of the time, and it could not walk)
+    PASSIVE = {"neck": 1.5}
 
     def default_body(self):
         return canonical(QUADS["dog"])
