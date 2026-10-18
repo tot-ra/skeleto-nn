@@ -28,11 +28,12 @@ def tests(family):
                 ((3.0, 0.0), {"climb": -0.3}), ((2.8, 0.0), {}), ((3.4, 0.0), {}), ((3.0, 0.0), {"climb": 0.3}), ((3.0, 0.0), {"climb": -0.3}),
                 ((3.0, 0.6), {}), ((3.0, 0.0), {"wind": np.array([0.0, -6.0, 0.0])}), ((3.0, 0.0), {"body": BIRDS["gull"]})]
     if family == "quadruped":
+        # the horse at a walk (0.45 units, Froude 0.2: about 1.8 m/s); 0.7 is the walk-trot transition
         from bodies import QUADS
         from motor.quadruped import canonical
         return [((0.0, 0.0), {}), ((0.5, 0.0), {}), ((0.8, 0.0), {}), ((1.4, 0.0), {}), ((0.0, 0.5), {}),
                 ((0.7, 0.0), {"friction": 0.15}), ((0.7, 0.0), {"body": canonical(QUADS["cat"])}),
-                ((0.7, 0.0), {"body": canonical(QUADS["horse"])})]
+                ((0.45, 0.0), {"body": canonical(QUADS["horse"])})]
     return [((0.0, 0.0), {}), ((0.8, 0.0), {}), ((1.3, 0.0), {}), ((2.5, 0.0), {}), ((0.0, 1.0), {}),
             ((1.2, 0.0), {"friction": 0.15}), ((1.0, 0.0), {"friction": 0.1}), ((1.0, 0.0), {"body": HumanBody(height=1.4, mass=38.0)}),
             ((1.0, 0.0), {"body": HumanBody(mass=95.0, pack=20.0)})]
