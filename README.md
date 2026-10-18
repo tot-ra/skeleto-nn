@@ -88,13 +88,13 @@ The best network of each family so far, no harness, no clips: every joint from t
 <td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: held 8.0 s, 1.22 m/s, goal 0.98</td>
 </tr></table>
 
-**Four-legged animals**: score 1.01 after 106 rounds (updated 2026-10-17 23:13)
+**Four-legged animals**: score 0.89 after 161 rounds (updated 2026-10-18 13:23)
 
 <table><tr>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 1.16 m/s, goal 0.94</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_trot.gif" width="100%"><br><b>dog, trot</b>: held 8.0 s, 2.13 m/s, goal 0.89</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: held 8.0 s, 0.83 m/s, goal 0.91</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: held 8.0 s, 0.60 m/s, goal 0.18</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 1.28 m/s, goal 0.85</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_trot.gif" width="100%"><br><b>dog, trot</b>: held 8.0 s, 1.93 m/s, goal 0.78</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: held 8.0 s, 0.85 m/s, goal 0.90</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: held 8.0 s, 0.77 m/s, goal 0.21</td>
 </tr></table>
 
 **Birds**: score 0.99 after 22 rounds (updated 2026-10-17 14:06)
