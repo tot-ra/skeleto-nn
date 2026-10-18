@@ -54,6 +54,13 @@ NEG_EFF = 1.2              # negative work costs about a fifth as much
 ISO = 0.12                 # holding a torque costs energy too (per N m per rad/s of a reference speed)
 RESERVE_TAU = 60.0         # s: how fast a reserve that is drained by twice the sustainable power empties
 FLIGHT_UNIT = 12.0         # flight power unit in m g sqrt(g span): the searched efficient crow wingbeat costs about 1
+# Local muscle endurance (Frey-Law and Avin 2010, a power model fitted across joints): a muscle can hold a share f of
+# its strength for about ET = 20 f^-1.7 seconds (a quarter of the strength: some 3.5 minutes; a tenth: 17 minutes). The
+# load that counts is the sustained one (|tau|/tau_max low-passed over ENDURE_TAU): a stride's legs rest between pushes,
+# a held-out arm does not. The cost per second is ENDURE_K x sum of 1/ET: a walker holding its arms out paid about 0.4
+# more strain per second than with them hanging (why people do not walk with their arms out, though energy hardly shows
+# it), and a crouched gait pays more than an upright one (30 at first made the legs' share alone about 3 per second)
+ENDURE_B0, ENDURE_B1, ENDURE_TAU, ENDURE_K = 20.0, -1.7, 1.0, 10.0
 ELASTIC_RETURN = 0.6      # elastic (wing) joints: the share of the braking work that tendons and feathers store and
                            # give back (bird flight muscle: about half to two thirds); the rest is lost
 SUSTAIN = 0.35             # sustainable metabolic power in m g sqrt(g l): about a brisk walk
@@ -106,6 +113,7 @@ class Evaluator:
                 self.arm_side[i] = a.side
         # joint tables: torque capacity and the mass each joint carries (mass-weighted strain)
         self.tau_max = np.maximum(pc.tau, 1e-3)
+        self.endure = False                                   # local muscle endurance in the strain cost (per family)
         carried = []
         for (i, _a) in pc.dof_list:
             carried.append(float(m.body_subtreemass[pc.bid[i]]))
@@ -133,6 +141,7 @@ class Evaluator:
         self.prev_force = {r: 0.0 for r in injury.REGIONS}
         self.prev_action = None
         self.totals = {t: 0.0 for t in TERMS}
+        self.sustained = np.zeros(len(self.tau_max))
 
     # ------------------------------------------------------------------ measurements
     def contact_forces(self):
@@ -212,6 +221,10 @@ class Evaluator:
         # --- strain and energy
         u = tau / (self.tau_max * strength_scale)
         strain = float(np.sum(self.w_strain * u ** 2))
+        if self.endure:
+            self.sustained += (np.abs(u) - self.sustained) * min(1.0, dt / ENDURE_TAU)
+            f = np.clip(self.sustained, 0.02, 1.0)
+            strain += ENDURE_K * float(np.sum(1.0 / (ENDURE_B0 * f ** ENDURE_B1)))
         pw = tau * qd
         p_met = (np.sum(np.maximum(pw, 0.0) * ~self.elastic) / MUSCLE_EFF + np.sum(np.maximum(-pw, 0.0) * ~self.elastic) / NEG_EFF
                  + ISO * np.sum(np.abs(tau)) * math.sqrt(G / self.leg) * 0.1)

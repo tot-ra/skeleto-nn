@@ -107,6 +107,7 @@ class FamilyEnv:
     SOFT_RANGE = {}       # bone group -> share of its range where the joint limit softly resists (physics.build_xml)
     ACTION_BOUND = 1.0    # policy means beyond this are pulled back (motor/ppo.py): beyond 1 the action is clipped
     GAMMA = 0.99          # reward discount per control step (0.99 at 30 Hz: about 3 s ahead)
+    ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
 
     def _stalled(self, goal, sp):
@@ -183,6 +184,7 @@ class FamilyEnv:
             goal = np.array([speed * math.cos(ang), speed * math.sin(ang)])
         self.goal_world = np.array(goal, float)
         self.ev = ev.Evaluator(self.pc, sores)
+        self.ev.endure = self.ENDURE
         q0 = rng.normal(0, 0.03, self.J)
         yaw = rng.uniform(-math.pi, math.pi)
         Rz = np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0], [0, 0, 1.0]])

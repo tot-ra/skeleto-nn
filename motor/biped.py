@@ -49,6 +49,7 @@ class BipedEnv(FamilyEnv):
     # exploration floor 0.10: with the 0.06 a walker had settled to, the arms kept the pose they had learned on their stops
     # for rounds after the stops became soft and costly; nothing ever tried lowering them
     MIN_LOGSTD = -2.3
+    ENDURE = True        # a held-out arm tires its shoulder within minutes; a walker's arms hang and swing
     ACTION_BOUND = 0.95  # arms back inside the clip range, where exploration changes the command
 
     def default_body(self):
