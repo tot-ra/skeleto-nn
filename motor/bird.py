@@ -44,7 +44,9 @@ class BirdEnv(FamilyEnv):
     # it flies, so the noise does not cost the precision of climbs and turns
     MIN_LOGSTD = -2.1
     PHASE_NOISE = 0.6      # share of the exploration noise locked to the wingbeat clock (motor/ppo.py)
-    CLIMB_TOL = 0.15       # climb-rate tolerance of the goal score (speed units)
+    # climb-rate tolerance of the goal score (speed units): 0.15 at first, but with the height-hold correction a bird 1.5 m
+    # below its height scored the same whether it climbed back slowly or not at all, so nothing led it back
+    CLIMB_TOL = 0.3
     HOLD_S = 2.0           # a height error is to be made good in about this many seconds
     # no pull on the action bound: a flier encodes its full-range strokes as outputs far beyond 1 (up to 3.5), and the
     # pull, though it does not change the clipped commands, reshapes the shared hidden layers and broke the wingbeat
