@@ -49,6 +49,9 @@ class BipedEnv(FamilyEnv):
     # exploration floor 0.10: with the 0.06 a walker had settled to, the arms kept the pose they had learned on their stops
     # for rounds after the stops became soft and costly; nothing ever tried lowering them
     MIN_LOGSTD = -2.3
+    # the Achilles tendon returns about half of the ankle's braking work in running, the patellar tendon about a third of
+    # the knee's: without them a bouncing run cost more than a shuffle (cadence 257 a minute, 8 % flight at 2.9 m/s)
+    TENDONS = {"foot": 0.5, "shank": 0.3}
     ENDURE = True        # a held-out arm tires its shoulder within minutes; a walker's arms hang and swing
     ACTION_BOUND = 0.95  # arms back inside the clip range, where exploration changes the command
 

@@ -85,6 +85,7 @@ class Evaluator:
         self.p_unit = self.mass * G * math.sqrt(G * self.leg)          # power unit
         self.sustain = SUSTAIN; self.reserve_tau = RESERVE_TAU
         self.elastic = np.zeros(pc.nj, bool); self.elastic_tau = 0.25
+        self.e_ret = np.zeros(pc.nj)                          # per joint: the share of braking work its tendons return
         self.sore = dict(sore or {})                                    # {"leg_L": 0..1, "leg_R", "arm_L", "arm_R", "torso", "head"}
         # geom -> region, and which geoms are feet / hands
         self.region_of_geom = {}
@@ -122,6 +123,14 @@ class Evaluator:
         self.dof_bone = pc.dof_bone
         self.reset()
 
+    def tendons(self, returns):
+        """Elastic tendons on some joints (``returns``: per joint, the share of its braking work stored and given back on
+        the next push; 0 for none): a runner's Achilles and patellar tendons return a third to half of it, which is what
+        makes a bouncing run with long strides cheap. Their work is summed over every physics sub-step."""
+        returns = np.asarray(returns, float)
+        self.e_ret = np.maximum(self.e_ret, returns); self.elastic = self.elastic | (returns > 0)
+        self.w_pos = np.zeros(len(self.elastic)); self.w_neg = np.zeros(len(self.elastic))
+
     def flight(self, span, elastic, sustain=1.4, beat_s=0.25, reserve_tau=20.0):
         """A flier. Power unit: FLIGHT_UNIT x m g sqrt(g x wingspan), what the cheapest level-flight wingbeat found by
         search costs in this physics (with the wing's downwash: about 80 W metabolic for a crow against a real crow's 10
@@ -132,6 +141,7 @@ class Evaluator:
         self.p_unit = FLIGHT_UNIT * self.mass * G * math.sqrt(G * span)
         self.reserve_tau = reserve_tau
         self.sustain = sustain; self.elastic = np.asarray(elastic, bool); self.elastic_tau = beat_s
+        self.e_ret = np.where(self.elastic, ELASTIC_RETURN, 0.0)
         self.w_pos = np.zeros(len(self.elastic)); self.w_neg = np.zeros(len(self.elastic))
 
     def reset(self):
@@ -232,8 +242,9 @@ class Evaluator:
             # elastic joints, work summed over every physics sub-step: tendons return ELASTIC_RETURN of the braking work
             # into the next stroke, the muscle does the rest. When all of it was counted as returned, beating twice as
             # fast as a crow does cost nothing, and the trained crow beat at the fastest rate allowed
-            wp = self.w_pos[self.elastic].sum() / dt; wn = self.w_neg[self.elastic].sum() / dt
-            p_met += max(wp - ELASTIC_RETURN * wn, 0.0) / MUSCLE_EFF + (1.0 - ELASTIC_RETURN) * wn / NEG_EFF
+            e = self.elastic; r = self.e_ret[e]
+            wp = self.w_pos[e].sum() / dt; wn = self.w_neg[e] / dt
+            p_met += max(wp - float(np.sum(r * wn)), 0.0) / MUSCLE_EFF + float(np.sum((1.0 - r) * wn)) / NEG_EFF
             self.w_pos[:] = 0.0; self.w_neg[:] = 0.0
         energy = float(p_met / self.p_unit)
         # --- fatigue: the reserve drains above the sustainable power and refills below it

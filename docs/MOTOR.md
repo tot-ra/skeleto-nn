@@ -189,6 +189,10 @@ Curriculum:
   endurance in the strain cost and the arm rows of the output layer set to zero (the arms start hanging, the rest of
   the network kept), one round later the arms hang beside the body with the elbows bent 20 degrees and swing 16
   degrees with the stride; strain fell from 1.4 to 0.4 per second and the walk, run, ice, pack and turn all hold.
+* **Leg tendons:** the walker stepped 206 times a minute at 1.3 m/s (a person about 110) and ran with 8 % flight at
+  2.9 m/s (a runner 30 to 40 %), at about twice a person's cost of transport: all the legs' braking work was lost, so a
+  shuffle was cheaper than a bounce. The ankle's tendons now return half of its braking work and the knee's a third
+  (Achilles and patellar tendon), summed over every physics sub-step (`TENDONS`, `Evaluator.tendons`).
 * **Mean actions stay inside [-1, 1]:** the environment clips actions there; a policy mean beyond it gets no
   gradient from the exploration noise. A walker's arm actions sat at 1.3 to 1.9 and the arms stayed on their stops for
   rounds after the stops were made costly; a small loss term now pulls the mean back inside.

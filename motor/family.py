@@ -109,6 +109,7 @@ class FamilyEnv:
     ACTION_BOUND = 1.0    # policy means beyond this are pulled back (motor/ppo.py): beyond 1 the action is clipped
     CTRL_HZ = 30          # control steps per second (the network's command rate; physics runs at a fixed 180 Hz)
     GAMMA = 0.99          # reward discount per control step (0.99 at 30 Hz: about 3 s ahead)
+    TENDONS = {}          # bone name prefix -> share of braking work its tendons return (evaluate.Evaluator.tendons)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
 
@@ -188,6 +189,10 @@ class FamilyEnv:
         self.goal_world = np.array(goal, float)
         self.ev = ev.Evaluator(self.pc, sores)
         self.ev.endure = self.ENDURE
+        if self.TENDONS:                                      # elastic leg tendons (bone name prefix -> share returned)
+            ret = [max([v for k, v in self.TENDONS.items() if self.pc.sk.bones[i].name.startswith(k)] or [0.0])
+                   for i, _a in self.pc.dof_list]
+            self.ev.tendons(ret)
         q0 = rng.normal(0, 0.03, self.J)
         yaw = rng.uniform(-math.pi, math.pi)
         Rz = np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0], [0, 0, 1.0]])
