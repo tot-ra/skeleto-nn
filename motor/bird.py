@@ -24,7 +24,6 @@ import mujoco
 
 import air as AIR
 from bodies import bird, BIRDS
-from physics import CTRL_HZ
 from motor.family import FamilyEnv, G, ACTIVATION_TAU, heading
 from motor import evaluate as ev
 
@@ -47,14 +46,16 @@ class BirdEnv(FamilyEnv):
     # climb-rate tolerance of the goal score (speed units): 0.15 at first, but with the height-hold correction a bird 1.5 m
     # below its height scored the same whether it climbed back slowly or not at all, so nothing led it back
     CLIMB_TOL = 0.3
+    CTRL_HZ = 60
     HOLD_S = 2.0           # a height error is to be made good in about this many seconds
     # no pull on the action bound: a flier encodes its full-range strokes as outputs far beyond 1 (up to 3.5), and the
     # pull, though it does not change the clipped commands, reshapes the shared hidden layers and broke the wingbeat
     # within a round at every bound tried (1.0, 1.1, 1.5)
     ACTION_BOUND = 100.0
-    # about 11 s ahead (0.99 looks 3 s ahead): flapping costs energy at once, a slow sink only crashes 10 s later, and
+    # 60 commands a second (at 30, a 4.5 Hz beat got 7 commands, a 9 Hz one 3: too few to shape a stroke and twist the
+    # wing); about 11 s ahead (0.99 at 30 Hz looks 3 s ahead): flapping costs energy at once, a slow sink only crashes 10 s later, and
     # with the shorter horizon every fine-tuning unlearned holding height to save energy
-    GAMMA = 0.997
+    GAMMA = 0.9985
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
@@ -125,7 +126,7 @@ class BirdEnv(FamilyEnv):
         Rz = np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0], [0, 0, 1.0]])
         self.goal_world = Rz[:2, :2] @ (np.asarray(goal, float) * u)
         # high enough that the whole episode's asked-for sink still ends in the air
-        self.alt0 = self.wingspan() * rng.uniform(3.0, 6.0) + max(0.0, -self.climb) * self.max_len / CTRL_HZ
+        self.alt0 = self.wingspan() * rng.uniform(3.0, 6.0) + max(0.0, -self.climb) * self.max_len / self.CTRL_HZ
         self.phase = rng.uniform(0, 2 * math.pi)
         wing = [self.pc.sk.bones[i].group == "wing" for i, _a in self.pc.dof_list]
         self.ev.flight(self.wingspan(), wing, beat_s=1.0 / self.beat_hz())
@@ -152,7 +153,7 @@ class BirdEnv(FamilyEnv):
 
     def want_climb(self):
         u = self.speed_unit(); p, _R = self.pc.root_pose()
-        alt_ref = self.alt0 + self.climb * self.steps / CTRL_HZ
+        alt_ref = self.alt0 + self.climb * self.steps / self.CTRL_HZ
         return self.climb + float(np.clip((alt_ref - p[2]) / self.HOLD_S, -0.5 * u, 0.5 * u))
 
     def obs_layout(self):
@@ -170,7 +171,7 @@ class BirdEnv(FamilyEnv):
         pc = self.pc; d = pc.data
         p, R = pc.root_pose()
         m = pc.total_mass; k = self.assist
-        alt = self.alt0 + self.climb * self.steps / CTRL_HZ    # the harness follows the asked-for climb or glide
+        alt = self.alt0 + self.climb * self.steps / self.CTRL_HZ    # the harness follows the asked-for climb or glide
         # no standing weight support: in a glide the weight is what drives the bird forward, and carrying it stalled
         # every glide; the harness only corrects departures from the path
         Fz = k * m * (6.0 * (alt - p[2]) - 3.0 * (d.qvel[2] - self.climb))
@@ -190,12 +191,12 @@ class BirdEnv(FamilyEnv):
 
     def step(self, a):
         a = np.clip(np.asarray(a, float), -1, 1)
-        self.phase = (self.phase + 2 * math.pi * self.beat_hz() * math.exp(0.7 * a[self.J]) / CTRL_HZ) % (2 * math.pi)
+        self.phase = (self.phase + 2 * math.pi * self.beat_hz() * math.exp(0.7 * a[self.J]) / self.CTRL_HZ) % (2 * math.pi)
         a = a[:self.J]
         pc = self.pc
         self.strength = 0.55 + 0.45 * self.ev.reserve
         pc.model.actuator_forcerange[pc.aid] = self.base_force * self.strength
-        alpha = 1.0 - math.exp(-1.0 / (CTRL_HZ * ACTIVATION_TAU))
+        alpha = 1.0 - math.exp(-1.0 / (self.CTRL_HZ * ACTIVATION_TAU))
         act = self.prev_a + alpha * (a - self.prev_a)
         target = np.clip(act * self.act_scale, pc.lo, pc.hi)
 
@@ -223,12 +224,12 @@ class BirdEnv(FamilyEnv):
         # in the air the capture point means nothing: balance is scored by tilt alone, through the term's weight
         weights = {t: w * self.cost_scale for t, w in self.profile.items()}
         weights["balance"] = 0.0
-        r, costs, bad = self.ev.step(a, 1.0 / CTRL_HZ, weights, goal * 2.0 + self.alive, self.strength)
+        r, costs, bad = self.ev.step(a, 1.0 / self.CTRL_HZ, weights, goal * 2.0 + self.alive, self.strength)
         self.prev_a = act
         unstable = pc.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number > 0 or not np.all(np.isfinite(pc.data.qpos))
         if unstable:
             pc.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number = 0
-            r = -2.0 / CTRL_HZ
+            r = -2.0 / self.CTRL_HZ
         grounded = pc.data.ncon > 0                          # stage 1: any touch of the ground ends a flight
         upside_down = float(R[2, 2]) < -0.2
         fell = unstable or grounded or upside_down or p[2] < 0.15 * self.wingspan()

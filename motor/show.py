@@ -63,7 +63,8 @@ def load(path):
     return ck, lay(ck["pi"], names)
 
 
-def run(env, pi, ck, kw, T=300, assist=0.0):
+def run(env, pi, ck, kw, T=None, assist=0.0):
+    T = T or int(10 * env.CTRL_HZ)                           # 10 s
     mean, std = ck["mean"], np.sqrt(ck["var"] + 1e-6)
     body = kw.get("body", env.default_body())
     env._build(body)
@@ -90,21 +91,22 @@ def render_clip(env, frames, title, path, size=(480, 300), seconds=None):
     """One GIF of a run's frames; birds are filmed closer, from above, every frame, with the height in the caption."""
     from render import Scene, Actor, caption, save_gif
     if seconds is not None:
-        frames = frames[:int(seconds * 30)]
+        frames = frames[:int(seconds * env.CTRL_HZ)]
     sc = Scene(None, [Actor(env.c, "a", base=(0.85, 0.6, 0.45))], size[0], size[1])
     imgs = []
     bird = env.family == "bird"
-    step = 1 if bird else 2                                   # a 4.5 Hz wingbeat needs every frame
+    fps = 30 if bird else 15                                  # a 4.5 Hz wingbeat needs 30 frames a second
+    step = max(1, env.CTRL_HZ // fps)
     for k, (S, E, R) in enumerate(frames[::step]):
         sc.pose(sc.actors[0], S, E, R)
         look = np.array([S[0][0], S[0][1], S[0][2] if bird else 0.9 * env.c.z0])   # follow a flier up
         if bird:      # closer, from above and behind (both wings show), the height in the caption (a camera that
-            sub = f"t={k / 30:.1f}s  height {S[0][2]:.1f} m"     # follows a flier hides whether it climbs or sinks)
+            sub = f"t={step * k / env.CTRL_HZ:.1f}s  height {S[0][2]:.1f} m"     # follows a flier hides whether it climbs or sinks)
             imgs.append(caption(sc.render(look, max(1.5, 2.5 * env.wingspan()), 160, -30), title, sub))
         else:
-            imgs.append(caption(sc.render(look, 4.0, 120, -12), title, f"t={step * k / 30:.1f}s"))
+            imgs.append(caption(sc.render(look, 4.0, 120, -12), title, f"t={step * k / env.CTRL_HZ:.1f}s"))
     sc.close()
-    save_gif(imgs, path, fps=30 if bird else 15)
+    save_gif(imgs, path, fps=fps)
 
 
 def main():

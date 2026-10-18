@@ -19,7 +19,7 @@ import math
 import numpy as np
 import mujoco
 
-from physics import PhysChar, CTRL_HZ
+from physics import PhysChar, DT
 from motor import evaluate as ev
 
 G = 9.81
@@ -106,6 +106,7 @@ class FamilyEnv:
     MIN_LOGSTD = None     # floor on the exploration noise (log std), if the family needs one
     SOFT_RANGE = {}       # bone group -> share of its range where the joint limit softly resists (physics.build_xml)
     ACTION_BOUND = 1.0    # policy means beyond this are pulled back (motor/ppo.py): beyond 1 the action is clipped
+    CTRL_HZ = 30          # control steps per second (the network's command rate; physics runs at a fixed 180 Hz)
     GAMMA = 0.99          # reward discount per control step (0.99 at 30 Hz: about 3 s ahead)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
@@ -113,8 +114,8 @@ class FamilyEnv:
     def _stalled(self, goal, sp):
         """``goal``: the progress toward the goal this step (the goal score, or turning toward it). Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns
         ALIVE every step while trying to walk risks the fall cost, so the safest policy ignores the goal."""
-        self.goal_ema += (goal - self.goal_ema) / CTRL_HZ
-        return sp > 0.2 and self.steps > 1.5 * CTRL_HZ and self.goal_ema < self.STALL_GOAL
+        self.goal_ema += (goal - self.goal_ema) / self.CTRL_HZ
+        return sp > 0.2 and self.steps > 1.5 * self.CTRL_HZ and self.goal_ema < self.STALL_GOAL
 
     # ------------------------------------------------------------------ setup
     def __init__(self, seed=0, spread=1.0, act_scale=0.7, max_len=450, alive=None, fall_cost=None, cost_scale=1.0):
@@ -122,7 +123,8 @@ class FamilyEnv:
         self.alive = ALIVE if alive is None else alive
         self.fall_cost = FALL_COST if fall_cost is None else fall_cost
         self.cost_scale = cost_scale
-        self.spread = spread; self.act_scale_base = act_scale; self.max_len = max_len
+        self.spread = spread; self.act_scale_base = act_scale
+        self.max_len = int(max_len * self.CTRL_HZ / 30)      # max_len is given in 30 Hz steps (15 s)
         self.assist = 0.0
         self.max_speed = 4.0
         self.moving_start = 0.7
@@ -133,7 +135,7 @@ class FamilyEnv:
     def _build(self, body):
         self.b = body
         self.c = self.make_creature(body)
-        self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE)
+        self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))))
         self.J = self.pc.nj
         self.act_dim = self.J
         self.base_force = self.pc.model.actuator_forcerange[self.pc.aid].copy()
@@ -271,7 +273,7 @@ class FamilyEnv:
         pc.model.actuator_forcerange[pc.aid] = self.base_force * self.strength
         # activation dynamics: the muscle target moves toward the command with a 50 ms time constant; commands
         # that flip every 33 ms cannot make the body vibrate (and cost energy no real muscle could spend)
-        alpha = 1.0 - math.exp(-1.0 / (CTRL_HZ * ACTIVATION_TAU))
+        alpha = 1.0 - math.exp(-1.0 / (self.CTRL_HZ * ACTIVATION_TAU))
         act = self.prev_a + alpha * (a - self.prev_a)
         target = np.clip(act * self.act_scale, pc.lo, pc.hi)
         self.wind.update()
@@ -312,13 +314,13 @@ class FamilyEnv:
             goal += 0.3
             progress = goal
         weights = {t: w * self.cost_scale for t, w in self.profile.items()}
-        r, costs, bad = self.ev.step(a, 1.0 / CTRL_HZ, weights, goal * 2.0 + self.alive, self.strength)
+        r, costs, bad = self.ev.step(a, 1.0 / self.CTRL_HZ, weights, goal * 2.0 + self.alive, self.strength)
         self.prev_a = act
         tilt = math.acos(max(-1.0, min(1.0, float(R[2, 2]))))
         unstable = pc.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number > 0 or not np.all(np.isfinite(pc.data.qpos))
         if unstable:
             pc.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number = 0
-            r = -2.0 / CTRL_HZ
+            r = -2.0 / self.CTRL_HZ
         fell = bad or unstable or p[2] < 0.5 * self.c.z0 or tilt > 1.2
         stalled = not fell and self._stalled(progress, sp)
         if fell or stalled:

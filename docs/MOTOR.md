@@ -109,6 +109,9 @@ Even so, longer bird training kept losing level flight within a few rounds (each
 training is paused: the published crow is the round 44 flier that holds its height. Birds need structural work first:
 a faster control rate (3 to 7 commands per beat now) and a wing model with downwash (flapping costs about 15 times a
 real crow's power), so that level flight is not a knife edge that every training change pushes off.
+**Control rate per family.** Birds now command their joints 60 times a second (people and quadrupeds 30; the
+physics runs at 180 Hz either way): at 30, a 4.5 Hz wingbeat got 7 commands and a 9 Hz one 3. Episode lengths, test
+durations and the discount are in seconds, not steps.
 Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
 commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
 

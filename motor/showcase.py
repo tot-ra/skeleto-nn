@@ -36,8 +36,8 @@ def best_member(run_name):
     return last["round"], int(last["best"]), float(max(last["scores"])), len(hist)
 
 
-def describe(family, res, frames):
-    held = res["steps"] / 30.0
+def describe(family, res, frames, ctrl_hz=30):
+    held = res["steps"] / ctrl_hz
     s = f"{'fell at' if res['fell'] else 'held'} {held:.1f} s"
     if family == "bird":
         z = [f[0][0][2] for f in frames]
@@ -57,10 +57,10 @@ def render_family(family, run_name, names, status):
     clips = []
     for name in names:
         kw, title = table[name]
-        frames, res = run(env, pi, ck, kw, T=SECONDS * 30)
+        frames, res = run(env, pi, ck, kw, T=SECONDS * env.CTRL_HZ)
         path = os.path.join(OUT, f"{family}_{name}.gif")
         render_clip(env, frames, title, path, size=SIZE)
-        clips.append(dict(name=name, title=title, gif=path, result=describe(family, res, frames)))
+        clips.append(dict(name=name, title=title, gif=path, result=describe(family, res, frames, env.CTRL_HZ)))
         print(family, name, clips[-1]["result"], flush=True)
     status[family] = dict(round=rnd, score=round(score, 3), rounds_total=n, clips=clips,
                           updated=time.strftime("%Y-%m-%d %H:%M"))

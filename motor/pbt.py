@@ -46,7 +46,7 @@ MUTABLE = {"lr": (5e-5, 1e-3), "fade": (0.0003, 0.006), "sym": (0.5, 10.0),
 DEFAULTS = {"lr": 2e-4, "fade": 0.0015, "sym": 4.0, "alive": 1.0, "fall_cost": 5.0, "cost_scale": 1.0}
 
 
-def score(ckpt, family="biped", T=240, seed=0):
+def score(ckpt, family="biped", seconds=8.0, seed=0):
     """Mean over the test cases of (share of the episode survived) x (0.3 + mean goal score), no harness."""
     from motor.ppo import make_env
     from motor.show import load
@@ -54,6 +54,7 @@ def score(ckpt, family="biped", T=240, seed=0):
     from motor.ppo import mlp_np
     ck, pi = load(ckpt)
     env = make_env(family, seed=seed)
+    T = int(seconds * env.CTRL_HZ)
     mean, std = ck["mean"], np.sqrt(ck["var"] + 1e-6)
     out = []
     for (g, extra) in tests(family):

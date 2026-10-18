@@ -161,4 +161,4 @@ def test_bird_has_a_wingbeat_clock_and_mirrors():
     L = env.obs_layout()
     assert np.allclose(env.mirror_obs(o)[L["clock"]], o[L["clock"]])
     p0 = env.phase; env.step(np.zeros(env.act_dim))
-    assert abs((env.phase - p0) % (2 * np.pi) - 2 * np.pi * env.beat_hz() / 30) < 1e-6
+    assert abs((env.phase - p0) % (2 * np.pi) - 2 * np.pi * env.beat_hz() / env.CTRL_HZ) < 1e-6

@@ -103,8 +103,9 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
     return xml
 
 class PhysChar:
-    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None):
+    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS):
         self.c = creature; self.sk = creature.skel
+        self.substeps = substeps                             # physics steps per control step (the physics step DT is fixed)
         self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
                                                               terrain_friction=friction, soft_range=soft_range))
         self.data = mujoco.MjData(self.model)
@@ -160,7 +161,7 @@ class PhysChar:
         d = self.data; m = self.model
         d.ctrl[self.aid] = np.clip(target_vec, self.lo * 1.05, self.hi * 1.05)
         d.xfrc_applied[:] = 0
-        for _ in range(SUBSTEPS):
+        for _ in range(self.substeps):
             if wrench is not None:
                 d.xfrc_applied[self.bid[0], :] = wrench
             if ext_force is not None:
