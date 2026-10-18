@@ -68,6 +68,8 @@ class Bone:
     tau: float = 100.0         # peak torque per active axis for the physics executor (N m)
     shape: str = "capsule"     # capsule | box | ellipsoid (render only)
     size: tuple = ()           # box half sizes or ellipsoid radii
+    tau_dir: dict = field(default_factory=dict)   # axis -> (share of tau toward negative angles, toward positive): a muscle
+                               # is not equally strong both ways (a calf pushes off far harder than the shin lifts the toes)
 
 def mirror_v(v): return (v[0], -v[1], v[2])
 
@@ -88,7 +90,8 @@ class Skeleton:
                 full.append(Bone(b.name[:-1] + "R" if b.name.endswith("L") else b.name + "_R",
                                  (b.parent[:-1] + "R") if (b.parent and b.parent.endswith("L")) else b.parent,
                                  mirror_v(b.dir), b.length, b.mass, b.radius, b.t, mirror_v(b.offset), b.order,
-                                 mirror_lim(b.lim), "R", b.group, b.tau, b.shape, b.size))
+                                 mirror_lim(b.lim), "R", b.group, b.tau, b.shape, b.size,
+                                 {ax: (f[::-1] if ax in "XZ" else f) for ax, f in b.tau_dir.items()}))   # X, Z flip in a mirror
         # parents first
         names = [b.name for b in full]; placed = set(); order = []
         def place(b):

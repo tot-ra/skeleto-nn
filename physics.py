@@ -80,7 +80,7 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
                     s += (f'{sp}  <joint name="j_{b.name}_{ax}" type="hinge" axis="{AX[ax][0]:.0f} {AX[ax][1]:.0f} {AX[ax][2]:.0f}" '
                           f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="{stiff:.3f}"{soft}/>\n')
                     kv = (0.02 if wing else 0.08) * kp
-                    acts.append(f'    <position name="a_{b.name}_{ax}" joint="j_{b.name}_{ax}" kp="{kp:.2f}" kv="{kv:.3f}" forcerange="{-b.tau:.1f} {b.tau:.1f}" ctrlrange="{math.radians(lo)*1.05:.4f} {math.radians(hi)*1.05:.4f}"/>\n')
+                    acts.append(f'    <position name="a_{b.name}_{ax}" joint="j_{b.name}_{ax}" kp="{kp:.2f}" kv="{kv:.3f}" forcerange="{-b.tau * b.tau_dir.get(ax, (1.0, 1.0))[0]:.1f} {b.tau * b.tau_dir.get(ax, (1.0, 1.0))[1]:.1f}" ctrlrange="{math.radians(lo)*1.05:.4f} {math.radians(hi)*1.05:.4f}"/>\n')
         for c in kids[i]:
             s += body(c, ind + 1)
         s += f'{sp}</body>\n'
@@ -135,6 +135,9 @@ class PhysChar:
         self.lo = np.array([math.radians(sk.bones[i].lim["XYZ"[a]][0]) for i, a in self.dof_list])
         self.hi = np.array([math.radians(sk.bones[i].lim["XYZ"[a]][1]) for i, a in self.dof_list])
         self.tau = np.array([sk.bones[i].tau for i, a in self.dof_list])
+        # strength toward negative and positive angles (Bone.tau_dir; equal unless given)
+        self.tau_neg = np.array([sk.bones[i].tau * sk.bones[i].tau_dir.get("XYZ"[a], (1.0, 1.0))[0] for i, a in self.dof_list])
+        self.tau_pos = np.array([sk.bones[i].tau * sk.bones[i].tau_dir.get("XYZ"[a], (1.0, 1.0))[1] for i, a in self.dof_list])
         # joints with a soft end of range (their limit load is a ligament load, scored as pain)
         self.soft_mask = np.array([(soft_range or {}).get(sk.bones[i].group, 0.0) > 0 for i, a in self.dof_list])
         self.foot_geoms = [m.geom("g_" + sk.bones[l.chain[-1]].name).id for l in creature.legs]

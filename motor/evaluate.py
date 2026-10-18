@@ -229,7 +229,9 @@ class Evaluator:
         if pc.soft_mask.any():
             pain += float(np.sum(pc.limit_torque()[pc.soft_mask] / self.tau_max[pc.soft_mask]))
         # --- strain and energy
-        u = tau / (self.tau_max * strength_scale)
+        # torque against the strength in the direction it acts (a calf pushes off far harder than the shin lifts the toes)
+        cap = np.maximum(np.where(tau >= 0, self.pc.tau_pos, self.pc.tau_neg), 1e-3)
+        u = tau / (cap * strength_scale)
         strain = float(np.sum(self.w_strain * u ** 2))
         if self.endure:
             self.sustained += (np.abs(u) - self.sustained) * min(1.0, dt / ENDURE_TAU)

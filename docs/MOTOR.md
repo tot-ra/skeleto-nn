@@ -196,6 +196,12 @@ Curriculum:
   2.9 m/s (a runner 30 to 40 %), at about twice a person's cost of transport: all the legs' braking work was lost, so a
   shuffle was cheaper than a bounce. The ankle's tendons now return half of its braking work and the knee's a third
   (Achilles and patellar tendon), summed over every physics sub-step (`TENDONS`, `Evaluator.tendons`).
+* **Direction-dependent joint strength:** every joint was equally strong both ways, the hip at 330 N m and the ankle
+  at 110: the legs swung forward twice as easily as a person's and the calf pushed off at half a person's strength, so
+  short, quick steps paid and a run with flight did not (asked for 4.5 m/s, 3.4 at 274 steps a minute with 10 % flight).
+  Now the hip flexes at about 150 N m and extends at 250, the knee extends at 250 and flexes at 130, the ankle pushes
+  off at about 200 and lifts the toes at 50 (`Bone.tau_dir`); strain counts against the strength in the direction the
+  torque acts. People's goal speeds also go up to 5 m/s now (a 4 m/s run in the review).
 * **Mean actions stay inside [-1, 1]:** the environment clips actions there; a policy mean beyond it gets no
   gradient from the exploration noise. A walker's arm actions sat at 1.3 to 1.9 and the arms stayed on their stops for
   rounds after the stops were made costly; a small loss term now pulls the mean back inside.

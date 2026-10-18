@@ -136,10 +136,14 @@ def human(b: HumanBody | None = None, name="human", rig: dict | None = None) -> 
         Bone("head", "neck", Z, L["head"], m(4.5), R(0.085), order="YXZ",
              lim={"Y": (-40, 40), "X": (-30, 30), "Z": (-60, 60)}, group="head", tau=40 * tau, shape="ellipsoid", size=(0.09 * s, 0.075 * s, L["head"] / 2 + 0.01)),
         Bone("thigh_L", "pelvis", (0, 0, -1), L["thigh"], m(8.0), R(0.07), t=0.0, offset=(0, hip_lat, 0), order="ZXY",
-             lim={"Y": (-120, 25), "X": (-20, 45), "Z": (-35, 35)}, side="L", group="leg", tau=330 * tau),
-        Bone("shank_L", "thigh_L", (0, 0, -1), L["shank"], m(3.5), R(0.05), order="YXZ", lim={"Y": (0, 150)}, side="L", group="leg", tau=250 * tau),
+             lim={"Y": (-120, 25), "X": (-20, 45), "Z": (-35, 35)}, side="L", group="leg", tau=330 * tau,
+             tau_dir={"Y": (0.45, 0.75)}),   # hip flexion about 150 N m, extension about 250 (a symmetric 330 swung the legs too cheaply)
+        Bone("shank_L", "thigh_L", (0, 0, -1), L["shank"], m(3.5), R(0.05), order="YXZ", lim={"Y": (0, 150)}, side="L", group="leg", tau=250 * tau,
+             tau_dir={"Y": (1.0, 0.5)}),     # knee extension about 250 N m, flexion about 130
         Bone("foot_L", "shank_L", X, L["foot"] * 0.76, m(1.0), R(0.04), order="YXZ",
-             lim={"Y": (-30, 50), "X": (-20, 20), "Z": (-15, 15)}, side="L", group="foot", tau=110 * tau, shape="box", size=(L["foot"] * 0.38 + 0.03 * s, 0.045 * s, 0.03 * s)),
+             lim={"Y": (-30, 50), "X": (-20, 20), "Z": (-15, 15)}, side="L", group="foot", tau=110 * tau,
+             # ankle plantarflexion about 200 N m (the push-off of a run), dorsiflexion about 50
+             tau_dir={"Y": (0.45, 1.8)}, shape="box", size=(L["foot"] * 0.38 + 0.03 * s, 0.045 * s, 0.03 * s)),
         Bone("toes_L", "foot_L", X, L["foot"] * 0.24, m(0.2), R(0.03), order="YXZ",
              lim={"Y": (-70, 35)}, side="L", group="foot", tau=25 * tau, shape="box", size=(L["foot"] * 0.12 + 0.01 * s, 0.045 * s, 0.02 * s)),
         Bone("clav_L", "chest", (0, 1, 0), 0.16 * w * s ** 0.5, m(0.6), R(0.02), t=sh_t, offset=(0, 0.03 * w, 0), order="XZY",
