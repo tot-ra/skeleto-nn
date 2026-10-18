@@ -118,6 +118,9 @@ following the lift over about a beat), and the induced drag comes from the lift 
 also recalibrated: it had been a wingbeat searched for thrust alone (about 200 W); a search for the cheapest level
 flight (thrust and lift just enough) finds one at 81 W metabolic for a crow, which is the unit now (`FLIGHT_UNIT` 6).
 A real crow needs about 10 W: the open-loop sine beats of the search and the flat plates leave a factor of eight.
+On the new air model, with one simulation worker per bird network (the machine's budget was halved), the birds fell
+over five rounds (0.67 to 0.47); bird training is paused with the last pre-downwash flier restored, until there is
+compute to retrain them on it.
 Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
 commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
 
