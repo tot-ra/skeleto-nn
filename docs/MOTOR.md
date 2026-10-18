@@ -105,6 +105,10 @@ saw its absolute height and the asked-for climb rate, so it could not predict it
 climb rate wanted at this moment (the correction toward the height included); ten minutes of training from the last
 level flier then kept it flying level and brought it back to its height instead of overshooting it. Birds also look
 about 11 s ahead (`GAMMA` 0.997; a slow sink crashes long after the energy it saves) and get no action-bound pull.
+Even so, longer bird training kept losing level flight within a few rounds (each fix held for a while), so bird
+training is paused: the published crow is the round 44 flier that holds its height. Birds need structural work first:
+a faster control rate (3 to 7 commands per beat now) and a wing model with downwash (flapping costs about 15 times a
+real crow's power), so that level flight is not a knife edge that every training change pushes off.
 Wing twist is barely used yet (8 degrees); at 30 control steps a second and 4 to 9 Hz the network has 3 to 7
 commands per beat. A faster bird control rate and a wing model with downwash are the next steps.
 
