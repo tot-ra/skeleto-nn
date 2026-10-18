@@ -21,7 +21,7 @@ CANON = dict(n_spine=4, n_neck=3, tail_n=4)
 SPECIES = ("dog", "cat", "wolf", "goat", "horse", "pig", "bear")
 # drawn by weight: the species that fail most come up more often (in run 6 the horse finished 0 of 13 training
 # episodes, the cat 3 of 16, the goat 8 of 20, the bear and wolf about half)
-SPECIES_WEIGHT = np.array([1.0, 1.6, 1.0, 1.4, 3.0, 1.0, 1.0]); SPECIES_WEIGHT /= SPECIES_WEIGHT.sum()
+SPECIES_WEIGHT = np.array([1.0, 1.6, 1.0, 1.4, 2.2, 1.0, 1.0]); SPECIES_WEIGHT /= SPECIES_WEIGHT.sum()
 
 
 def canonical(spec):
