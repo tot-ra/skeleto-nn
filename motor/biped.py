@@ -45,6 +45,9 @@ def body_vector(b: HumanBody, leg):
 class BipedEnv(FamilyEnv):
     family = "biped"
     BODY_DIM = 9
+    # goal speeds up to 5 m/s: up to 3 (the family default) a shuffle with almost no flight still met the goal (cadence
+    # 257 a minute, 7 % flight at 3 m/s); people run from about 2 m/s, and at 4 to 5 a run without flight is not possible
+    MAX_SPEED = 5.0
     SOFT_RANGE = {"arm": 0.2}   # the last fifth of an arm joint's range resists: arms cannot hang on their stops
     # exploration floor 0.10: with the 0.06 a walker had settled to, the arms kept the pose they had learned on their stops
     # for rounds after the stops became soft and costly; nothing ever tried lowering them
