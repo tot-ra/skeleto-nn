@@ -120,6 +120,12 @@ the cat has longer hind legs and a heavier, stronger tail to balance with. A pas
 joint strengths per radian in every quadruped's neck, free of energy) carries the head: the horse's raised neck held up
 by muscle alone kept its base at 71 % of its strength, and it could not walk; with the ligament, 46 %.
 
+**The horse and the shared network.** The quadruped network walks the dog, cat and pig but kept the horse almost
+standing (0.2 m/s at any asked speed); drawing the horse three times as often only made the others worse. Trained on
+horses alone (`QUAD_ONLY=horse`), the same network walked the horse within 20 minutes (0.8 to 1.05 m/s for the full
+test). The body can walk; the shared network does not make room for it. The next step is distillation: specialists
+for the species the shared network fails, then one network trained to imitate them and itself.
+
 Mixed bodies (monkey, bear on two legs, kangaroo, penguin) and snakes are not
 built yet.
 
