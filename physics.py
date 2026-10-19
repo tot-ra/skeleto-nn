@@ -107,7 +107,8 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
     return xml
 
 class PhysChar:
-    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS, passive=None):
+    def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS, passive=None,
+                 springs=None):
         self.c = creature; self.sk = creature.skel
         self.substeps = substeps                             # physics steps per control step (the physics step DT is fixed)
         self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
@@ -145,6 +146,13 @@ class PhysChar:
         self.leg_sites = [(m.site(f"s_{l.name}_heel").id, m.site(f"s_{l.name}_ball").id) for l in creature.legs]
         self.total_mass = float(m.body_subtreemass[self.bid[0]])
         self.mass_vec = m.body_mass.copy()
+        # one-sided elastic springs (``springs``: bone name prefix -> (axis, stiffness in joint strengths per radian, slack
+        # angle in radians)): taut only below the slack angle, e.g. the Achilles tendon stretched as the shank tips over the
+        # planted foot, which gives the energy back in the push-off; free of energy, outside the muscles' strength
+        sel = [(k, kk, sl) for k, (i, a) in enumerate(self.dof_list) for pre, (ax, kk, sl) in (springs or {}).items()
+               if sk.bones[i].name.startswith(pre) and "XYZ"[a] == ax]
+        self.sp_q = self.qadr[[s[0] for s in sel]]; self.sp_v = self.vadr[[s[0] for s in sel]]
+        self.sp_k = np.array([s[1] * self.tau[s[0]] for s in sel]); self.sp_slack = np.array([s[2] for s in sel])
 
     # ---- state transfer ----------------------------------------------------------------
     def q_to_vec(self, q):
@@ -174,6 +182,9 @@ class PhysChar:
             if ext_force is not None:
                 d.xfrc_applied[self.bid[1 if len(self.bid) > 1 else 0], 0:3] = ext_force
             if pre is not None: pre()
+            if len(self.sp_k):
+                if pre is None: d.qfrc_applied[self.sp_v] = 0.0        # a ``pre`` hook clears the applied forces itself
+                d.qfrc_applied[self.sp_v] += self.sp_k * np.maximum(self.sp_slack - d.qpos[self.sp_q], 0.0)
             mujoco.mj_step(m, d)
             if probe is not None: probe()
         if ext_force is not None: d.xfrc_applied[:] = 0

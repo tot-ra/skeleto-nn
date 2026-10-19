@@ -110,6 +110,8 @@ class FamilyEnv:
     CTRL_HZ = 30          # control steps per second (the network's command rate; physics runs at a fixed 180 Hz)
     GAMMA = 0.99          # reward discount per control step (0.99 at 30 Hz: about 3 s ahead)
     TENDONS = {}          # bone name prefix -> share of braking work its tendons return (evaluate.Evaluator.tendons)
+    MOVING_START_MAX = None  # cap on a moving start's speed (speed units); faster goals are reached by speeding up
+    SPRINGS = {}          # bone name prefix -> one-sided elastic spring (axis, strengths per radian, slack; physics.PhysChar)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
 
@@ -137,7 +139,8 @@ class FamilyEnv:
     def _build(self, body):
         self.b = body
         self.c = self.make_creature(body)
-        self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))), passive=self.PASSIVE)
+        self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))), passive=self.PASSIVE,
+                           springs=self.SPRINGS)
         self.J = self.pc.nj
         self.act_dim = self.J
         self.base_force = self.pc.model.actuator_forcerange[self.pc.aid].copy()
@@ -201,6 +204,8 @@ class FamilyEnv:
         v0 = np.zeros(3)
         if sp > 0.1 and rng.random() < self.moving_start:
             v0[:2] = self.goal_world * rng.uniform(0.6, 1.0)
+            if self.MOVING_START_MAX is not None:
+                v0[:2] *= min(1.0, self.MOVING_START_MAX * self.speed_unit() / max(float(np.linalg.norm(v0[:2])), 1e-9))
             for key, val in self.stride_pose(rng, sp).items():
                 j = self.dof_index.get(key)
                 if j is not None:

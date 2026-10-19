@@ -210,6 +210,12 @@ Curriculum:
   weights fine-tuned at 60 Hz for about two hours (discount 0.995, the same horizon in seconds) went back to a shuffle:
   180 steps a minute and 0.37 m steps at 1.3 m/s, up to 766 a minute when asked for 3.5. A faster command rate made
   quick small steps easier, not a run.
+* **People's moving starts are capped at a walk** (`MOVING_START_MAX`, 1.5 m/s): a moving start puts both feet down
+  in a stride, joints still, the whole body at up to the goal speed. At 3 to 4 m/s about half of those starts fell
+  within a second, while from rest the same networks never fell but never sped up past a walk (2 to 4 % flight): the
+  falls taught that going fast means falling. Run speeds are now reached by speeding up.
+* **Achilles spring (experiment, `BIPED_ACHILLES=1`):** a one-sided spring on the ankle (`SPRINGS`,
+  `physics.PhysChar`), taut once the shank tips over the planted foot, about 220 N m/rad for an adult.
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 

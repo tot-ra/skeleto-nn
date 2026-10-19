@@ -10,7 +10,7 @@ Everything shared with the other families (observation, mirror maps, muscle acti
   goal speed  in m/s
 """
 from __future__ import annotations
-import math
+import math, os
 import numpy as np
 
 from bodies import human, HumanBody
@@ -57,6 +57,13 @@ class BipedEnv(FamilyEnv):
     TENDONS = {"foot": 0.5, "shank": 0.3}
     ENDURE = True        # a held-out arm tires its shoulder within minutes; a walker's arms hang and swing
     ACTION_BOUND = 0.95  # arms back inside the clip range, where exploration changes the command
+    # a moving start puts both feet down in a stride, joints still, the whole body at up to the goal speed: at 3 to 4 m/s
+    # about half of those starts fell within a second (from rest the same networks never fell, but never sped up past
+    # a walk either), and the falls taught that going fast means falling. Run speeds are reached by speeding up
+    MOVING_START_MAX = 1.5
+    # experiment (BIPED_ACHILLES=1): the Achilles tendon as a real spring, taut once the ankle dorsiflexes past neutral
+    # (negative foot Y); 2 strengths per radian is about 220 N m/rad, 75 N m at 20 degrees, a third of a run's push-off
+    SPRINGS = {"foot_": ("Y", 2.0, 0.0)} if os.environ.get("BIPED_ACHILLES") else {}
 
     def default_body(self):
         return HumanBody()
