@@ -205,6 +205,11 @@ Curriculum:
 * **Mean actions stay inside [-1, 1]:** the environment clips actions there; a policy mean beyond it gets no
   gradient from the exploration noise. A walker's arm actions sat at 1.3 to 1.9 and the arms stayed on their stops for
   rounds after the stops were made costly; a small loss term now pulls the mean back inside.
+* **People stay at 30 Hz control:** a network trained from scratch on the realistic body walked like a person (137
+  steps a minute, 0.55 to 0.6 m steps at 1.3 m/s) but fell within a second of each try at a run with flight. The same
+  weights fine-tuned at 60 Hz for about two hours (discount 0.995, the same horizon in seconds) went back to a shuffle:
+  180 steps a minute and 0.37 m steps at 1.3 m/s, up to 766 a minute when asked for 3.5. A faster command rate made
+  quick small steps easier, not a run.
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 
