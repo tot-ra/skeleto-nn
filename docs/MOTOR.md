@@ -234,7 +234,10 @@ Curriculum:
   8). A relaxed joint is free. Trained from scratch (`runs/motor/biped_torque`). The first run bent its knees
   freely (peak 6 rad/s) but, with the harness gone within about 700 iterations, settled into a deep crouch (knees at
   80 to 127 degrees, energy cost four times the straight-legged walker's) and never stood up out of it. Restarted with
-  the harness fading about twenty times slower (`--fade 0.0001 --fade-ok 0.0002`).
+  the harness fading about twenty times slower (`--fade 0.0001 --fade-ok 0.0002`). Under that slow harness the
+  network folded its legs (knees at 150 degrees, feet off the ground) and hung from the harness's spring to the
+  standing height: free for muscle torques, and without falls the curriculum raised the goal speeds anyway. For muscle
+  torques the harness now carries a fixed share of the weight (up to 60 %) with no height spring.
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 

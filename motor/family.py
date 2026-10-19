@@ -277,7 +277,12 @@ class FamilyEnv:
         p, R = pc.root_pose()
         k = self.assist * pc.total_mass / 75.0
         v = d.qvel[0:3]
-        Fz = self.assist * 0.5 * pc.total_mass * G + k * (3000.0 * (self.c.z0 - p[2]) - 300.0 * v[2])
+        if self.TORQUE:
+            # a fixed share of the weight, no spring to the standing height: under a height spring, muscle-torque
+            # legs folded up (knees at 150 degrees, feet off the ground) and hung in the harness for free
+            Fz = self.assist * 0.6 * pc.total_mass * G - k * 300.0 * v[2]
+        else:
+            Fz = self.assist * 0.5 * pc.total_mass * G + k * (3000.0 * (self.c.z0 - p[2]) - 300.0 * v[2])
         # the run harness only keeps the trunk upright: no height, so the body can bounce and leave the ground
         kt = k + (self.run_assist * pc.total_mass / 75.0 if run else 0.0)
         zx, zy = R[0, 2], R[1, 2]
