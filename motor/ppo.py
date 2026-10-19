@@ -114,6 +114,7 @@ def main():
     ap.add_argument("--reset-curriculum", action="store_true", help="with --init: restart harness, goal speeds and spread")
     ap.add_argument("--speed0", type=float, default=0.8, help="goal speeds at the start of the curriculum (m/s)")
     ap.add_argument("--fade", type=float, default=0.0015, help="harness lost per iteration regardless of success")
+    ap.add_argument("--fade-ok", type=float, default=0.01, help="extra harness lost per iteration while the goal is met")
     ap.add_argument("--run-assist0", type=float, default=0.0,
                     help="run harness (goals past the family's RUN_FROM; upright only) when a run starts without one saved")
     ap.add_argument("--run-fade", type=float, default=0.0004, help="run harness lost per iteration")
@@ -235,7 +236,7 @@ def main():
         # goal speeds and variety grow slowly while the goal is met (fast growth ran past what the body could learn
         # twice) and shrink back when most episodes fail
         if n_ep and goal > ref.GOAL_OK and fell < ref.FAIL_OK:
-            assist = max(0.0, assist - 0.01)
+            assist = max(0.0, assist - args.fade_ok)
             max_speed = min(ref.MAX_SPEED, max_speed + 0.005)
             spread = min(1.0, spread + 0.003)
         elif n_ep and fell > 0.6:

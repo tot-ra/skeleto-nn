@@ -231,7 +231,10 @@ Curriculum:
 * **Muscle torque (experiment, `BIPED_TORQUE=1`):** the actions are activations; the torque is the activation times
   the strength in that direction, weakened while the muscle shortens and up to 1.4 times stronger while it is
   stretched (Hill's relation at the joint, `physics.hill`: zero force at 20 rad/s, about 65 % at 4 rad/s and 40 % at
-  8). A relaxed joint is free. Trained from scratch (`runs/motor/biped_torque`).
+  8). A relaxed joint is free. Trained from scratch (`runs/motor/biped_torque`). The first run bent its knees
+  freely (peak 6 rad/s) but, with the harness gone within about 700 iterations, settled into a deep crouch (knees at
+  80 to 127 degrees, energy cost four times the straight-legged walker's) and never stood up out of it. Restarted with
+  the harness fading about twenty times slower (`--fade 0.0001 --fade-ok 0.0002`).
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 
