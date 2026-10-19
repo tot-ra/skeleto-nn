@@ -220,7 +220,18 @@ Curriculum:
 * **Run harness** (`RUN_FROM`, `ppo --run-assist0/--run-fade`): with starts capped, the networks sped up to about
   1.8 m/s and no further, since every try at a run had fallen within a second. Goals past 2.2 m/s get a harness that
   only keeps the trunk upright (no height, no push), so a run can be practised before it can be balanced; it fades
-  with time.
+  with time. In about 1,500 iterations the network came to lean on it (it fell at 4 m/s within 3 s once the harness was
+  off) and still did not run.
+* **Fatigue is not what stops a run:** the walker spends 6.6 to 7.7 W/kg against a sustainable 10; a run at two to two
+  and a half times that would leave about 0.65 of the reserve after a 15 s episode.
+* **Stiff knees are:** with joints driven toward target angles at a fixed stiffness, the trained walker held its knee
+  target on the straight stop all the time (peak knee speed 0.3 rad/s; a person's swing knee bends about 60 degrees at
+  6 to 7 rad/s). A relaxed knee could not swing back as a pendulum, every bend had to be held against the stiffness,
+  and a leg locked straight cost nothing: the waddle with the feet barely off the ground, and legs that cannot run.
+* **Muscle torque (experiment, `BIPED_TORQUE=1`):** the actions are activations; the torque is the activation times
+  the strength in that direction, weakened while the muscle shortens and up to 1.4 times stronger while it is
+  stretched (Hill's relation at the joint, `physics.hill`: zero force at 20 rad/s, about 65 % at 4 rad/s and 40 % at
+  8). A relaxed joint is free. Trained from scratch (`runs/motor/biped_torque`).
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 

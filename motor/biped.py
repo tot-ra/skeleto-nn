@@ -65,6 +65,11 @@ class BipedEnv(FamilyEnv):
     # try at a run had fallen within a second. Goals past a walk get a harness that only keeps the trunk upright, so a
     # run can be practised before it can be balanced; it fades with time (ppo --run-assist0, --run-fade)
     RUN_FROM = 2.2
+    # experiment (BIPED_TORQUE=1): muscles as torques. With target angles at a fixed stiffness the trained walkers held the
+    # knee on its stop all the time (peak knee speed 0.3 rad/s; a person's swing knee bends 60 degrees at 6 to 7): a
+    # relaxed knee could not swing as a pendulum, any bend had to be paid for, a straight leg cost nothing. Walked with
+    # stiff legs (the waddle, feet barely off the ground); such legs cannot run
+    TORQUE = bool(os.environ.get("BIPED_TORQUE"))
     # experiment (BIPED_ACHILLES=1): the Achilles tendon as a real spring, taut once the ankle dorsiflexes past neutral
     # (negative foot Y); 2 strengths per radian is about 220 N m/rad, 75 N m at 20 degrees, a third of a run's push-off
     SPRINGS = {"foot_": ("Y", 2.0, 0.0)} if os.environ.get("BIPED_ACHILLES") else {}

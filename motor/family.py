@@ -112,6 +112,7 @@ class FamilyEnv:
     TENDONS = {}          # bone name prefix -> share of braking work its tendons return (evaluate.Evaluator.tendons)
     MOVING_START_MAX = None  # cap on a moving start's speed (speed units); faster goals are reached by speeding up
     RUN_FROM = None       # goals faster than this (speed units) get the run harness (run_assist: upright only, no height)
+    TORQUE = False        # actions are muscle activations (torque with force-velocity), not target angles (physics)
     SPRINGS = {}          # bone name prefix -> one-sided elastic spring (axis, strengths per radian, slack; physics.PhysChar)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
@@ -142,7 +143,7 @@ class FamilyEnv:
         self.b = body
         self.c = self.make_creature(body)
         self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))), passive=self.PASSIVE,
-                           springs=self.SPRINGS)
+                           springs=self.SPRINGS, torque=self.TORQUE)
         self.J = self.pc.nj
         self.act_dim = self.J
         self.base_force = self.pc.model.actuator_forcerange[self.pc.aid].copy()
@@ -214,7 +215,8 @@ class FamilyEnv:
                     q0[j] = val
         self.pc.set_state(np.array([0, 0, self.c.z0 + 0.01]), Rz, np.clip(q0, self.pc.lo, self.pc.hi), root_vel=v0)
         # muscle state: the current target as a share of the range, starting from the pose the body starts in
-        self.prev_a = np.clip(np.clip(q0, self.pc.lo, self.pc.hi) / np.maximum(self.act_scale, 1e-6), -1, 1)
+        self.prev_a = (np.zeros(self.J) if self.TORQUE else
+                       np.clip(np.clip(q0, self.pc.lo, self.pc.hi) / np.maximum(self.act_scale, 1e-6), -1, 1))
         self.steps = 0; self.ep_ret = 0.0; self.ep_goal = 0.0; self.goal_ema = 1.0
         self.strength = 1.0
         return self.obs()
@@ -292,7 +294,7 @@ class FamilyEnv:
         # that flip every 33 ms cannot make the body vibrate (and cost energy no real muscle could spend)
         alpha = 1.0 - math.exp(-1.0 / (self.CTRL_HZ * ACTIVATION_TAU))
         act = self.prev_a + alpha * (a - self.prev_a)
-        target = np.clip(act * self.act_scale, pc.lo, pc.hi)
+        target = act if self.TORQUE else np.clip(act * self.act_scale, pc.lo, pc.hi)
         self.wind.update()
 
         def pre():

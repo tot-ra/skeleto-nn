@@ -13,8 +13,24 @@ DT = 1.0 / (CTRL_HZ * SUBSTEPS)
 def mat2quat(R):
     q = np.zeros(4); mujoco.mju_mat2Quat(q, np.asarray(R, float).reshape(9)); return q
 
+VMAX = 20.0       # rad/s: joint speed at which a shortening muscle's force falls to nothing
+# curvature of Hill's force-velocity relation (a / F0): at the joint, curves are flatter than a single fibre's 0.25;
+# 0.8 keeps about 65 % of the strength at 4 rad/s and 40 % at 8 (a person's knee extension: roughly 60-70 and 40 %)
+HILL_A = 0.8
+ECC_MAX = 1.4     # a lengthening muscle resists up to 1.4 times its isometric strength
+
+
+def hill(u):
+    """Force share at joint speed ``u`` along the torque, as a share of VMAX (> 0: the muscle shortens, < 0: it is
+    stretched): Hill's hyperbola when shortening, rising to ECC_MAX when lengthening."""
+    c = np.clip(u, 0.0, 1.0)
+    conc = (1.0 - c) / (1.0 + c / HILL_A)
+    ecc = ECC_MAX - (ECC_MAX - 1.0) / (1.0 + 7.5 * np.maximum(-u, 0.0))
+    return np.where(u >= 0, conc, ecc)
+
+
 def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None,
-              passive=None):
+              passive=None, torque=False):
     sk = creature.skel
     kids = sk.children
     foot_idx = {l.chain[-1] for l in creature.legs}
@@ -80,6 +96,13 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
                     s += (f'{sp}  <joint name="j_{b.name}_{ax}" type="hinge" axis="{AX[ax][0]:.0f} {AX[ax][1]:.0f} {AX[ax][2]:.0f}" '
                           f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="{stiff:.3f}"{soft}/>\n')
                     kv = (0.02 if wing else 0.08) * kp
+                    if torque:
+                        # muscle torque (``torque``): the command is the activation, the force follows it (PhysChar.step
+                        # applies the force-velocity relation); a relaxed joint is free, not held at a target angle
+                        tn = b.tau * b.tau_dir.get(ax, (1.0, 1.0))[0]; tp = b.tau * b.tau_dir.get(ax, (1.0, 1.0))[1]
+                        acts.append(f'    <motor name="a_{b.name}_{ax}" joint="j_{b.name}_{ax}" gear="1" '
+                                    f'ctrlrange="{-tn * ECC_MAX:.1f} {tp * ECC_MAX:.1f}" forcerange="{-tn * ECC_MAX:.1f} {tp * ECC_MAX:.1f}"/>\n')
+                        continue
                     acts.append(f'    <position name="a_{b.name}_{ax}" joint="j_{b.name}_{ax}" kp="{kp:.2f}" kv="{kv:.3f}" forcerange="{-b.tau * b.tau_dir.get(ax, (1.0, 1.0))[0]:.1f} {b.tau * b.tau_dir.get(ax, (1.0, 1.0))[1]:.1f}" ctrlrange="{math.radians(lo)*1.05:.4f} {math.radians(hi)*1.05:.4f}"/>\n')
         for c in kids[i]:
             s += body(c, ind + 1)
@@ -108,11 +131,13 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
 
 class PhysChar:
     def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS, passive=None,
-                 springs=None):
+                 springs=None, torque=False):
         self.c = creature; self.sk = creature.skel
         self.substeps = substeps                             # physics steps per control step (the physics step DT is fixed)
+        self.torque = torque                                 # step() takes activations in [-1, 1], not target angles
         self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
-                                                              terrain_friction=friction, soft_range=soft_range, passive=passive))
+                                                              terrain_friction=friction, soft_range=soft_range, passive=passive,
+                                                              torque=torque))
         self.data = mujoco.MjData(self.model)
         m = self.model; sk = self.sk
         self.bid = [m.body(b.name).id for b in sk.bones]
@@ -169,14 +194,23 @@ class PhysChar:
         if root_vel is not None: d.qvel[0:3] = root_vel
         if root_angvel is not None: d.qvel[3:6] = root_R.T @ root_angvel   # free joint angular velocity is in the body frame
         if qd is not None: d.qvel[self.vadr] = qd
-        d.ctrl[self.aid] = qvec
+        d.ctrl[self.aid] = 0.0 if self.torque else qvec
         mujoco.mj_forward(m, d)
 
     def step(self, target_vec, ext_force=None, ext_torque=None, wrench=None, probe=None, pre=None):
         d = self.data; m = self.model
-        d.ctrl[self.aid] = np.clip(target_vec, self.lo * 1.05, self.hi * 1.05)
+        if self.torque:
+            a = np.clip(target_vec, -1.0, 1.0)
+            # signed isometric torque the activation asks for; the force range (ECC_MAX times the strength) also carries
+            # the environment's fatigue scaling
+            fr = m.actuator_forcerange[self.aid]
+            cap = np.where(a >= 0, fr[:, 1], -fr[:, 0]) / ECC_MAX * a
+        else:
+            d.ctrl[self.aid] = np.clip(target_vec, self.lo * 1.05, self.hi * 1.05)
         d.xfrc_applied[:] = 0
         for _ in range(self.substeps):
+            if self.torque:                                  # force-velocity: weaker while shortening, stronger stretched
+                d.ctrl[self.aid] = cap * hill(np.sign(cap) * d.qvel[self.vadr] / VMAX)
             if wrench is not None:
                 d.xfrc_applied[self.bid[0], :] = wrench
             if ext_force is not None:

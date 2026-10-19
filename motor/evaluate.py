@@ -249,6 +249,7 @@ class Evaluator:
             p_met += max(wp - float(np.sum(r * wn)), 0.0) / MUSCLE_EFF + float(np.sum((1.0 - r) * wn)) / NEG_EFF
             self.w_pos[:] = 0.0; self.w_neg[:] = 0.0
         energy = float(p_met / self.p_unit)
+        self.last_energy = energy
         # --- fatigue: the reserve drains above the sustainable power and refills below it
         self.reserve = float(np.clip(self.reserve - (energy - self.sustain) / (self.sustain * self.reserve_tau) * dt, 0.0, 1.0))
         fatigue = (1.0 - self.reserve) ** 2
