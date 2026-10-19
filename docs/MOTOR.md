@@ -215,7 +215,12 @@ Curriculum:
   within a second, while from rest the same networks never fell but never sped up past a walk (2 to 4 % flight): the
   falls taught that going fast means falling. Run speeds are now reached by speeding up.
 * **Achilles spring (experiment, `BIPED_ACHILLES=1`):** a one-sided spring on the ankle (`SPRINGS`,
-  `physics.PhysChar`), taut once the shank tips over the planted foot, about 220 N m/rad for an adult.
+  `physics.PhysChar`), taut once the shank tips over the planted foot, about 220 N m/rad for an adult. Two hours of
+  fine-tuning with it changed nothing: both networks still topped out at a quick walk of about 1.7 to 1.8 m/s.
+* **Run harness** (`RUN_FROM`, `ppo --run-assist0/--run-fade`): with starts capped, the networks sped up to about
+  1.8 m/s and no further, since every try at a run had fallen within a second. Goals past 2.2 m/s get a harness that
+  only keeps the trunk upright (no height, no push), so a run can be practised before it can be balanced; it fades
+  with time.
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 

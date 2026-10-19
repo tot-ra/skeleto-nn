@@ -56,7 +56,9 @@ def worker(conn, family, seed, env_kw, kick=None):
         if msg[0] == "stop":
             break
         if msg[0] == "assist":
-            env.assist, env.spread, env.max_speed = msg[1], msg[2], msg[3]; conn.send(("ok",)); continue
+            env.assist, env.spread, env.max_speed = msg[1], msg[2], msg[3]
+            if len(msg) > 4: env.run_assist = msg[4]
+            conn.send(("ok",)); continue
         _, W, norm, n = msg
         mean, std = norm
         O, A, LP, R, D, V, infos, costs = [], [], [], [], [], [], [], []
@@ -112,6 +114,9 @@ def main():
     ap.add_argument("--reset-curriculum", action="store_true", help="with --init: restart harness, goal speeds and spread")
     ap.add_argument("--speed0", type=float, default=0.8, help="goal speeds at the start of the curriculum (m/s)")
     ap.add_argument("--fade", type=float, default=0.0015, help="harness lost per iteration regardless of success")
+    ap.add_argument("--run-assist0", type=float, default=0.0,
+                    help="run harness (goals past the family's RUN_FROM; upright only) when a run starts without one saved")
+    ap.add_argument("--run-fade", type=float, default=0.0004, help="run harness lost per iteration")
     args = ap.parse_args()
     import torch, torch.nn as nn
     torch.set_num_threads(2)                 # leave the cores to the simulation workers
@@ -133,11 +138,12 @@ def main():
     logstd = nn.Parameter(torch.full((ad,), -2.5))
     opt = torch.optim.Adam(list(pi.parameters()) + list(vf.parameters()) + [logstd], lr=args.lr)
     mean = np.zeros(od, np.float32); var = np.ones(od, np.float32); cnt = 1e-4
-    assist = args.assist0; it0 = 0; max_speed = args.speed0; spread = args.spread
+    assist = args.assist0; it0 = 0; max_speed = args.speed0; spread = args.spread; run_assist = args.run_assist0
     if args.init:
         ck = torch.load(args.init, weights_only=False)
         pi.load_state_dict(ck["pi"]); vf.load_state_dict(ck["vf"]); logstd.data = ck["logstd"]
         mean, var, cnt = ck["mean"], ck["var"], ck["cnt"]; assist = ck.get("assist", 0.0); it0 = ck.get("it", 0)
+        run_assist = ck.get("run_assist", args.run_assist0)
         max_speed = ck.get("max_speed", ref.MAX_SPEED); spread = ck.get("spread", 1.0)
         if args.reset_curriculum:            # keep the weights, start the harness and the goals over
             assist, max_speed, spread = args.assist0, args.speed0, args.spread
@@ -149,7 +155,7 @@ def main():
 
     def save(it):
         torch.save(dict(pi=pi.state_dict(), vf=vf.state_dict(), logstd=logstd.data, mean=mean, var=var, cnt=cnt, it=it,
-                        assist=assist, max_speed=max_speed, spread=spread, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args)),
+                        assist=assist, run_assist=run_assist, max_speed=max_speed, spread=spread, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args)),
                    os.path.join(out, "ckpt.pt"))
 
     log = open(os.path.join(out, "log.csv"), "a"); t_start = time.time()
@@ -157,7 +163,7 @@ def main():
     cost_names = sorted(ref.ev.totals)
     for it in range(it0, it0 + args.iters):
         t0 = time.time()
-        for c in conns: c.send(("assist", assist, spread, max_speed))
+        for c in conns: c.send(("assist", assist, spread, max_speed, run_assist))
         for c in conns: c.recv()
         W = export(); norm = (mean, np.sqrt(var + 1e-6).astype(np.float32))
         for c in conns: c.send(("roll", W, norm, args.steps))
@@ -225,6 +231,7 @@ def main():
         # curriculum: the harness fades with time (so standing still under it never becomes a home) and faster while
         # the goal is met; goal speeds grow while it is met
         assist = max(0.0, assist - args.fade)
+        run_assist = max(0.0, run_assist - args.run_fade)
         # goal speeds and variety grow slowly while the goal is met (fast growth ran past what the body could learn
         # twice) and shrink back when most episodes fail
         if n_ep and goal > ref.GOAL_OK and fell < ref.FAIL_OK:
@@ -237,7 +244,7 @@ def main():
             if assist < ref.ASSIST_RECOVER:                  # how far the harness comes back is the family's
                 assist = min(args.assist0, assist + 0.01)
         costs = " ".join(f"{k}={v:.3f}" for k, v in zip(cost_names, cm) if k not in ("heat", "breath"))
-        line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
+        line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} run_assist={run_assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
                 f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs} t={(time.time() - t_start) / 60:.1f}m")
         print(line, flush=True); log.write(line + "\n"); log.flush()
         if it % 10 == 9:

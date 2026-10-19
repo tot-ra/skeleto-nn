@@ -61,6 +61,10 @@ class BipedEnv(FamilyEnv):
     # about half of those starts fell within a second (from rest the same networks never fell, but never sped up past
     # a walk either), and the falls taught that going fast means falling. Run speeds are reached by speeding up
     MOVING_START_MAX = 1.5
+    # with starts capped, both networks sped up to about 1.8 m/s and no further (a quick walk, 2 to 6 % flight): every
+    # try at a run had fallen within a second. Goals past a walk get a harness that only keeps the trunk upright, so a
+    # run can be practised before it can be balanced; it fades with time (ppo --run-assist0, --run-fade)
+    RUN_FROM = 2.2
     # experiment (BIPED_ACHILLES=1): the Achilles tendon as a real spring, taut once the ankle dorsiflexes past neutral
     # (negative foot Y); 2 strengths per radian is about 220 N m/rad, 75 N m at 20 degrees, a third of a run's push-off
     SPRINGS = {"foot_": ("Y", 2.0, 0.0)} if os.environ.get("BIPED_ACHILLES") else {}

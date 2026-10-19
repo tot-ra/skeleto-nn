@@ -111,6 +111,7 @@ class FamilyEnv:
     GAMMA = 0.99          # reward discount per control step (0.99 at 30 Hz: about 3 s ahead)
     TENDONS = {}          # bone name prefix -> share of braking work its tendons return (evaluate.Evaluator.tendons)
     MOVING_START_MAX = None  # cap on a moving start's speed (speed units); faster goals are reached by speeding up
+    RUN_FROM = None       # goals faster than this (speed units) get the run harness (run_assist: upright only, no height)
     SPRINGS = {}          # bone name prefix -> one-sided elastic spring (axis, strengths per radian, slack; physics.PhysChar)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
@@ -130,6 +131,7 @@ class FamilyEnv:
         self.spread = spread; self.act_scale_base = act_scale
         self.max_len = int(max_len * self.CTRL_HZ / 30)      # max_len is given in 30 Hz steps (15 s)
         self.assist = 0.0
+        self.run_assist = 0.0
         self.max_speed = 4.0
         self.moving_start = 0.7
         self.SORES = tuple(self.sores())
@@ -265,17 +267,21 @@ class FamilyEnv:
     # ------------------------------------------------------------------ step
     def _harness(self):
         """Curriculum help: hold the root up and upright (it never pushes toward the goal)."""
-        if self.assist <= 0:
+        run = (self.RUN_FROM is not None and self.run_assist > 0
+               and float(np.linalg.norm(self.goal_world)) > self.RUN_FROM * self.speed_unit())
+        if self.assist <= 0 and not run:
             return None
         pc = self.pc; d = pc.data
         p, R = pc.root_pose()
         k = self.assist * pc.total_mass / 75.0
         v = d.qvel[0:3]
         Fz = self.assist * 0.5 * pc.total_mass * G + k * (3000.0 * (self.c.z0 - p[2]) - 300.0 * v[2])
+        # the run harness only keeps the trunk upright: no height, so the body can bounce and leave the ground
+        kt = k + (self.run_assist * pc.total_mass / 75.0 if run else 0.0)
         zx, zy = R[0, 2], R[1, 2]
         wv_w = R @ d.qvel[3:6]
-        return np.array([0.0, 0.0, max(Fz, 0.0), k * (800.0 * zy - 60.0 * wv_w[0]), k * (-800.0 * zx - 60.0 * wv_w[1]),
-                         k * (-18.0 * wv_w[2])])
+        return np.array([0.0, 0.0, max(Fz, 0.0) if self.assist > 0 else 0.0, kt * (800.0 * zy - 60.0 * wv_w[0]),
+                         kt * (-800.0 * zx - 60.0 * wv_w[1]), kt * (-18.0 * wv_w[2])])
 
     def step(self, a):
         a = np.clip(np.asarray(a, float), -1, 1)
