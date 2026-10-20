@@ -100,3 +100,19 @@ class BipedEnv(FamilyEnv):
         # thigh about Y: negative swings it forward; shank about Y: positive bends the knee
         return {(f"thigh_{front}", 1): -0.45 * stride, (f"thigh_{back}", 1): 0.30 * stride,
                 (f"shank_{front}", 1): 0.10, (f"shank_{back}", 1): 0.35 * stride}
+
+    def amp_features(self):
+        """The pose and motion features the motion-prior discriminator compares with recordings (``motor.amp``)."""
+        from motor.amp import features
+        pc = self.pc; sk = pc.sk; d = pc.data
+        S, E, _R = pc.bone_ends(); i = sk.idx
+        pts = dict(chest=E[i["chest"]])
+        for l in self.c.legs:                              # the ball of the foot on the sole, as a recording marks it
+            s = l.side; f = i["foot_" + s]
+            pts.update({f"hip_{s}": S[i["thigh_" + s]], f"knee_{s}": E[i["thigh_" + s]], f"ankle_{s}": E[i["shank_" + s]],
+                        f"ball_{s}": S[f] + _R[f] @ l.ball, f"shoulder_{s}": S[i["uarm_" + s]], f"elbow_{s}": E[i["uarm_" + s]],
+                        f"wrist_{s}": E[i["farm_" + s]]})
+        _p, R = pc.root_pose()
+        leg = sk.length[i["thigh_L"]] + sk.length[i["shank_L"]]
+        return features(pts, d.qvel[0:3].copy(), float((R @ d.qvel[3:6])[2]), leg)
+

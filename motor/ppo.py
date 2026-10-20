@@ -34,7 +34,7 @@ def mlp_np(x, layers, act=np.tanh):
     return x
 
 
-def worker(conn, family, seed, env_kw, kick=None):
+def worker(conn, family, seed, env_kw, kick=None, amp=False):
     env = make_env(family, seed=seed, **env_kw)
     rng = np.random.default_rng(seed + 7)
     obs = env.reset()
@@ -62,7 +62,8 @@ def worker(conn, family, seed, env_kw, kick=None):
         _, W, norm, n = msg
         mean, std = norm
         O, A, LP, R, D, V, infos, costs = [], [], [], [], [], [], [], []
-        K, KM = [], []
+        K, KM, FP = [], [], []
+        f = env.amp_features() if amp else None
         for _ in range(n):
             o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
             mu = mlp_np(o, W["pi"]); ls = W["logstd"]
@@ -75,6 +76,8 @@ def worker(conn, family, seed, env_kw, kick=None):
             t = teachers.get(env.c.skel.name) if teachers else None
             K.append(t.act(obs) if t is not None else np.zeros_like(mu)); KM.append(t is not None)
             obs2, r, done, info = env.step(a)
+            if amp:                                          # the motion-prior transition: features before and after
+                f2 = env.amp_features(); FP.append(np.concatenate([f, f2])); f = f2
             O.append(o); A.append(a); LP.append(lp); V.append(v)
             if info["trunc"] and not done:
                 o2 = np.clip((obs2 - mean) / std, -10, 10).astype(np.float32)
@@ -86,12 +89,14 @@ def worker(conn, family, seed, env_kw, kick=None):
                 infos.append((info["ep_ret"], info["ep_len"], info["fell"] or info.get("stalled", False), info["goal"]))
             if done or info["trunc"]:
                 obs = env.reset(); AB = rng.standard_normal((2, env.act_dim))
+                if amp: f = env.amp_features()
             else:
                 obs = obs2
         o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
         conn.send(("data", np.array(O, np.float32), np.array(A, np.float32), np.array(LP, np.float32),
                    np.array(R, np.float32), np.array(D, np.float32), np.array(V, np.float32),
-                   float(mlp_np(o, W["v"])[0]), infos, np.mean(costs, 0), np.array(K, np.float32), np.array(KM, bool)))
+                   float(mlp_np(o, W["v"])[0]), infos, np.mean(costs, 0), np.array(K, np.float32), np.array(KM, bool),
+                   np.array(FP, np.float32) if amp else None))
 
 
 def main():
@@ -118,6 +123,8 @@ def main():
     ap.add_argument("--run-assist0", type=float, default=0.0,
                     help="run harness (goals past the family's RUN_FROM; upright only) when a run starts without one saved")
     ap.add_argument("--run-fade", type=float, default=0.0004, help="run harness lost per iteration")
+    ap.add_argument("--amp", default=None, help="motion-prior transitions (motor/amp.py npz): a reward for looking human")
+    ap.add_argument("--amp-w", type=float, default=2.0, help="motion-prior reward per second at a perfect score")
     args = ap.parse_args()
     import torch, torch.nn as nn
     torch.set_num_threads(2)                 # leave the cores to the simulation workers
@@ -127,7 +134,7 @@ def main():
     ctx = mp.get_context("spawn"); conns = []
     for i in range(args.workers):
         a, b = ctx.Pipe()
-        ctx.Process(target=worker, args=(b, args.family, 1000 + i, env_kw, args.kick), daemon=True).start(); conns.append(a)
+        ctx.Process(target=worker, args=(b, args.family, 1000 + i, env_kw, args.kick, bool(args.amp)), daemon=True).start(); conns.append(a)
     dims = [c.recv() for c in conns]; od, ad = dims[0][1], dims[0][2]
     print(f"{args.family}: obs {od}, act {ad}, {args.workers} workers", flush=True)
 
@@ -149,6 +156,12 @@ def main():
         if args.reset_curriculum:            # keep the weights, start the harness and the goals over
             assist, max_speed, spread = args.assist0, args.speed0, args.spread
     m_perm = torch.tensor(ref.a_perm); m_sign = torch.tensor(ref.a_sign, dtype=torch.float32)
+    disc = None
+    if args.amp:
+        from motor.amp import Discriminator
+        disc = Discriminator(args.amp)
+        if args.init and "disc" in ck:
+            disc.load(ck["disc"])
 
     def export():
         lay = lambda m: [(l.weight.detach().numpy().T.copy(), l.bias.detach().numpy().copy()) for l in m if isinstance(l, nn.Linear)]
@@ -156,7 +169,8 @@ def main():
 
     def save(it):
         torch.save(dict(pi=pi.state_dict(), vf=vf.state_dict(), logstd=logstd.data, mean=mean, var=var, cnt=cnt, it=it,
-                        assist=assist, run_assist=run_assist, max_speed=max_speed, spread=spread, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args)),
+                        assist=assist, run_assist=run_assist, max_speed=max_speed, spread=spread, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args),
+                        disc=disc.state() if disc else None),
                    os.path.join(out, "ckpt.pt"))
 
     log = open(os.path.join(out, "log.csv"), "a"); t_start = time.time()
@@ -171,8 +185,15 @@ def main():
         res = [c.recv() for c in conns]
         O = np.concatenate([r[1] for r in res]); A = np.concatenate([r[2] for r in res]); LP = np.concatenate([r[3] for r in res])
         advs, rets = [], []
-        for r in res:
+        amp_s = amp_d = (float("nan"),) * 2
+        if disc is not None:                                 # the motion prior: how human each transition looks
+            FPs = [r[12] for r in res]
+            styles = [disc.reward(fp)[0] for fp in FPs]
+            amp_s = float(np.mean(np.concatenate(styles))); amp_d = disc.update(np.concatenate(FPs))
+        for k_r, r in enumerate(res):
             rew, dn, v, lastv = r[4], r[5], r[6], r[7]
+            if disc is not None:
+                rew = rew + args.amp_w * styles[k_r] / ref.CTRL_HZ
             n = len(rew); adv = np.zeros(n, np.float32); g = 0.0
             for t in reversed(range(n)):
                 nv = lastv if t == n - 1 else v[t + 1]; nd = 1.0 - dn[t]
@@ -246,7 +267,9 @@ def main():
                 assist = min(args.assist0, assist + 0.01)
         costs = " ".join(f"{k}={v:.3f}" for k, v in zip(cost_names, cm) if k not in ("heat", "breath"))
         line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} run_assist={run_assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
-                f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs} t={(time.time() - t_start) / 60:.1f}m")
+                f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs}"
+                + (f" style={amp_s:.3f} d_real={amp_d[0]:.2f} d_fake={amp_d[1]:.2f}" if disc is not None else "")
+                + f" t={(time.time() - t_start) / 60:.1f}m")
         print(line, flush=True); log.write(line + "\n"); log.flush()
         if it % 10 == 9:
             save(it + 1)

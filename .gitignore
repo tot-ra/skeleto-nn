@@ -4,3 +4,5 @@ __pycache__/
 runs/
 *.pt
 .DS_Store
+data/mocap/cmu/
+MUJOCO_LOG.TXT

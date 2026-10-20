@@ -254,6 +254,15 @@ Curriculum:
   `tests/test_muscles.py` checks them); `python muscle_atlas.py` draws the attachments and a twitch of each muscle.
   Standing, the relaxed muscles give 5 to 9 N m (iliopsoas pulling the hip forward, calf the heel up): a hanging
   relaxed leg rests with the knee a little bent and the toes down. Trained from scratch (`runs/motor/biped_muscle`).
+* **Motion prior from recordings (`--amp data/mocap/cmu_amp.npz`, `motor/amp.py`):** reward alone kept finding
+  gaits no person uses. A discriminator (AMP, Peng et al. 2021) learns to tell the policy's transitions from 99
+  recorded walks, runs, turns and stops of six people (CMU Motion Capture Database, `data/mocap/get_cmu.sh`); how
+  human a transition looks is a reward of up to `--amp-w` (2) per second next to the goal and the costs. Only training
+  uses the recordings: the network still drives the muscles in the physics, nothing is replayed. The features are
+  segment directions (thighs, shanks, feet, upper arms, forearms, trunk) in the heading frame plus the hip velocity in
+  sqrt(g leg) and the turn rate: with positions over leg length, the model standing still differed from the recordings
+  by up to three standard deviations through its proportions alone (a longer trunk), which a discriminator would have
+  used instead of the motion. Started from the muscle run at iteration 801.
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 
