@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw
 from motor.ppo import make_env, mlp_np
 from motor.show import load, render_clip
 from motor import evaluate as ev
-from muscle_atlas import COLORS, font
+from muscle_atlas import color, font
 
 
 def record(env, pi, ck, speed, assist, T):
@@ -36,13 +36,13 @@ def record(env, pi, ck, speed, assist, T):
 
 def chart(env, acts, contacts, path, title, hz=30, W=900):
     names = [n for n in env.pc.mnames if n.endswith("_L")]
-    rows = len(names) + 1; rh = 34; top = 40; left = 150
+    rows = len(names) + 1; rh = 26 if len(names) > 12 else 34; top = 40; left = 170
     H = top + rows * rh + 30
     im = Image.new("RGB", (W, H), (252, 251, 247)); dr = ImageDraw.Draw(im); f = font(13)
     n = len(acts); xs = lambda t: left + (W - left - 10) * t / max(n - 1, 1)
     dr.text((8, 8), title, fill=(30, 30, 30), font=font(15))
     for r, nm in enumerate(names):
-        k = env.pc.mnames.index(nm); y0 = top + r * rh; col = COLORS[nm[:-2]]
+        k = env.pc.mnames.index(nm); y0 = top + r * rh; col = color(nm[:-2], r)
         dr.text((8, y0 + 9), env.pc.ms.muscles[k].title, fill=col, font=f)
         dr.line([(left, y0 + rh - 4), (W - 10, y0 + rh - 4)], fill=(220, 220, 220))
         pts = [(xs(t), y0 + rh - 4 - (rh - 8) * float(acts[t, k])) for t in range(n)]
