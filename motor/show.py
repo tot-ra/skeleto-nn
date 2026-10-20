@@ -18,6 +18,7 @@ from motor import evaluate as ev
 NO_SORES = {"leg_L": 0.0, "leg_R": 0.0, "arm_L": 0.0, "arm_R": 0.0, "torso": 0.0, "head": 0.0}
 BIPED = [
     ("stand", dict(goal=(0.0, 0.0)), "standing still"),
+    ("walk_slow", dict(goal=(0.8, 0.0)), "walk 0.8 m/s"),
     ("walk", dict(goal=(1.3, 0.0)), "walk 1.3 m/s"),
     ("run", dict(goal=(3.2, 0.0)), "run 3.2 m/s"),
     ("turn", dict(goal=(0.0, 1.2)), "walk to the left"),
@@ -109,7 +110,8 @@ def render_clip(env, frames, title, path, size=(480, 300), seconds=None):
             sub = f"t={step * k / env.CTRL_HZ:.1f}s  height {S[0][2]:.1f} m"     # follows a flier hides whether it climbs or sinks)
             imgs.append(caption(sc.render(look, max(1.5, 2.5 * env.wingspan()), 160, -30), title, sub))
         else:
-            imgs.append(caption(sc.render(look, 4.0, 120, -12), title, f"t={step * k / env.CTRL_HZ:.1f}s"))
+            dist = 4.0 * min(1.0, max(0.4, env.c.z0 / 0.95))           # a cat or a dog filmed as close as a person
+            imgs.append(caption(sc.render(look, dist, 120, -12), title, f"t={step * k / env.CTRL_HZ:.1f}s"))
     sc.close()
     save_gif(imgs, path, fps=fps)
 
