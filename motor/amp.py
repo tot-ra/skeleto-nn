@@ -32,9 +32,10 @@ QUAD_SEGS = [(f"{seg}{e}_{s}", f"{a}{e}_{s}", f"{b}{e}_{s}") for s in "LR" for e
 
 # birds: each wing's three segments, each leg's four, trunk, neck, head and tail. Flight compares pose and wing
 # motion only (the speed is the goal's business, and the reference flight's speed is not a real one)
+# no legs: the flight reference holds them in one pose while the policy also walks and takes off on them, so legs alone
+# told the discriminator apart (z-scores ~30) and style stayed ~0.03
 BIRD_SEGS = [(f"{seg}_{s}", f"{a}_{s}", f"{b}_{s}") for s in "LR" for seg, a, b in
-             (("humerus", "shoulder", "elbow"), ("forearm", "elbow", "wrist"), ("hand", "wrist", "wingtip"),
-              ("thigh", "hip", "knee"), ("shank", "knee", "ankle"), ("meta", "ankle", "foot"), ("toes", "foot", "toetip"))] + \
+             (("humerus", "shoulder", "elbow"), ("forearm", "elbow", "wrist"), ("hand", "wrist", "wingtip"))] + \
             [("trunk", "hip_mid", "chest"), ("neck", "chest", "poll"), ("head", "poll", "beak"), ("tail", "tailbase", "tailtip")]
 
 
