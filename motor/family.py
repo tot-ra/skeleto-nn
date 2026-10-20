@@ -105,6 +105,10 @@ class FamilyEnv:
     FAIL_OK = 0.3        # the curriculum moves on while fewer episodes than this fail
     GOAL_OK = 0.5        # ... and while the mean goal score is above this
     MIN_LOGSTD = None     # floor on the exploration noise (log std), if the family needs one
+    # Muscle excitations are clipped to 0..1, so noise below the zero line is lost and a muscle whose mean sits near 0
+    # barely twitches: at a 0.1 floor both muscle runs settled into standing on a weak tone for hours without ever
+    # finding a step. 0.2 of full excitation lets a single burst move a leg.
+    MUSCLE_LOGSTD = math.log(0.2)
     PASSIVE = {}          # bone group -> passive elastic stiffness (joint strengths per radian, physics.build_xml)
     SOFT_RANGE = {}       # bone group -> share of its range where the joint limit softly resists (physics.build_xml)
     ACTION_BOUND = 1.0    # policy means beyond this are pulled back (motor/ppo.py): beyond 1 the action is clipped

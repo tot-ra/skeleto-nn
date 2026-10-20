@@ -242,6 +242,8 @@ def main():
                 nn.utils.clip_grad_norm_(list(pi.parameters()) + list(vf.parameters()), 1.0); opt.step()
                 if ref.MIN_LOGSTD is not None:                   # keep exploring where the skill is far away
                     with torch.no_grad(): logstd.clamp_(min=ref.MIN_LOGSTD)
+                if ref.pc.nm:                                    # muscle excitations explore on their own floor
+                    with torch.no_grad(): logstd[len(ref.pc.free):].clamp_(min=ref.MUSCLE_LOGSTD)
                 sym_l = float(lsym)
             with torch.no_grad():
                 logstd.clamp_(-3.0, -1.5)
