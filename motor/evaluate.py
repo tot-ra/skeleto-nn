@@ -58,6 +58,7 @@ NEG_EFF = 1.2              # negative work costs about a fifth as much
 # per N m, twenty times cheaper) arms held raised and bent for a whole walk cost 1.5 W, so a walker kept them there,
 # and swinging them against the legs' turning saved nothing (the feet took the twist for free)
 ISO = 2.4
+MUSCLE_FATIGUE = 2.0       # fatigue cost of the strength-weighted tired share of the muscles (muscles.FATIGUE)
 HEAD_REST = 3.0           # pain per body weight resting on the head (where the head may touch the ground at all)
 RESERVE_TAU = 60.0         # s: how fast a reserve that is drained by twice the sustainable power empties
 FLIGHT_UNIT = 6.0          # flight power unit in m g sqrt(g span): the cheapest searched level-flight crow wingbeat costs 1
@@ -279,6 +280,8 @@ class Evaluator:
         # --- fatigue: the reserve drains above the sustainable power and refills below it
         self.reserve = float(np.clip(self.reserve - (energy - self.sustain) / (self.sustain * self.reserve_tau) * dt, 0.0, 1.0))
         fatigue = (1.0 - self.reserve) ** 2
+        if pc.nm:                                             # tired muscles, the strong ones counting more
+            fatigue += MUSCLE_FATIGUE * float(np.sum(pc.F0 * pc.m_mf) / np.sum(pc.F0))
         # --- balance: fall risk. The capture point (centre of mass plus velocity over the pendulum frequency) is where the
         # body must step to stop; walking keeps it within a step of the feet, a fall puts it out of reach.
         com = pc.com(); fp = pc.foot_points().reshape(-1, 3)

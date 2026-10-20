@@ -5,7 +5,7 @@ import math
 import numpy as np
 import mujoco
 from skeleton import Skeleton, AX
-from muscles import fl_active, fl_passive, FL_LO, FL_HI, V_MAX, TAU_ACT, TAU_DEACT
+from muscles import fl_active, fl_passive, FL_LO, FL_HI, V_MAX, TAU_ACT, TAU_DEACT, FATIGUE, fatigue_class
 
 CTRL_HZ = 30
 SUBSTEPS = 6
@@ -271,6 +271,9 @@ class PhysChar:
                 k = bw * self.total_mass * 9.81 / self.F0[sel].sum()
                 self.F0[np.array([mu.group == g for mu in ms])] *= k
         self.m_act = np.zeros(self.nm); self.m_exc = np.zeros(self.nm); self.m_fact = np.zeros(self.nm)
+        # fatigue: the tired share of every muscle's motor units and its rates (``muscles.FATIGUE``)
+        rates = np.array([FATIGUE[fatigue_class(mu.primary[0])] for mu in ms])
+        self.m_F, self.m_R = rates[:, 0], rates[:, 1]; self.m_mf = np.zeros(self.nm)
         # drawn thickness: a muscle's strength goes with its cross-section, so its diameter with the square root of F0
         # (against the body weight, and in proportion to the body's size)
         self.m_thick = 0.007 * (self.c.leg_len() / 0.86) * np.sqrt(self.F0 / (self.total_mass * 9.81))
@@ -310,7 +313,7 @@ class PhysChar:
         if qd is not None: d.qvel[self.vadr] = qd
         d.ctrl[self.aid] = 0.0 if self.torque else qvec[self.free]
         if self.nm:
-            d.ctrl[self.mid] = 0.0; self.m_act[:] = 0.0; self.m_exc[:] = 0.0; self.m_fact[:] = 0.0
+            d.ctrl[self.mid] = 0.0; self.m_act[:] = 0.0; self.m_exc[:] = 0.0; self.m_fact[:] = 0.0; self.m_mf[:] = 0.0
         mujoco.mj_forward(m, d)
 
     def step(self, target_vec, ext_force=None, ext_torque=None, wrench=None, probe=None, pre=None):
@@ -335,7 +338,7 @@ class PhysChar:
             if self.nm:                                      # Hill muscles: activation, force-length, force-velocity, passive
                 self.m_act += (self.m_exc - self.m_act) * np.where(self.m_exc > self.m_act, k_up, k_down)
                 lt, u = self.muscle_state()
-                self.m_fact = self.strength * self.F0 * self.m_act * fl_active(lt) * hill(u)
+                self.m_fact = self.strength * self.F0 * np.minimum(self.m_act, 1.0 - self.m_mf) * fl_active(lt) * hill(u)
                 d.ctrl[self.mid] = -(self.m_fact + self.F0 * fl_passive(lt))         # a tendon actuator pushes when > 0
             if wrench is not None:
                 d.xfrc_applied[self.bid[0], :] = wrench
@@ -347,6 +350,9 @@ class PhysChar:
                 d.qfrc_applied[self.sp_v] += self.sp_k * np.maximum(self.sp_slack - d.qpos[self.sp_q], 0.0)
             mujoco.mj_step(m, d)
             if probe is not None: probe()
+        if self.nm:                                          # tired units recover, working ones tire (once per step)
+            dt = self.substeps * m.opt.timestep
+            self.m_mf += dt * (self.m_F * np.minimum(self.m_act, 1.0 - self.m_mf) - self.m_R * self.m_mf)
         if ext_force is not None: d.xfrc_applied[:] = 0
 
     # ---- measurements ------------------------------------------------------------------

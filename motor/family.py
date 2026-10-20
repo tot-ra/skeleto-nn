@@ -185,6 +185,7 @@ class FamilyEnv:
             ap = [fpos[int(perm[j])] for j in pc.free] + [len(pc.free) + pc.mnames.index(mirror_name(n)) for n in pc.mnames]
             self.a_perm = np.array(ap); self.a_sign = np.concatenate([sign[pc.free], np.ones(pc.nm)])
             self.prev_perm, self.prev_sign = self.a_perm, self.a_sign
+        self.mf_perm = np.array([pc.mnames.index(mirror_name(n)) for n in pc.mnames], int) if pc.nm else np.zeros(0, int)
         names = [l.name for l in self.c.legs]
         self.leg_perm = np.array([names.index(mirror_name(n, names)) for n in names])
         self.sore_perm = np.array([self.SORES.index(mirror_name(k, self.SORES)) for k in self.SORES])
@@ -254,6 +255,10 @@ class FamilyEnv:
                        np.clip(np.clip(q0, self.pc.lo, self.pc.hi) / np.maximum(self.act_scale, 1e-6), -1, 1))
         self.steps = 0; self.ep_ret = 0.0; self.ep_goal = 0.0; self.goal_ema = 1.0
         self.strength = 1.0
+        # in training, half the episodes start with tired muscles (some more than others, one side unlike the other): an
+        # episode lasts seconds and a muscle tires over minutes, so the network meets what tiredness does only this way
+        if self.pc.nm and body is None and rng.random() < 0.5:
+            self.pc.m_mf[:] = rng.uniform(0.0, 0.6) * rng.uniform(0.2, 1.0, self.pc.nm)
         return self.obs()
 
     # ------------------------------------------------------------------ observation
@@ -267,14 +272,14 @@ class FamilyEnv:
         wind_h = H.T @ self.wind.w
         o = np.concatenate([
             g_loc, v_loc, w_loc * 0.2, [p[2] / self.leg - 1.0], pc.qvec(), pc.qdvec() * 0.1, self.prev_a, pc.foot_contacts(),
-            [self.ev.reserve], cmd[:2], self.bvec, [self.friction, wind_h[0] / 10.0, wind_h[1] / 10.0],
+            [self.ev.reserve], pc.m_mf if pc.nm else [], cmd[:2], self.bvec, [self.friction, wind_h[0] / 10.0, wind_h[1] / 10.0],
             [self.sores_now[k] for k in self.SORES], ev.profile_vector(self.profile)])
         return o.astype(np.float32)
 
     def obs_layout(self):
         J = self.J
         parts = [("g", 3), ("v", 3), ("w", 3), ("z", 1), ("q", J), ("qd", J), ("prev", len(self.prev_sign)), ("contact", len(self.c.legs)),
-                 ("reserve", 1), ("cmd", 2), ("body", self.BODY_DIM), ("env", 3), ("sores", len(self.SORES)),
+                 ("reserve", 1), ("mfat", self.pc.nm), ("cmd", 2), ("body", self.BODY_DIM), ("env", 3), ("sores", len(self.SORES)),
                  ("profile", len(ev.TERMS))]
         out, k = {}, 0
         for name, n in parts:
@@ -294,7 +299,7 @@ class FamilyEnv:
             m[..., sl] = o[..., sl][..., self.m_perm] * sign
         psign = __import__("torch").tensor(self.prev_sign, dtype=o.dtype) if torch_ else self.prev_sign
         m[..., L["prev"]] = o[..., L["prev"]][..., self.prev_perm] * psign
-        for key, perm in (("contact", self.leg_perm), ("sores", self.sore_perm)):
+        for key, perm in (("contact", self.leg_perm), ("sores", self.sore_perm), ("mfat", self.mf_perm)):
             sl = L[key]
             m[..., sl] = o[..., sl][..., perm]
         return m

@@ -30,6 +30,29 @@ FL_W = 0.45                   # width of the active force-length curve (Gaussian
 FPE_K, FPE_E0 = 5.0, 0.6      # passive force: (exp(K (l - 1) / E0) - 1) / (exp(K) - 1); F0 at 1.6 optimal lengths
 V_MAX = 10.0                  # optimal fibre lengths per second: shortening speed at which the force falls to nothing
 TAU_ACT, TAU_DEACT = 0.010, 0.040   # s: activation rises in 10 ms, falls in 40 (Thelen 2003, Millard 2013)
+# Fatigue of every muscle (three-compartment model, Xia and Frey-Law 2008): of its motor units a share is fatigued (MF);
+# the rest can be recruited. Units working at activation a tire at F a per second, tired ones recover at R per second,
+# and a muscle cannot be activated beyond 1 - MF. Rates per joint fitted to endurance times (Frey-Law, Looft and
+# Heitsman 2012); held at full effort a shoulder gives out within a minute, an ankle in some three, and the level a
+# muscle can keep up indefinitely is R / (F + R): about 9 % of its strength at the knee, 15 % in the trunk
+FATIGUE = {"ankle": (0.00589, 0.00058), "knee": (0.01500, 0.00149), "trunk": (0.00755, 0.00128),
+           "shoulder": (0.01820, 0.00168), "elbow": (0.00912, 0.00094), "hand": (0.00980, 0.00064)}
+
+
+def fatigue_class(bone):
+    """The joint whose fatigue rates a muscle gets, from the bone its primary action turns (hips use the knee's)."""
+    b = bone[:-2] if bone.endswith(("_L", "_R")) else bone
+    if b.startswith(("foot", "toes", "meta", "paw")):
+        return "ankle"
+    if b.startswith(("uarm", "wing_a", "scap", "clav")):
+        return "shoulder"
+    if b.startswith(("farm", "wing_b")):
+        return "elbow"
+    if b.startswith(("hand", "wing_c")):
+        return "hand"
+    if b.startswith(("lumbar", "thorax", "chest", "spine", "tail", "neck", "head", "pelvis")):
+        return "trunk"
+    return "knee"
 
 
 def fl_active(lt):

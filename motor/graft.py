@@ -1,6 +1,7 @@
 """Carry a trained policy over to a body whose actions changed (new muscles took over joint-motor axes).
 
     QUAD_MUSCLES=1 python -m motor.graft OLD.pt NEW.pt --family quadruped --new-muscles '^T(LEV|DEP|LAT)\\d'
+    BIPED_MUSCLES=1 python -m motor.graft OLD.pt NEW.pt --family biped --new-obs mfat     (a new input, unconnected)
 
 Actions and observations are matched by name: joint motors as ``bone+axis``, muscles by name. The checkpoint was
 trained without the muscles matching ``--new-muscles``; the axes those muscles cover were joint motors then. Kept
@@ -22,10 +23,12 @@ def action_names(pc, skip_muscles=None, extra_axes=()):
     return names + [n for n in pc.mnames if not (skip_muscles and skip_muscles.match(n))]
 
 
-def obs_names(env, acts):
+def obs_names(env, acts, skip=()):
     out = []
     for key, sl in env.obs_layout().items():
         n = sl.stop - sl.start
+        if key in skip:                                  # inputs the old network did not have
+            continue
         out += [f"prev:{a}" for a in acts] if key == "prev" else [f"{key}{i}" for i in range(n)]
     return out
 
@@ -33,12 +36,13 @@ def obs_names(env, acts):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("old"); ap.add_argument("new"); ap.add_argument("--family", required=True)
-    ap.add_argument("--new-muscles", required=True, help="regex of the muscle names the old checkpoint lacks")
+    ap.add_argument("--new-muscles", default=None, help="regex of the muscle names the old checkpoint lacks")
+    ap.add_argument("--new-obs", default="", help="comma-separated observation parts the old checkpoint lacks (e.g. mfat)")
     ap.add_argument("--logstd", type=float, default=float(np.log(0.2)), help="exploration of the new muscles")
     a = ap.parse_args()
     env = make_env(a.family, seed=0); pc = env.pc
-    rx = re.compile(a.new_muscles)
-    new_m = [n for n in pc.mnames if rx.match(n)]
+    rx = re.compile(a.new_muscles) if a.new_muscles else None
+    new_m = [n for n in pc.mnames if rx and rx.match(n)]
     # the axes the new muscles cover were joint motors before
     idx = {(pc.sk.bones[i].name, "XYZ"[ax]): k for k, (i, ax) in enumerate(pc.dof_list)}
     was_free = [idx[c] for c in sorted(pc.ms.covered) if any(c[0] == b for b in _bones_of(pc, new_m))]
@@ -46,7 +50,7 @@ def main():
     new_acts = action_names(pc)
     ck = torch.load(a.old, weights_only=False)
     assert ck["act_dim"] == len(old_acts), (ck["act_dim"], len(old_acts))
-    old_obs, new_obs = obs_names(env, old_acts), obs_names(env, new_acts)
+    old_obs, new_obs = obs_names(env, old_acts, [k for k in a.new_obs.split(",") if k]), obs_names(env, new_acts)
     assert ck["obs_dim"] == len(old_obs), (ck["obs_dim"], len(old_obs))
     oi = {n: i for i, n in enumerate(old_obs)}; ai = {n: i for i, n in enumerate(old_acts)}
 

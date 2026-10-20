@@ -277,6 +277,15 @@ Curriculum:
 * **Hanging on the spine's ligaments:** after that, the walker was still stooped, head down and turned: every lumbar
   and thoracic joint sat on its flexion and side-bend stops, the stops carrying 25 to 45 N m each while the back
   muscles barely worked. The spine (0.2 of its range), neck and head (0.15) now have soft ends too.
+* **Fatigue of every muscle (`muscles.FATIGUE`, `PhysChar.m_mf`):** the three-compartment model (Xia and Frey-Law
+  2008) per muscle: units working at activation a tire at F a per second, tired ones recover at R per second, and a
+  muscle cannot be activated beyond its untired share. F and R per joint from fitted endurance times (Frey-Law, Looft
+  and Heitsman 2012: shoulder fastest, ankle slowest); what a muscle keeps up indefinitely is R / (F + R), about 9 % of
+  its strength in the limbs, 14 % in the trunk. The network sees every muscle's tired share (observation `mfat`), the
+  fatigue cost adds the strength-weighted tired share (`evaluate.MUSCLE_FATIGUE`), and half the training episodes
+  start with tired muscles (an episode lasts seconds, tiring takes minutes). In the human walker the first to tire
+  was the latissimus dorsi (10 % in 10 s): it was held on all the time, pulling the arms back. Checkpoints carry over
+  with `motor.graft --new-obs mfat`.
 * **A dog on its chin:** walking under a 30 % harness, the muscle dog's paws carried 0.37 body weights in front and
   0.34 behind (a real dog about 60:40), and its head on the ground 0.11: a head may touch the ground (grazing), but
   that touch was free. Load on the head now hurts (`evaluate.HEAD_REST`, 3 pain per body weight).
