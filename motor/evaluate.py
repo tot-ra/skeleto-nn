@@ -51,7 +51,13 @@ REGION_OF_GROUP = {"head": "head", "neck": "head", "trunk": "torso", "arm": "arm
                    "wing": "arms", "tail": "torso"}
 MUSCLE_EFF = 0.25          # positive work: chemical energy per joule of work
 NEG_EFF = 1.2              # negative work costs about a fifth as much
-ISO = 0.12                 # holding a torque costs energy too (per N m per rad/s of a reference speed)
+# holding a torque costs energy too (per N m per rad/s of a reference speed). From muscle physiology: a fully
+# activated muscle spends about 90 W/kg keeping its force (Umberger 2003, half fast fibres); at 0.3 MPa and 0.1 m
+# fibres that is some 2,800 N per kg, so about 0.03 W per newton held, and at a 4 cm moment arm 0.8 W per N m. For a
+# person that makes the legs' holding torques in a walk some 150 W and both arms held up some 30 W. At 0.12 (0.04 W
+# per N m, twenty times cheaper) arms held raised and bent for a whole walk cost 1.5 W, so a walker kept them there,
+# and swinging them against the legs' turning saved nothing (the feet took the twist for free)
+ISO = 2.4
 RESERVE_TAU = 60.0         # s: how fast a reserve that is drained by twice the sustainable power empties
 FLIGHT_UNIT = 6.0          # flight power unit in m g sqrt(g span): the cheapest searched level-flight crow wingbeat costs 1
 # Local muscle endurance (Frey-Law and Avin 2010, a power model fitted across joints): a muscle can hold a share f of

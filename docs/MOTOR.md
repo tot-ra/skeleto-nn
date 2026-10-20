@@ -21,7 +21,7 @@ term turns one consequence into a cost per second, with the body's own scale div
 | injury | fracture risk per region (`injury.py`: tolerance per region, a fast load is more brittle), from the peak contact force of every physics sub-step; an event, so a certain leg fracture costs about three seconds of goal |
 | pain | weight carried by a sore leg, work of a sore arm, load on a sore trunk or head; joints pressed into the last 5 % of their range by their own muscle |
 | strain | muscle torque against its capacity, squared, weighted by the mass each joint carries; for people also local muscle endurance (Frey-Law and Avin 2010: a share f of a muscle's strength can be held for about 20 f^-1.7 s; the sustained load, low-passed over a second, counts, so a held-out arm tires and a stride's legs rest between pushes) |
-| energy | metabolic power: positive work at 25 % efficiency, negative work, isometric holding |
+| energy | metabolic power: positive work at 25 % efficiency, negative work, isometric holding at about 0.8 W per N m for a person (a muscle's maintenance cost, about 90 W/kg at full activation: both arms held raised cost some 30 W; at the earlier twentieth of that a walker kept its arms up and bent, and swinging them against the legs' twist saved nothing) |
 | fatigue | an energy reserve drains above the sustainable power (about a brisk walk) and refills below it; a drained body is weaker |
 | balance | fall risk: the capture point (where the body would have to step to stop) further than half a leg from the nearest foot; pelvis tilt |
 | gaze | head spin |
