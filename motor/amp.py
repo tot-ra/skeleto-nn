@@ -24,6 +24,23 @@ SEGS = [(f"{seg}_{s}", f"{a}_{s}", f"{b}_{s}") for s in "LR" for seg, a, b in
         (("thigh", "hip", "knee"), ("shank", "knee", "ankle"), ("foot", "ankle", "ball"), ("uarm", "shoulder", "elbow"),
          ("farm", "elbow", "wrist"))] + [("trunk", "hip_mid", "chest")]
 DIM = 3 * len(SEGS) + 4
+# quadrupeds: every leg's four segments, the back, neck, head and tail (heading from the hind hips)
+QUAD_SEGS = [(f"{seg}{e}_{s}", f"{a}{e}_{s}", f"{b}{e}_{s}") for s in "LR" for e in "HF" for seg, a, b in
+             (("thigh", "hip", "knee"), ("shank", "knee", "hock"), ("meta", "hock", "fet"), ("paw", "fet", "toe"))] + \
+            [("back", "hip_mid", "withers"), ("neck", "withers", "poll"), ("head", "poll", "nose"), ("tail", "tailbase", "tailtip")]
+
+
+def quad_points(sk, S, E):
+    """The points of ``QUAD_SEGS`` from bone starts and ends (a planner frame or the physics body)."""
+    i = sk.idx; pts = {}
+    for s in "LR":
+        for e in "HF":
+            pts.update({f"hip{e}_{s}": S[i[f"thigh{e}_{s}"]], f"knee{e}_{s}": E[i[f"thigh{e}_{s}"]],
+                        f"hock{e}_{s}": E[i[f"shank{e}_{s}"]], f"fet{e}_{s}": E[i[f"meta{e}_{s}"]], f"toe{e}_{s}": E[i[f"paw{e}_{s}"]]})
+    tail = [b.name for b in sk.bones if b.name.startswith("tail")]
+    pts.update(hip_L=pts["hipH_L"], hip_R=pts["hipH_R"], withers=E[i["chest"]], poll=S[i["head"]], nose=E[i["head"]],
+               tailbase=S[i[tail[0]]], tailtip=E[i[tail[-1]]])
+    return pts
 
 
 def heading_frame(hip_L, hip_R):
@@ -33,23 +50,25 @@ def heading_frame(hip_L, hip_R):
     return np.stack([x, y, [0.0, 0.0, 1.0]]), math.atan2(x[1], x[0])
 
 
-def features(pts, vel, yaw_rate, leg):
-    """``pts``: world points named in SEGS (hip_mid is made here), ``vel``: world hip velocity, ``yaw_rate``: rad/s."""
+def features(pts, vel, yaw_rate, leg, segs=None):
+    """``pts``: world points named in the segments (hip_mid is made here), ``vel``: world hip velocity, ``yaw_rate``: rad/s."""
+    segs = segs or SEGS
     H, _yaw = heading_frame(pts["hip_L"], pts["hip_R"])
     pts = dict(pts, hip_mid=0.5 * (pts["hip_L"] + pts["hip_R"]))
     f = []
-    for _n, a, b in SEGS:
+    for _n, a, b in segs:
         v = H @ (pts[b] - pts[a]); f.append(v / max(np.linalg.norm(v), 1e-9))
     f.append(H @ vel / math.sqrt(G * leg)); f.append([yaw_rate * 0.3])
     return np.concatenate(f).astype(np.float32)
 
 
-def mirror(F):
+def mirror(F, segs=None):
     """Mirror features (..., DIM): y negated, left and right swapped, yaw rate negated."""
-    F = F.copy(); n = len(SEGS)
+    segs = segs or SEGS
+    F = F.copy(); n = len(segs)
     P = F[..., :3 * n].reshape(F.shape[:-1] + (n, 3)).copy()
     P[..., 1] *= -1
-    names = [g[0] for g in SEGS]
+    names = [g[0] for g in segs]
     idx = [names.index(m[:-1] + ("R" if m[-1] == "L" else "L")) if m[-2:] in ("_L", "_R") else names.index(m) for m in names]
     F[..., :3 * n] = P[..., idx, :].reshape(F.shape[:-1] + (-1,))
     F[..., 3 * n + 1] *= -1; F[..., -1] *= -1

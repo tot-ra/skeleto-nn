@@ -160,7 +160,7 @@ def main():
     if args.amp:
         from motor.amp import Discriminator
         disc = Discriminator(args.amp)
-        if args.init and "disc" in ck:
+        if args.init and ck.get("disc") is not None:
             disc.load(ck["disc"])
 
     def export():

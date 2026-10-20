@@ -277,6 +277,13 @@ Curriculum:
   touch. Landing on the back is a fall and a hard landing an injury, so turning over in the air (spine bend and
   twist, the tail) pays. Real cats right themselves mostly with the spine (tailless cats do it too); the tail helps.
   `motor/graft.py` carries a trained policy over to the new actions by name (new muscles start silent).
+* **The planner as a motion prior (`motor/amp_planner.py`):** the procedural planner's gaits (Froude-scaled cadence
+  and duty factor, planted feet, swinging arms and tail) are the reference the AMP discriminator compares a policy
+  with, where no recordings exist: every quadruped species walks, trots and gallops under random commands for two
+  minutes (`data/mocap/planner_quad_amp.npz`, 50,000 transitions of 64 features: each leg's four segments, back, neck,
+  head and tail in the heading frame, speed and turn rate). Training only; at run time there is no planner. The
+  procedural animations stay as training situations, the network learns to arrive at motion like them through
+  physics and muscles.
 * **Quadruped anatomy, found while attaching the muscles:** the joint ranges let a dog's stifle straighten fully
   (180 degrees between the bones; a dog's stops at about 162) and a horse's hock too, and the elbow bent only 30
   degrees the anatomical way but 140 the other; the trained joint-motor dog walked with straight knees. Ranges now

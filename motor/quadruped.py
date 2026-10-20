@@ -74,6 +74,13 @@ class QuadrupedEnv(FamilyEnv):
     def sores(self):
         return ("leg_HL", "leg_HR", "leg_FL", "leg_FR", "torso", "head")
 
+    def amp_features(self):
+        """Pose and motion features for the motion-prior discriminator (``motor.amp``, the planner's gaits as reference)."""
+        from motor.amp import features, quad_points, QUAD_SEGS
+        pc = self.pc; d = pc.data
+        S, E, _R = pc.bone_ends(); _p, R = pc.root_pose()
+        return features(quad_points(pc.sk, S, E), d.qvel[0:3].copy(), float((R @ d.qvel[3:6])[2]), self.leg, QUAD_SEGS)
+
     def drop_share(self):
         return float(self.c.params["spec"].get("drop_share", 0.0))
 
