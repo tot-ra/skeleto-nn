@@ -268,6 +268,12 @@ Curriculum:
   flexors extended the bent wrist, the shoulder's sphere wrap let the deltoid jump sides). At the very ends of a
   range a few muscles turn, as in a body (a deltoid with the arm overhead, the pectoralis above 90 degrees of
   abduction): the test checks the inner range.
+* **Standing on the ankle stop:** the muscle walker held the ankle at -29 degrees (the dorsiflexion stop is -30) with
+  the calves silent and the shin muscle at 0.9 excitation; the joint stop carried 17 N m on average and up to 97, the
+  muscles' net ankle torque about zero. Ligaments took the body's forward lean for free. The ankle now has a soft
+  last tenth of its range (`BipedEnv.SOFT_RANGE`, by bone name in `physics.soft_share`), which costs pain in
+  proportion to the load, as the arms already had; the toes keep a hard stop, since they bend back under the body's
+  weight in every push-off.
 * **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by
   muscles, not joint motors: levators above, depressors below and lateral flexors at the side, in two runs (from the
   sacrum over the first two joints, from the second vertebra over the last two), so it can swing and curl in an S;

@@ -48,7 +48,11 @@ class BipedEnv(FamilyEnv):
     # goal speeds up to 5 m/s: up to 3 (the family default) a shuffle with almost no flight still met the goal (cadence
     # 257 a minute, 7 % flight at 3 m/s); people run from about 2 m/s, and at 4 to 5 a run without flight is not possible
     MAX_SPEED = 5.0
-    SOFT_RANGE = {"arm": 0.2}   # the last fifth of an arm joint's range resists: arms cannot hang on their stops
+    SOFT_RANGE = {"arm": 0.2,   # the last fifth of an arm joint's range resists: arms cannot hang on their stops
+                  # and the last tenth of the ankle's: a muscle walker stood leaning on the dorsiflexion stop (17 N m on
+                  # average, up to 97), calves silent and the shin muscle pulling the foot up, the ligaments carrying it
+                  # for free. The toes keep a hard stop: they bend back under the body's weight in every push-off
+                  "foot": 0.1, "toes": 0.0}
     # exploration floor 0.10: with the 0.06 a walker had settled to, the arms kept the pose they had learned on their stops
     # for rounds after the stops became soft and costly; nothing ever tried lowering them
     MIN_LOGSTD = -2.3

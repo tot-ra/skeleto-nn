@@ -30,6 +30,12 @@ def hill(u):
     return np.where(u >= 0, conc, ecc)
 
 
+def soft_share(soft_range, b):
+    """Share of a joint's range that is soft: by bone name without its side (``foot``), else by bone group."""
+    sr = soft_range or {}
+    return sr.get(b.name[:-2] if b.name.endswith(("_L", "_R")) else b.name, sr.get(b.group, 0.0))
+
+
 def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None,
               passive=None, torque=False, muscles=None, fixed_root=None):
     sk = creature.skel
@@ -98,12 +104,12 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
                     # the armature that keeps kp dt^2 / inertia below 1: a heron's wing twist (a long bone turning about
                     # itself, very little inertia) was five times past that and blew the simulation up
                     arm = max(0.0003, kp * DT * DT) if wing else 0.002 * (1 + mi)
-                    # soft end of range (``soft_range``: bone group -> share of the range): the limit acts from that far
+                    # soft end of range (``soft_range``: bone or bone group -> share of the range): the limit acts from that far
                     # inside it and stiffens toward the stop, as stretched ligaments and the opposing muscles do; a joint
                     # can no longer rest on its stop for free (the arms of a trained walker hung on their stops, held out
                     # backwards). Not for legs: a straight knee or an extended hip locked on its ligaments is how one stands
                     soft = ""
-                    share = (soft_range or {}).get(b.group, 0.0)
+                    share = soft_share(soft_range, b)
                     if share > 0:
                         mg = math.radians(share * (hi - lo))           # margin and width are not converted from degrees
                         soft = f' margin="{mg:.4f}" solreflimit="0.04 1" solimplimit="0.05 0.95 {mg:.4f} 0.5 2"'
@@ -200,7 +206,7 @@ class PhysChar:
         self.tau_neg = np.array([sk.bones[i].tau * sk.bones[i].tau_dir.get("XYZ"[a], (1.0, 1.0))[0] for i, a in self.dof_list])
         self.tau_pos = np.array([sk.bones[i].tau * sk.bones[i].tau_dir.get("XYZ"[a], (1.0, 1.0))[1] for i, a in self.dof_list])
         # joints with a soft end of range (their limit load is a ligament load, scored as pain)
-        self.soft_mask = np.array([(soft_range or {}).get(sk.bones[i].group, 0.0) > 0 for i, a in self.dof_list])
+        self.soft_mask = np.array([soft_share(soft_range, sk.bones[i]) > 0 for i, a in self.dof_list])
         self.foot_geoms = [m.geom("g_" + sk.bones[l.chain[-1]].name).id for l in creature.legs]
         self.hand_geoms = [m.geom("g_" + sk.bones[a.chain[-1]].name).id for a in creature.arms]
         self.touch_ok = set()                                # geoms whose ground contact is not a fall (a tail, a grazing head)
