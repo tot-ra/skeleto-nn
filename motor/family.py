@@ -118,6 +118,8 @@ class FamilyEnv:
     SPRINGS = {}          # bone name prefix -> one-sided elastic spring (axis, strengths per radian, slack; physics.PhysChar)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
+    HARNESS_CHEST = False  # the weight-share harness holds the chest as well as the pelvis (a sling under both ends)
+    TOUCH_OK = ()         # bone groups whose ground contact is not a fall (it still counts as injury and pain)
 
     def _stalled(self, goal, sp):
         """``goal``: the progress toward the goal this step (the goal score, or turning toward it). Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns
@@ -149,6 +151,8 @@ class FamilyEnv:
                            muscles=SETS[self.MUSCLES](self.c) if self.MUSCLES else None)
         self.J = self.pc.nj
         self.act_dim = self.pc.n_act
+        m_ = self.pc.model
+        self.pc.touch_ok = {m_.geom("g_" + b.name).id for b in self.pc.sk.bones if b.group in self.TOUCH_OK}
         self.base_force = self.pc.model.actuator_forcerange[self.pc.aid].copy()
         sc = np.maximum(np.abs(self.pc.lo), np.abs(self.pc.hi)) * self.act_scale_base
         for j, (i, _a) in enumerate(self.pc.dof_list):
@@ -288,7 +292,7 @@ class FamilyEnv:
         p, R = pc.root_pose()
         k = self.assist * pc.total_mass / 75.0
         v = d.qvel[0:3]
-        if self.TORQUE:
+        if self.TORQUE or pc.nm:
             # a fixed share of the weight, no spring to the standing height: under a height spring, muscle-torque
             # legs folded up (knees at 150 degrees, feet off the ground) and hung in the harness for free
             Fz = self.assist * 0.6 * pc.total_mass * G - k * 300.0 * v[2]
@@ -321,6 +325,11 @@ class FamilyEnv:
             self.wind.apply()
             wrench = self._harness()
             if wrench is not None:
+                if self.HARNESS_CHEST and (self.TORQUE or pc.nm):
+                    # half the lift under the chest, with its own damping: a relaxed back cannot carry the front
+                    ch = pc.bid[pc.sk.idx["chest"]]; half = 0.5 * wrench[2]
+                    wrench = wrench.copy(); wrench[2] = half
+                    d.xfrc_applied[ch, 2] = max(half - self.assist * pc.total_mass / 75.0 * 150.0 * d.cvel[ch][5], 0.0)
                 d.xfrc_applied[pc.bid[0], :] = wrench
         pc.step(target, pre=pre, probe=self.ev.probe)
         self.steps += 1

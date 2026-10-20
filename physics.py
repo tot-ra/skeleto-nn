@@ -203,6 +203,7 @@ class PhysChar:
         self.soft_mask = np.array([(soft_range or {}).get(sk.bones[i].group, 0.0) > 0 for i, a in self.dof_list])
         self.foot_geoms = [m.geom("g_" + sk.bones[l.chain[-1]].name).id for l in creature.legs]
         self.hand_geoms = [m.geom("g_" + sk.bones[a.chain[-1]].name).id for a in creature.arms]
+        self.touch_ok = set()                                # geoms whose ground contact is not a fall (a tail, a grazing head)
         self.leg_sites = [(m.site(f"s_{l.name}_heel").id, m.site(f"s_{l.name}_ball").id) for l in creature.legs]
         self.total_mass = float(m.body_subtreemass[self.bid[0]])
         self.mass_vec = m.body_mass.copy()
@@ -387,7 +388,7 @@ class PhysChar:
     def bad_contact(self):
         """Any body part other than feet (and hands, which may brace) touching the terrain."""
         d = self.data; m = self.model
-        ok = set(self.foot_geoms) | set(self.hand_geoms)
+        ok = set(self.foot_geoms) | set(self.hand_geoms) | self.touch_ok
         for k in range(d.ncon):
             c = d.contact[k]
             g1, g2 = c.geom1, c.geom2

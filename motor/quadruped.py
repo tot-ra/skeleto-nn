@@ -40,6 +40,14 @@ class QuadrupedEnv(FamilyEnv):
     # QUAD_MUSCLES=1: line muscles on legs, back and belly (``muscles.quadruped_set``), anatomical joint ranges and leg
     # strengths from muscle mass (``bodies.QuadSpec``); joint motors only where no muscle spans the axis
     MUSCLES = "quadruped" if os.environ.get("QUAD_MUSCLES") else None
+    # with muscles, a relaxed back let the chest, neck and head fall to the floor within a third of a second: the
+    # harness holds both ends while it lasts, and the spine has its ligaments and discs (supraspinous and nuchal
+    # ligaments, about a strength per radian, free of energy)
+    HARNESS_CHEST = MUSCLES is not None
+    # a tail on the ground, or a head lowered to it, is not a fall (a relaxed tail rests there; horses graze)
+    TOUCH_OK = ("tail", "head") if MUSCLES else ()
+    if MUSCLES:
+        PASSIVE = {"neck": 1.5, "trunk": 1.0}
 
     def default_body(self):
         return canonical(QUADS[ONLY or "dog"])

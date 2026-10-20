@@ -175,7 +175,7 @@ class Evaluator:
             reg[r] += f
             if g in self.foot_geoms:
                 foot[self.leg_side[g]] = foot.get(self.leg_side[g], 0.0) + f
-            elif g not in self.hand_geoms:
+            elif g not in self.hand_geoms and g not in self.pc.touch_ok:
                 bad = True
         return reg, foot, bad
 
