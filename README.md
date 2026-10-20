@@ -109,23 +109,23 @@ the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
 
 The best network of each family so far, no harness, no clips: every joint from the network. The score is the population test mean (survival share x (0.3 + goal), at most 1.3).
 
-**People**: score 1.20 after 139 rounds (updated 2026-10-18 07:25)
+**People**: score 0.99 after 195 rounds (updated 2026-10-20 19:13)
 
 <table><tr>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.32 m/s, goal 0.97</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_run.gif" width="100%"><br><b>run 3.2 m/s</b>: held 8.0 s, 2.86 m/s, goal 0.85</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_ice.gif" width="100%"><br><b>walk on ice</b>: fell at 1.2 s, 0.53 m/s, goal 0.07</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_pack.gif" width="100%"><br><b>20 kg pack</b>: held 8.0 s, 1.22 m/s, goal 0.81</td>
-<td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: held 8.0 s, 1.22 m/s, goal 0.98</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.42 m/s, goal 0.89</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_run.gif" width="100%"><br><b>run 3.2 m/s</b>: held 8.0 s, 2.70 m/s, goal 0.70</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_ice.gif" width="100%"><br><b>walk on ice</b>: held 8.0 s, 0.91 m/s, goal 0.52</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_pack.gif" width="100%"><br><b>20 kg pack</b>: held 8.0 s, 1.16 m/s, goal 0.53</td>
+<td width="20%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: held 8.0 s, 1.27 m/s, goal 0.89</td>
 </tr></table>
 
-**Four-legged animals**: score 0.96 after 243 rounds (updated 2026-10-19 13:01)
+**Four-legged animals**: score 0.90 after 274 rounds (updated 2026-10-20 19:13)
 
 <table><tr>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 1.17 m/s, goal 0.86</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_trot.gif" width="100%"><br><b>dog, trot</b>: held 8.0 s, 1.74 m/s, goal 0.64</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: held 8.0 s, 0.88 m/s, goal 0.88</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: held 8.0 s, 0.76 m/s, goal 0.26</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 1.30 m/s, goal 0.89</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_trot.gif" width="100%"><br><b>dog, trot</b>: held 8.0 s, 2.15 m/s, goal 0.87</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: held 8.0 s, 0.89 m/s, goal 0.85</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: fell at 4.2 s, 0.89 m/s, goal 0.29</td>
 </tr></table>
 
 **Birds**: score 0.99 after 22 rounds (updated 2026-10-17 14:06)
