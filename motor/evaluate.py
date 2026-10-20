@@ -58,6 +58,7 @@ NEG_EFF = 1.2              # negative work costs about a fifth as much
 # per N m, twenty times cheaper) arms held raised and bent for a whole walk cost 1.5 W, so a walker kept them there,
 # and swinging them against the legs' turning saved nothing (the feet took the twist for free)
 ISO = 2.4
+HEAD_REST = 3.0           # pain per body weight resting on the head (where the head may touch the ground at all)
 RESERVE_TAU = 60.0         # s: how fast a reserve that is drained by twice the sustainable power empties
 FLIGHT_UNIT = 6.0          # flight power unit in m g sqrt(g span): the cheapest searched level-flight crow wingbeat costs 1
 # Local muscle endurance (Frey-Law and Avin 2010, a power model fitted across joints): a muscle can hold a share f of
@@ -220,6 +221,9 @@ class Evaluator:
         s = self.sore
         pain = (sum(s.get(k, 0.0) * f for k, f in foot.items())
                 + s.get("torso", 0.0) * (reg["torso"] + reg["abdomen"]) + s.get("head", 0.0) * reg["head"])
+        # a head allowed on the ground (a grazing horse) touches it lightly; leaning on it hurts. A muscle dog walked
+        # with 11 % of its weight on its chin, a fifth leg that cost nothing
+        pain += HEAD_REST * reg["head"]
         for j, i in enumerate(self.dof_bone):                # a sore arm hurts when it works
             side = self.arm_side.get(int(i))
             if side is not None:

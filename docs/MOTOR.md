@@ -277,6 +277,9 @@ Curriculum:
 * **Hanging on the spine's ligaments:** after that, the walker was still stooped, head down and turned: every lumbar
   and thoracic joint sat on its flexion and side-bend stops, the stops carrying 25 to 45 N m each while the back
   muscles barely worked. The spine (0.2 of its range), neck and head (0.15) now have soft ends too.
+* **A dog on its chin:** walking under a 30 % harness, the muscle dog's paws carried 0.37 body weights in front and
+  0.34 behind (a real dog about 60:40), and its head on the ground 0.11: a head may touch the ground (grazing), but
+  that touch was free. Load on the head now hurts (`evaluate.HEAD_REST`, 3 pain per body weight).
 * **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by
   muscles, not joint motors: levators above, depressors below and lateral flexors at the side, in two runs (from the
   sacrum over the first two joints, from the second vertebra over the last two), so it can swing and curl in an S;
