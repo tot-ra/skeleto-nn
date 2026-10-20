@@ -274,6 +274,9 @@ Curriculum:
   last tenth of its range (`BipedEnv.SOFT_RANGE`, by bone name in `physics.soft_share`), which costs pain in
   proportion to the load, as the arms already had; the toes keep a hard stop, since they bend back under the body's
   weight in every push-off.
+* **Hanging on the spine's ligaments:** after that, the walker was still stooped, head down and turned: every lumbar
+  and thoracic joint sat on its flexion and side-bend stops, the stops carrying 25 to 45 N m each while the back
+  muscles barely worked. The spine (0.2 of its range), neck and head (0.15) now have soft ends too.
 * **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by
   muscles, not joint motors: levators above, depressors below and lateral flexors at the side, in two runs (from the
   sacrum over the first two joints, from the second vertebra over the last two), so it can swing and curl in an S;

@@ -52,7 +52,11 @@ class BipedEnv(FamilyEnv):
                   # and the last tenth of the ankle's: a muscle walker stood leaning on the dorsiflexion stop (17 N m on
                   # average, up to 97), calves silent and the shin muscle pulling the foot up, the ligaments carrying it
                   # for free. The toes keep a hard stop: they bend back under the body's weight in every push-off
-                  "foot": 0.1, "toes": 0.0}
+                  "foot": 0.1, "toes": 0.0,
+                  # and the spine's, neck's and head's: the walker stooped with every lumbar and thoracic joint on its
+                  # flexion and side-bend stops (25 to 45 N m each on the ligaments, back muscles barely working) and the
+                  # head hanging down and turned. A stooped back held on its ligaments aches within minutes
+                  "trunk": 0.2, "neck": 0.15, "head": 0.15}
     # exploration floor 0.10: with the 0.06 a walker had settled to, the arms kept the pose they had learned on their stops
     # for rounds after the stops became soft and costly; nothing ever tried lowering them
     MIN_LOGSTD = -2.3
