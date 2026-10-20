@@ -30,6 +30,24 @@ QUAD_SEGS = [(f"{seg}{e}_{s}", f"{a}{e}_{s}", f"{b}{e}_{s}") for s in "LR" for e
             [("back", "hip_mid", "withers"), ("neck", "withers", "poll"), ("head", "poll", "nose"), ("tail", "tailbase", "tailtip")]
 
 
+# birds: each wing's three segments, each leg's four, trunk, neck, head and tail. Flight compares pose and wing
+# motion only (the speed is the goal's business, and the reference flight's speed is not a real one)
+BIRD_SEGS = [(f"{seg}_{s}", f"{a}_{s}", f"{b}_{s}") for s in "LR" for seg, a, b in
+             (("humerus", "shoulder", "elbow"), ("forearm", "elbow", "wrist"), ("hand", "wrist", "wingtip"),
+              ("thigh", "hip", "knee"), ("shank", "knee", "ankle"), ("meta", "ankle", "foot"), ("toes", "foot", "toetip"))] + \
+            [("trunk", "hip_mid", "chest"), ("neck", "chest", "poll"), ("head", "poll", "beak"), ("tail", "tailbase", "tailtip")]
+
+
+def bird_points(sk, S, E):
+    i = sk.idx; pts = {}
+    for s in "LR":
+        pts.update({f"shoulder_{s}": S[i["wing_a_" + s]], f"elbow_{s}": E[i["wing_a_" + s]], f"wrist_{s}": E[i["wing_b_" + s]],
+                    f"wingtip_{s}": E[i["wing_c_" + s]], f"hip_{s}": S[i["thigh_" + s]], f"knee_{s}": E[i["thigh_" + s]],
+                    f"ankle_{s}": E[i["shank_" + s]], f"foot_{s}": E[i["meta_" + s]], f"toetip_{s}": E[i["toes_" + s]]})
+    pts.update(chest=E[i["chest"]], poll=S[i["head"]], beak=E[i["head"]], tailbase=S[i["tail0"]], tailtip=E[i["tail1"]])
+    return pts
+
+
 def quad_points(sk, S, E):
     """The points of ``QUAD_SEGS`` from bone starts and ends (a planner frame or the physics body)."""
     i = sk.idx; pts = {}

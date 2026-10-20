@@ -81,6 +81,12 @@ class BirdEnv(FamilyEnv):
         self.a_perm = np.append(self.m_perm, J); self.a_sign = np.append(self.m_sign, 1.0)
         self.act_dim = J + 1
 
+    def amp_features(self):
+        """Pose and wing motion for the motion-prior discriminator (``motor.amp``; the procedural flight as reference)."""
+        from motor.amp import features, bird_points, BIRD_SEGS
+        S, E, _R = self.pc.bone_ends()
+        return features(bird_points(self.pc.sk, S, E), np.zeros(3), 0.0, self.wingspan(), BIRD_SEGS)
+
     def beat_hz(self):
         return 4.5 * 0.9 / self.wingspan()                   # a crow (0.9 m) beats at about 4.5 Hz, a sparrow at 15
 

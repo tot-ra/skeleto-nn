@@ -283,7 +283,10 @@ Curriculum:
   minutes (`data/mocap/planner_quad_amp.npz`, 50,000 transitions of 64 features: each leg's four segments, back, neck,
   head and tail in the heading frame, speed and turn rate). Training only; at run time there is no planner. The
   procedural animations stay as training situations, the network learns to arrive at motion like them through
-  physics and muscles.
+  physics and muscles. Birds: the procedural flight (`adapt/flight.py`) at the bird family's 60 Hz and wingbeat
+  frequency, in each species' flap-and-glide bouts (crow 15 % gliding in 1.5 s bouts, gull half in 3 s, heron 10 %,
+  duck none), compared by wing, leg, trunk, neck, head and tail segments without the speed
+  (`data/mocap/planner_bird_amp.npz`; `runs/motor/bird_amp` resumes the joint-motor crow network with it).
 * **Quadruped anatomy, found while attaching the muscles:** the joint ranges let a dog's stifle straighten fully
   (180 degrees between the bones; a dog's stops at about 162) and a horse's hock too, and the elbow bent only 30
   degrees the anatomical way but 140 the other; the trained joint-motor dog walked with straight knees. Ranges now
