@@ -268,6 +268,15 @@ Curriculum:
   flexors extended the bent wrist, the shoulder's sphere wrap let the deltoid jump sides). At the very ends of a
   range a few muscles turn, as in a body (a deltoid with the arm overhead, the pectoralis above 90 degrees of
   abduction): the test checks the inner range.
+* **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by
+  muscles, not joint motors: levators above, depressors below and lateral flexors at the side, in two runs (from the
+  sacrum over the first two joints, from the second vertebra over the last two), so it can swing and curl in an S;
+  the twist keeps joint motors. A cat's tail is 1.8 dog units long (0.37 m, about two thirds of its head and body).
+  A share of a cat's training episodes (`QuadSpec.drop_share`, 0.3) starts with a fall from 2 to 5 leg lengths in
+  any roll: no harness, a goal to stand where it lands, the tilt free in the air and for 0.2 s after the first
+  touch. Landing on the back is a fall and a hard landing an injury, so turning over in the air (spine bend and
+  twist, the tail) pays. Real cats right themselves mostly with the spine (tailless cats do it too); the tail helps.
+  `motor/graft.py` carries a trained policy over to the new actions by name (new muscles start silent).
 * **Quadruped anatomy, found while attaching the muscles:** the joint ranges let a dog's stifle straighten fully
   (180 degrees between the bones; a dog's stops at about 162) and a horse's hock too, and the elbow bent only 30
   degrees the anatomical way but 140 the other; the trained joint-motor dog walked with straight knees. Ranges now

@@ -273,6 +273,7 @@ class QuadSpec:
     hind_scale: float = 1.0             # hind-leg length relative to the fore (a cat's hind legs are longer)
     tail_mass: float = 1.0              # tail mass and muscle relative to a dog's (a cat balances with its tail)
     tail_power: float = 1.0
+    drop_share: float = 0.0             # share of episodes that start with a fall from height (a cat lands on its paws)
     foot_type: str = "paw"              # paw | hoof
     vigor: float = 1.0                  # muscle power for the body size (0.5 old, 1 adult, 1.4 strong)
     turn_rate: float = 3.0              # fastest turn on the spot (rad/s)
@@ -301,7 +302,7 @@ class QuadSpec:
 # jump_gain is the muscle side of the story: relative hind-limb power (cat ~3.4 sqrt(g L), dog ~2.2, horse ~1.35, pig ~1.0).
 QUADS = {
     "dog": QuadSpec("dog", 30.0, 1.0),
-    "cat": QuadSpec("cat", 4.5, 0.58, hind_power=1.35, fore_power=0.8, muscle_bw_hind=95.0, muscle_bw_fore=60.0, rom=dict(elbow=(30, 165), carpus=(25, 200), stifle=(35, 165), hock=(30, 170)), tail_n=6, leg_scale=0.95, spine_flex=1.7, tail_len=1.5, hind_scale=1.15, tail_mass=1.6, tail_power=2.5, neck_len=0.8, head_len=0.7, body_len=1.05,
+    "cat": QuadSpec("cat", 4.5, 0.58, hind_power=1.35, fore_power=0.8, muscle_bw_hind=95.0, muscle_bw_fore=60.0, rom=dict(elbow=(30, 165), carpus=(25, 200), stifle=(35, 165), hock=(30, 170)), tail_n=6, leg_scale=0.95, spine_flex=1.7, tail_len=1.8, drop_share=0.3, hind_scale=1.15, tail_mass=1.6, tail_power=2.5, neck_len=0.8, head_len=0.7, body_len=1.05,
                     turn_rate=4.5, min_radius=0.45, n_neck=3, neck_rom=110.0, neck_nod=0.04, neck_speed_drop=0.05, tail_type="balance", n_spine=8, ext_rom=45.0, flex_rom=75.0, lat_rom=95.0, twist_rom=45.0, core_power=1.5, jump_gain=3.4, jump_pitch=1.05),
     "horse": QuadSpec("horse", 500.0, 2.45, hind_power=1.15, fore_power=0.85, distal_power=0.5, muscle_bw_hind=20.0, muscle_bw_fore=12.0,
                       rom=dict(elbow=(55, 160), carpus=(70, 182), stifle=(70, 150), hock=(60, 162)), tail_n=5, leg_scale=1.22, cannon=1.45, spine_flex=0.35, neck_len=1.9, tail_len=0.8, head_len=1.2, body_len=0.95, chest_depth=1.35,

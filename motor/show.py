@@ -48,6 +48,7 @@ def situations(family, env):
         body = canonical(QUADS[sp])
         out += [(f"{sp}_walk", dict(body=body, goal=(0.5, 0.0)), f"{sp}, walk"),
                 (f"{sp}_trot", dict(body=body, goal=(1.0, 0.0)), f"{sp}, trot")]
+    out += [("cat_drop", dict(body=canonical(QUADS["cat"]), goal=(0.0, 0.0), drop=True), "cat dropped upside down")]
     out += [("dog_ice", dict(body=canonical(QUADS["dog"]), goal=(0.6, 0.0), friction=0.1), "dog on ice"),
             ("dog_lame", dict(body=canonical(QUADS["dog"]), goal=(0.6, 0.0),
                               sores={"leg_HL": 0.0, "leg_HR": 0.0, "leg_FL": 0.9, "leg_FR": 0.0, "torso": 0.0, "head": 0.0}),

@@ -74,6 +74,9 @@ class QuadrupedEnv(FamilyEnv):
     def sores(self):
         return ("leg_HL", "leg_HR", "leg_FL", "leg_FR", "torso", "head")
 
+    def drop_share(self):
+        return float(self.c.params["spec"].get("drop_share", 0.0))
+
     def speed_unit(self):
         return math.sqrt(G * self.leg)
 

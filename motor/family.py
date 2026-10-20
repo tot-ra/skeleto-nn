@@ -92,6 +92,10 @@ class FamilyEnv:
         """Multiplier on the curriculum's goal speeds for the current body (a family may keep one per kind of body)."""
         return 1.0
 
+    def drop_share(self):
+        """Share of episodes that start with a fall from height (``reset(drop=...)``)."""
+        return 0.0
+
     def episode_done(self, failed, goal):
         """Called at the end of every episode (failed: a fall or a stall; goal: its mean goal score)."""
     def make_creature(self, body): raise NotImplementedError
@@ -186,7 +190,7 @@ class FamilyEnv:
         self.sore_perm = np.array([self.SORES.index(mirror_name(k, self.SORES)) for k in self.SORES])
 
     # ------------------------------------------------------------------ episode
-    def reset(self, body=None, friction=None, wind=None, sores=None, goal=None, profile=None):
+    def reset(self, body=None, friction=None, wind=None, sores=None, goal=None, profile=None, drop=None):
         rng = self.rng
         if body is not None or not hasattr(self, "ev") or (rng.random() < 0.25 and rng.random() < self.spread):
             self._build(body or (self.sample_body(rng, self.spread) if rng.random() < self.spread else self.default_body()))
@@ -220,6 +224,13 @@ class FamilyEnv:
         yaw = rng.uniform(-math.pi, math.pi)
         Rz = np.array([[math.cos(yaw), -math.sin(yaw), 0], [math.sin(yaw), math.cos(yaw), 0], [0, 0, 1.0]])
         self.goal_world = Rz[:2, :2] @ self.goal_world
+        # a fall from height (cats; random only in training, where no body is given): dropped in any roll, no
+        # harness, asked only to stand where it lands. Landing on the
+        # back is a fall (the episode's fall cost) and a hard landing an injury, so turning over in the air pays
+        self.dropping = bool(drop) if drop is not None else bool(body is None and rng.random() < self.drop_share())
+        self.air_t = 0.0                                   # touchdown time of a drop (0: still in the air)
+        if self.dropping:
+            self.goal_world = np.zeros(2)
         sp = float(np.linalg.norm(self.goal_world))
         v0 = np.zeros(3)
         if sp > 0.1 and rng.random() < self.moving_start:
@@ -230,7 +241,14 @@ class FamilyEnv:
                 j = self.dof_index.get(key)
                 if j is not None:
                     q0[j] = val
-        self.pc.set_state(np.array([0, 0, self.c.z0 + 0.01]), Rz, np.clip(q0, self.pc.lo, self.pc.hi), root_vel=v0)
+        if self.dropping:
+            roll, pitch = rng.uniform(-math.pi, math.pi), rng.normal(0.0, 0.3)
+            Rx = np.array([[1, 0, 0], [0, math.cos(roll), -math.sin(roll)], [0, math.sin(roll), math.cos(roll)]])
+            Ry = np.array([[math.cos(pitch), 0, math.sin(pitch)], [0, 1, 0], [-math.sin(pitch), 0, math.cos(pitch)]])
+            h = self.c.z0 + rng.uniform(2.0, 5.0) * self.leg
+            self.pc.set_state(np.array([0, 0, h]), Rz @ Ry @ Rx, np.clip(q0, self.pc.lo, self.pc.hi))
+        else:
+            self.pc.set_state(np.array([0, 0, self.c.z0 + 0.01]), Rz, np.clip(q0, self.pc.lo, self.pc.hi), root_vel=v0)
         # muscle state: the current target as a share of the range, starting from the pose the body starts in
         self.prev_a = (np.zeros(self.act_dim) if self.TORQUE or self.pc.nm else
                        np.clip(np.clip(q0, self.pc.lo, self.pc.hi) / np.maximum(self.act_scale, 1e-6), -1, 1))
@@ -288,6 +306,8 @@ class FamilyEnv:
     # ------------------------------------------------------------------ step
     def _harness(self):
         """Curriculum help: hold the root up and upright (it never pushes toward the goal)."""
+        if self.dropping:
+            return None
         run = (self.RUN_FROM is not None and self.run_assist > 0
                and float(np.linalg.norm(self.goal_world)) > self.RUN_FROM * self.speed_unit())
         if self.assist <= 0 and not run:
@@ -370,7 +390,14 @@ class FamilyEnv:
         if unstable:
             pc.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number = 0
             r = -2.0 / self.CTRL_HZ
-        fell = bad or unstable or p[2] < 0.5 * self.c.z0 or tilt > 1.2
+        if self.dropping and self.air_t is not None:
+            # in the air a dropped body may be in any roll; from 0.2 s after the first touch it must be on its feet
+            if self.air_t == 0.0 and (bad or pc.foot_contacts().any()):
+                self.air_t = self.steps / self.CTRL_HZ
+            if self.air_t and self.steps / self.CTRL_HZ > self.air_t + 0.2:
+                self.air_t = None
+            tilt = 0.0 if self.air_t is not None else tilt
+        fell = bad or unstable or (p[2] < 0.5 * self.c.z0 and not (self.dropping and self.air_t is not None)) or tilt > 1.2
         stalled = not fell and self._stalled(progress, sp)
         if fell or stalled:
             r -= self.fall_cost

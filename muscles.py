@@ -323,6 +323,26 @@ def quadruped_set(c) -> MuscleSet:
               + [B.site("chest", 0.4, (0.0, 1.0 * cd, 0.0))], (spine[0], "Z", 1), 0.6)
         for b in spine + ["chest"]:
             B.cover(b, "YZ")
+        # tail: the sacrocaudal muscles in two runs along the tail (from the pelvis over the first two joints, from the
+        # second vertebra over the last two), above (levators), below (depressors) and at the side (lateral flexors),
+        # so a cat can swing and curl it in an S; the twist keeps joint motors
+        tail = [b.name for b in sk.bones if b.name.startswith("tail")]
+        if len(tail) >= 4:
+            rt = sk.bones[sk.idx["tail0"]].radius / s * 1.3
+            runs = ((None, tail[0:2]), (tail[1], tail[2:4]))     # (bone the run starts on, the bones it pulls)
+            for k, (start, chain) in enumerate(runs):
+                for key, title, off, prim in (("TLEV", "tail levator", (0.0, 0.4, 1.0), (chain[0], "Y", 1)),
+                                              ("TDEP", "tail depressor", (0.0, 0.4, -1.0), (chain[0], "Y", -1)),
+                                              ("TLAT", "tail lateral flexor", (0.0, 1.0, 0.0), (chain[0], "Z", -1))):
+                    o = tuple(v * rt for v in off)
+                    # the base run starts on the sacrum and the pelvic floor ahead of the tail's root, so a tail raised or
+                    # lowered far still has leverage
+                    head = (B.near("tail0", (2.5 * rt, o[1], o[2] * 1.6)) if start is None
+                            else B.site(start, 0.6, o))
+                    B.add(f"{key}{k}", title + (" (base)" if k == 0 else " (tip)"),
+                          [head] + [B.site(b, 0.5, o) for b in chain], prim, 0.5 if key != "TLAT" else 1.0)
+            for b in tail:
+                B.cover(b, "YZ")
     return B.ms
 
 
