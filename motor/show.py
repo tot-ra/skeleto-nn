@@ -102,7 +102,7 @@ def render_clip(env, frames, title, path, size=(480, 300), seconds=None):
         S, E, R = fr[:3]
         sc.pose(sc.actors[0], S, E, R)
         if nm:
-            sc.pose_muscles(sc.actors[0], *fr[3:5])
+            sc.pose_muscles(sc.actors[0], *fr[3:5], thick=env.pc.m_thick)
         look = np.array([S[0][0], S[0][1], S[0][2] if bird else 0.9 * env.c.z0])   # follow a flier up
         if bird:      # closer, from above and behind (both wings show), the height in the caption (a camera that
             sub = f"t={step * k / env.CTRL_HZ:.1f}s  height {S[0][2]:.1f} m"     # follows a flier hides whether it climbs or sinks)

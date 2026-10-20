@@ -50,6 +50,8 @@ class Muscle:
     share: float                     # share of that joint direction's strength
     tendon_return: float = 0.0       # share of the braking work its tendon stores and gives back (Achilles, patellar)
     side: str = "L"
+    check: tuple = None              # degrees of the primary joint where it must pull its way (default: the inner range)
+    group: str = ""                  # muscles whose summed strength is set together (``MuscleSet.targets``)
 
 
 @dataclass
@@ -58,6 +60,7 @@ class MuscleSet:
     wraps: list = field(default_factory=list)       # (bone, geom name, pos, radius, half length)
     sites: list = field(default_factory=list)       # (bone, site name, pos): side sites of the wraps
     covered: set = field(default_factory=set)       # (bone, axis) joint axes moved by muscles (no joint motor there)
+    targets: dict = field(default_factory=dict)     # group -> summed strength of one side's muscles in body weights
 
 
 def human_legs(c) -> MuscleSet:
@@ -108,4 +111,262 @@ def human_legs(c) -> MuscleSet:
     return out
 
 
-SETS = {"human_legs": human_legs}
+class Builder:
+    """Writes a muscle set for the left side and mirrors it: bone names carry ``@`` for the side, points are given as a
+    share ``t`` along the bone plus an offset in metres for a reference body (scaled by ``scale``; y is mirrored)."""
+
+    def __init__(self, c, scale):
+        self.c = c; self.sk = c.skel; self.s = scale; self.ms = MuscleSet(); self.sd = "L"; self.my = 1.0
+
+    def side(self, sd):
+        self.sd = sd; self.my = 1.0 if sd == "L" else -1.0
+        return self
+
+    def b(self, bone):
+        return bone.replace("@", self.sd)
+
+    def pt(self, bone, t=0.0, off=(0.0, 0.0, 0.0)):
+        i = self.sk.idx[self.b(bone)]
+        p = self.sk.dir[i] * self.sk.length[i] * t + np.array([off[0], self.my * off[1], off[2]]) * self.s
+        return tuple(float(x) for x in p)
+
+    def site(self, bone, t=0.0, off=(0.0, 0.0, 0.0)):
+        return ("site", self.b(bone), self.pt(bone, t, off))
+
+    def sn(self, bone, t, n=0.0, y=0.0):
+        """A site ``n`` metres off the bone's axis in the side-view plane, on the cranial or dorsal side for n > 0 (for a
+        bone pointing down: in front; for a paw pointing forward: on top), and ``y`` to the side; ``t`` < 0 is
+        above the joint along the bone (the point of the hock)."""
+        i = self.sk.idx[self.b(bone)]; d = self.sk.dir[i]
+        perp = np.array([-d[2], 0.0, d[0]]); perp = perp if (perp[0] > 1e-6 or (abs(perp[0]) <= 1e-6 and perp[2] > 0)) else -perp
+        p = d * self.sk.length[i] * t + (perp * n + np.array([0.0, self.my * y, 0.0])) * self.s
+        return ("site", self.b(bone), tuple(float(x) for x in p))
+
+    def wrap(self, bone, key, t, off, r, side_off, kind="cylinder", axis=(0, 1, 0)):
+        """A wrapping surface on ``bone`` and the side site that tells a path which way round it goes."""
+        nm = f"w_{key}_{self.sd}"; ss = f"ss_{key}_{self.sd}"
+        if not any(w[1] == nm for w in self.ms.wraps):
+            self.ms.wraps.append((self.b(bone), nm, self.pt(bone, t, off), r * self.s, 0.04 * self.s, kind, axis))
+        k = 0
+        while any(x[1] == f"{ss}{k}" for x in self.ms.sites):
+            if any(x[1] == f"{ss}{k}" and x[2] == self.pt(bone, t, side_off) for x in self.ms.sites):
+                return ("wrap", nm, f"{ss}{k}")
+            k += 1
+        self.ms.sites.append((self.b(bone), f"{ss}{k}", self.pt(bone, t, side_off)))
+        return ("wrap", nm, f"{ss}{k}")
+
+    group = ""
+
+    def add(self, key, title, path, primary, share, ret=0.0, check=None):
+        bone, ax, sg = primary
+        if self.sd == "R" and ax in "XZ":                     # rotations about X and Z flip in the mirror
+            sg = -sg
+            check = check and (-check[1], -check[0])
+        self.ms.muscles.append(Muscle(f"{key}_{self.sd}", title, path, (self.b(bone), ax, sg), share, ret, self.sd, check, self.group))
+
+    def near(self, child, off=(0.0, 0.0, 0.0)):
+        """A site on the parent of ``child``, at the joint where ``child`` attaches plus an offset (the hip on the pelvis,
+        the shoulder on the chest)."""
+        i = self.sk.idx[self.b(child)]; par = self.sk.bones[self.sk.parent[i]].name
+        p = np.array(self.sk.attach[i]) + np.array([off[0], self.my * off[1], off[2]]) * self.s
+        return ("site", par, tuple(float(x) for x in p))
+
+    def cover(self, bone, axes):
+        for ax in axes:
+            if ax in self.sk.bones[self.sk.idx[self.b(bone)]].lim:
+                self.ms.covered.add((self.b(bone), ax))
+
+
+def human_upper(c) -> MuscleSet:
+    """Trunk and arm muscles of a ``bodies.human`` creature: abdominal wall, back extensors, obliques; deltoid, chest,
+    back and arm flexors and extensors (13 per side). Hip rotation, the shoulder girdle, the twist of the spine, the
+    wrist, neck and head keep joint motors."""
+    s = c.params.get("height", 1.75) / 1.75
+    B = Builder(c, s); sk = c.skel
+    Lp = sk.length[sk.idx["pelvis"]]
+    spine = ("lumbar", "lumbar1", "lumbar2", "thorax")
+    for sd in "LR":
+        B.side(sd)
+        # trunk: rectus abdominis in front of every vertebral joint, erector spinae behind (lumbar and thoracic parts),
+        # the external oblique on the side
+        B.add("RA", "rectus abdominis", [B.site("pelvis", 0.0, (0.07, 0.03, 0.0))] + [B.site(b, 0.5, (0.11, 0.035, 0.0)) for b in spine]
+              + [B.site("chest", 0.2, (0.12, 0.04, 0.0))], ("lumbar", "Y", 1), 0.45)
+        B.add("ESL", "erector spinae, lumbar", [B.site("pelvis", 1.0, (-0.06, 0.03, -0.04))] + [B.site(b, 0.5, (-0.065, 0.03, 0.0)) for b in spine[:3]]
+              + [B.site("thorax", 0.6, (-0.065, 0.03, 0.0))], ("lumbar", "Y", -1), 0.6)
+        B.add("EST", "erector spinae, thoracic", [B.site("lumbar1", 0.5, (-0.065, 0.03, 0.0)), B.site("lumbar2", 0.5, (-0.07, 0.03, 0.0)),
+                                                  B.site("thorax", 0.5, (-0.075, 0.03, 0.0)), B.site("chest", 0.8, (-0.08, 0.03, 0.0))],
+              ("thorax", "Y", -1), 0.6)
+        B.add("EO", "external oblique", [B.site("pelvis", 1.0, (0.0, 0.13, 0.0))] + [B.site(b, 0.5, (0.04, 0.13, 0.0)) for b in spine[1:]]
+              + [B.site("chest", 0.3, (0.08, 0.12, 0.0))], ("lumbar", "X", -1), 0.5)
+        for b in spine + ("chest",):
+            B.cover(b, "YX")
+        # shoulder: the deltoid runs over the humeral head (a via point on the head, so it turns with the arm) to the
+        # deltoid tuberosity; chest and back muscles adduct. A sphere wrap at the joint let the paths jump from one side
+        # of the head to the other, flipping the force
+        head = lambda side_off: B.wrap("clav_@", "humhead", 1.0, (0, 0, 0), 0.04, side_off, kind="sphere")
+        B.add("DELTA", "deltoid, front", [B.site("clav_@", 0.75, (0.05, 0.0, 0.035)), head((0.09, 0.0, 0.0)),
+                                          B.site("uarm_@", 0.4, (0.018, 0.012, 0.0))], ("uarm_@", "Y", -1), 0.5,
+              check=(-110, 70))      # higher, the shoulder blade turns to lift the arm (the clavicle motors here)
+        B.add("DELTP", "deltoid, back", [B.site("clav_@", 0.85, (-0.06, 0.0, 0.035)), head((-0.09, 0.0, 0.0)),
+                                         B.site("uarm_@", 0.4, (-0.012, 0.012, 0.0))], ("uarm_@", "Y", 1), 0.5,
+              check=(-110, 70))
+        B.add("DELTM", "deltoid, middle", [B.site("clav_@", 1.0, (0.0, 0.015, 0.045)), head((0.0, 0.09, 0.0)),
+                                           B.site("uarm_@", 0.4, (0.0, 0.016, 0.0))], ("uarm_@", "X", 1), 0.7)
+        B.add("PEC", "pectoralis major", [B.site("chest", 0.55, (0.10, 0.03, 0.0)), B.site("uarm_@", 0.0, (0.02, 0.0, -0.07))],
+              ("uarm_@", "X", -1), 0.6, check=(-5, 95))     # above that it lifts the arm further (action inversion)
+        B.add("LAT", "latissimus dorsi", [B.site("lumbar2", 0.5, (-0.07, 0.03, 0.0)), B.site("thorax", 0.7, (-0.07, 0.10, 0.0)),
+                                          B.site("uarm_@", 0.0, (0.005, -0.012, -0.08))], ("uarm_@", "X", -1), 0.4)
+        B.cover("uarm_@", "YX")
+        # elbow: biceps (from the shoulder blade) and brachialis bowstring in front of the elbow, triceps wraps the olecranon
+        elbow = lambda side_off: B.wrap("uarm_@", "elbow", 1.0, (0, 0, 0), 0.02, side_off)
+        B.add("BIC", "biceps", [B.site("clav_@", 1.0, (0.03, -0.01, -0.02)), B.site("uarm_@", 0.5, (0.03, 0.0, 0.0)),
+                                B.site("farm_@", 0.0, (0.025, 0.0, -0.055))], ("farm_@", "Y", -1), 0.5)
+        B.add("BRA", "brachialis", [B.site("uarm_@", 0.55, (0.02, 0.0, 0.0)), B.site("farm_@", 0.0, (0.022, 0.0, -0.05))],
+              ("farm_@", "Y", -1), 0.5)
+        B.add("TRI", "triceps", [B.site("clav_@", 1.0, (-0.02, -0.01, -0.03)), B.site("uarm_@", 0.5, (-0.028, 0.0, 0.0)), elbow((-0.06, 0.0, 0.0)),
+                                 B.site("farm_@", 0.0, (-0.025, 0.0, 0.015))], ("farm_@", "Y", 1), 1.0)
+        B.cover("farm_@", "Y")
+    return B.ms
+
+
+def zigzag_leg(B, root, th, sh, me, ft, k=1.0, tag=""):
+    """A hind leg folded in a zig-zag (quadruped hind leg, bird leg): hip, stifle (knee), hock (intertarsal joint),
+    toes. ``root``: the bone the leg hangs from; offsets are for a 30 kg dog and scale with ``B.s``; ``k`` scales them
+    for thinner limbs. Every joint has a wrapping surface (femoral head, kneecap and condyles, the hock's retinaculum
+    and the point of the hock, the sesamoids of the toe joint) so a path cannot slip to the wrong side of a bent
+    joint. 11 muscles."""
+    o = lambda x, y, z: (x * k, y * k, z * k)
+    W = lambda bone, key, r, side: B.wrap(bone, key + tag, 1.0, (0, 0, 0), r * k, o(*side))
+    hip = lambda side: _joint_wrap(B, th, "hip" + tag, 0.028 * k, o(*side))
+    B.add("GLUT" + tag, "gluteals", [B.near(th, o(0.09, 0.0, 0.05)), hip((-0.05, 0, 0.05)), B.sn(th, 0.12, -0.02 * k, 0.012 * k)], (th, "Y", 1), 0.5)
+    B.add("HAMS" + tag, "hamstrings", [B.near(th, o(-0.06, -0.005, -0.01)), hip((-0.06, 0, -0.02)), B.sn(th, 0.5, -0.035 * k),
+                                        W(th, "cond", 0.018, (-0.06, 0, 0)),
+                                        B.sn(sh, 0.3, -0.01 * k)], (th, "Y", 1), 0.5)
+    B.add("ILIO" + tag, "iliopsoas", [B.near(th, o(0.12, -0.03, 0.06)), hip((0.06, 0, -0.02)), B.sn(th, 0.15, 0.012 * k, -0.01 * k)], (th, "Y", -1), 0.7)
+    B.add("RF" + tag, "rectus femoris", [B.near(th, o(0.035, 0.0, -0.01)), B.sn(th, 0.5, 0.03 * k), W(th, "stifle", 0.03, (0.08, 0, 0)),
+                                          B.sn(sh, 0.12, 0.025 * k)], (sh, "Y", -1), 0.25)
+    B.add("QUAD" + tag, "vasti (quadriceps)", [B.sn(th, 0.2, 0.025 * k), W(th, "stifle", 0.03, (0.08, 0, 0)), B.sn(sh, 0.12, 0.025 * k)],
+          (sh, "Y", -1), 0.75)
+    calc = B.sn(me, -0.12, -0.04 * k)                       # the point of the hock (calcaneal tuber)
+    B.add("GAS" + tag, "gastrocnemius", [B.sn(th, 0.9, -0.025 * k), W(th, "cond", 0.018, (-0.06, 0, 0)), B.sn(sh, 0.6, -0.03 * k),
+                                          W(sh, "hockpt", 0.03, (-0.07, 0, 0.02)), calc], (me, "Y", 1), 0.6, ret=0.5)
+    B.add("SDF" + tag, "superficial digital flexor", [B.sn(th, 0.9, -0.02 * k), W(th, "cond", 0.018, (-0.06, 0, 0)), B.sn(sh, 0.6, -0.028 * k),
+                                                      W(sh, "hockpt", 0.03, (-0.07, 0, 0.02)), B.sn(me, 0.5, -0.02 * k),
+                                                      W(me, "sesam", 0.012, (-0.04, 0, -0.04)), B.sn(ft, 0.7, -0.012 * k)], (ft, "Y", 1), 0.7, ret=0.5)
+    B.add("TC" + tag, "tibialis cranialis", [B.sn(sh, 0.15, 0.025 * k), W(sh, "retin", 0.015, (0.06, 0, 0)), B.sn(me, 0.2, 0.015 * k)],
+          (me, "Y", -1), 1.0)
+    B.add("DE" + tag, "long digital extensor", [B.sn(sh, 0.1, 0.02 * k), W(sh, "retin", 0.015, (0.06, 0, 0)), B.sn(me, 0.5, 0.015 * k),
+                                                W(me, "fetlock", 0.012, (0.04, 0, 0.04)), B.sn(ft, 0.7, 0.012 * k)], (ft, "Y", -1), 1.0)
+    B.add("ABD" + tag, "hip abductors", [B.near(th, o(0.03, 0.0, 0.08)), B.sn(th, -0.05, 0.0, 0.045 * k)], (th, "X", 1), 0.5)
+    B.add("ADD" + tag, "adductors", [B.near(th, o(-0.02, -0.04, -0.04)), B.sn(th, 0.5, 0.0, -0.015 * k)], (th, "X", -1), 0.5)
+    B.cover(th, "YX"); B.cover(sh, "Y"); B.cover(me, "Y"); B.cover(ft, "Y")
+
+
+def _joint_wrap(B, child, key, r, side_off, axis=(0, 1, 0)):
+    """A wrapping cylinder on the parent of ``child`` at the joint (femoral head, humeral head)."""
+    i = B.sk.idx[B.b(child)]; par = B.sk.bones[B.sk.parent[i]].name
+    nm = f"w_{key}_{B.sd}"; at = tuple(float(x) for x in B.sk.attach[i])
+    if not any(w[1] == nm for w in B.ms.wraps):
+        B.ms.wraps.append((par, nm, at, r * B.s, 0.04 * B.s, "cylinder", axis))
+    p = tuple(float(a + b) for a, b in zip(at, (side_off[0] * B.s, B.my * side_off[1] * B.s, side_off[2] * B.s)))
+    for x in B.ms.sites:
+        if x[0] == par and x[2] == p:
+            return ("wrap", nm, x[1])
+    ss = f"ss_{key}_{B.sd}{sum(1 for x in B.ms.sites if x[1].startswith(f'ss_{key}_{B.sd}'))}"
+    B.ms.sites.append((par, ss, p))
+    return ("wrap", nm, ss)
+
+
+def quadruped_set(c) -> MuscleSet:
+    """Muscles of a ``bodies.quadruped``: 11 per hind leg, 11 per fore leg, back and belly (3 per side)."""
+    s = c.params["spec"]["scale"]
+    B = Builder(c, s); sk = c.skel
+    spine = [b.name for b in sk.bones if b.name.startswith("spine")]
+    cd = sk.bones[sk.idx["chest"]].radius / 1.15 / s         # half the chest depth for the reference size (0.11 m)
+    sp = c.params["spec"]
+    B.ms.targets = {"hind": sp["muscle_bw_hind"], "fore": sp["muscle_bw_fore"]}
+    for sd in "LR":
+        B.side(sd)
+        B.group = "hind"
+        zigzag_leg(B, "pelvis", "thighH_@", "shankH_@", "metaH_@", "pawH_@", tag="H")
+        B.group = "fore"
+        # fore leg. There is no shoulder blade bone: the shoulder joint sits on the chest, the muscles of the
+        # shoulder blade start there
+        th, sh, me, ft = "thighF_@", "shankF_@", "metaF_@", "pawF_@"
+        W = lambda bone, key, r, side: B.wrap(bone, key, 1.0, (0, 0, 0), r, side)
+        sho = lambda side: _joint_wrap(B, th, "shoulder", 0.028, side)
+        B.add("BRC", "brachiocephalicus", [B.site("neck", 0.5, (0.0, 0.03, 0.0)), sho((0.06, 0, 0.02)), B.sn(th, 0.6, 0.025)], (th, "Y", -1), 0.6)
+        B.add("SSP", "supraspinatus", [B.near(th, (-0.02, 0.0, 0.10)), sho((0.06, 0, 0.04)), B.sn(th, 0.05, 0.03)], (th, "Y", -1), 0.4)
+        B.add("LATF", "latissimus dorsi", [B.site("chest", 0.0, (0.0, 0.04, 0.9 * cd)), sho((-0.06, 0, 0.0)), B.sn(th, 0.25, -0.012, -0.01)],
+              (th, "Y", 1), 0.5)
+        B.add("TER", "teres major and deltoid", [B.near(th, (-0.08, 0.0, 0.08)), sho((-0.06, 0, 0.02)), B.sn(th, 0.3, -0.015, 0.01)], (th, "Y", 1), 0.5)
+        B.add("TRIF", "triceps", [B.near(th, (-0.07, 0.0, 0.06)), B.sn(th, 0.6, -0.03), B.sn(sh, -0.15, -0.035)], (sh, "Y", 1), 1.0)
+        B.add("BICF", "biceps", [B.near(th, (0.03, 0.0, 0.01)), B.sn(th, 0.5, 0.025), B.sn(sh, 0.3, 0.025)], (sh, "Y", -1), 0.6)
+        B.add("BRF", "brachialis", [B.sn(th, 0.4, 0.012, 0.012), B.sn(sh, 0.22, 0.02)], (sh, "Y", -1), 0.4)
+        B.add("ECR", "extensor carpi radialis", [B.sn(th, 0.95, 0.02), W(sh, "carpf", 0.015, (0.05, 0, 0)), B.sn(me, 0.2, 0.015)], (me, "Y", -1), 1.0)
+        B.add("FCU", "carpal flexors", [B.sn(th, 0.95, -0.015, -0.01), W(sh, "carpb", 0.015, (-0.05, 0, 0)), B.sn(me, 0.25, -0.02)], (me, "Y", 1), 1.0)
+        B.add("DFF", "digital flexors", [B.sn(th, 0.95, -0.02), W(sh, "carpb", 0.015, (-0.05, 0, 0)), B.sn(me, 0.5, -0.02),
+                                         W(me, "sesamF", 0.012, (-0.04, 0, -0.04)), B.sn(ft, 0.7, -0.012)], (ft, "Y", 1), 0.7, ret=0.5)
+        B.add("CDE", "common digital extensor", [B.sn(th, 0.95, 0.015, 0.01), W(sh, "carpf", 0.015, (0.05, 0, 0)), B.sn(me, 0.5, 0.015),
+                                                 W(me, "fetlockF", 0.012, (0.04, 0, 0.04)), B.sn(ft, 0.7, 0.012)], (ft, "Y", -1), 1.0)
+        B.add("ABDF", "shoulder abductors", [B.near(th, (0.0, 0.03, 0.06)), B.sn(th, 0.2, 0.0, 0.02)], (th, "X", 1), 0.5)
+        B.add("PECF", "pectorals", [B.near(th, (0.03, -0.07, -0.05)), B.sn(th, 0.3, 0.0, -0.015)], (th, "X", -1), 0.5)
+        B.cover(th, "YX"); B.cover(sh, "Y"); B.cover(me, "Y"); B.cover(ft, "Y")
+        # trunk: epaxial muscles over the back (extension), rectus abdominis under the belly (flexion), obliques
+        # for bending sideways; the axial twist keeps joint motors
+        B.group = ""
+        B.add("EPAX", "epaxial (longissimus)", [B.site("pelvis", 0.4, (0.0, 0.03, 0.9 * cd))] + [B.site(b, 0.5, (0.0, 0.03, 0.95 * cd)) for b in spine]
+              + [B.site("chest", 0.6, (0.0, 0.03, cd))], (spine[0], "Y", -1), 0.6)
+        B.add("RECT", "rectus abdominis", [B.site("pelvis", 0.6, (0.0, 0.02, -0.8 * cd))] + [B.site(b, 0.5, (0.0, 0.02, -1.1 * cd)) for b in spine]
+              + [B.site("chest", 0.6, (0.0, 0.02, -1.1 * cd))], (spine[0], "Y", 1), 0.5)
+        B.add("OBLQ", "obliques", [B.site("pelvis", 0.7, (0.0, 0.9 * cd, 0.0))] + [B.site(b, 0.5, (0.0, 1.0 * cd, 0.0)) for b in spine]
+              + [B.site("chest", 0.4, (0.0, 1.0 * cd, 0.0))], (spine[0], "Z", 1), 0.6)
+        for b in spine + ["chest"]:
+            B.cover(b, "YZ")
+    return B.ms
+
+
+def bird_set(c) -> MuscleSet:
+    """Muscles of a ``bodies.bird``: the flight muscles on the keel (pectoralis pulls the wing down; supracoracoideus
+    lifts it through the triosseal canal, a pulley over the shoulder), wing protractor and retractor, elbow and wrist
+    flexors and extensors, and the leg (11 per leg). The wing's twist and the trunk keep joint motors."""
+    ch = c.params["spec"]["scale"]                          # 1 for a crow
+    B = Builder(c, ch); sk = c.skel
+    for sd in "LR":
+        B.side(sd)
+        wa, wb, wc = "wing_a_@", "wing_b_@", "wing_c_@"
+        keel = lambda t, z: B.site("chest", t, (0.0, 0.004, -z))
+        # the shoulder: a pulley across the stroke (axis forward) and one across the sweep (axis up), so paths stay on
+        # their side of the joint through a full beat
+        stroke = lambda side: _joint_wrap(B, wa, "wstroke", 0.008, side, axis=(1, 0, 0))
+        sweep = lambda side: _joint_wrap(B, wa, "wsweep", 0.008, side, axis=(0, 0, 1))
+        B.add("PECT", "pectoralis", [keel(0.4, 0.05), stroke((0.0, 0.0, -0.03)), B.site(wa, 0.18, (0.004, 0.0, -0.008))], (wa, "X", -1), 1.0)
+        B.add("SUPRA", "supracoracoideus", [keel(0.55, 0.04), B.near(wa, (0.004, -0.006, 0.012)), stroke((0.0, 0.0, 0.03)),
+                                            B.site(wa, 0.08, (0.0, 0.0, 0.009))], (wa, "X", 1), 1.0)
+        B.add("PROT", "wing protractors", [B.near(wa, (0.03, -0.01, 0.01)), sweep((0.03, 0.0, 0.0)), B.site(wa, 0.3, (0.007, 0.0, 0.0))], (wa, "Z", -1), 1.0)
+        B.add("RETR", "wing retractors", [B.near(wa, (-0.04, -0.01, 0.015)), sweep((-0.03, 0.0, 0.0)), B.site(wa, 0.2, (-0.007, 0.0, 0.0))], (wa, "Z", 1), 1.0)
+        B.cover(wa, "XZ")
+        elbow = lambda side: _joint_wrap(B, wb, "welbow", 0.004, side, axis=(0, 0, 1))
+        B.add("BICW", "biceps", [B.site(wa, 0.08, (0.006, 0.0, 0.0)), elbow((0.02, 0.0, 0.0)), B.site(wb, 0.15, (0.005, 0.0, 0.0))], (wb, "Z", -1), 1.0)
+        B.add("TRIW", "triceps", [B.site(wa, 0.15, (-0.006, 0.0, 0.0)), elbow((-0.02, 0.0, 0.0)), B.site(wb, 0.08, (-0.006, 0.0, 0.0))],
+              (wb, "Z", 1), 1.0)
+        B.cover(wb, "Z")
+        wrist = lambda side: _joint_wrap(B, wc, "wwrist", 0.004, side, axis=(0, 0, 1))
+        B.add("EMR", "extensor metacarpi radialis", [B.site(wa, 0.95, (0.005, 0.0, 0.0)), elbow((0.02, 0.0, 0.0)), B.site(wb, 0.6, (0.005, 0.0, 0.0)),
+                                                     wrist((0.02, 0.0, 0.0)), B.site(wc, 0.1, (0.004, 0.0, 0.0))], (wc, "Z", -1), 1.0)
+        B.add("FCU", "flexor carpi ulnaris", [B.site(wb, 0.3, (-0.004, 0.0, 0.0)), wrist((-0.02, 0.0, 0.0)), B.site(wc, 0.1, (-0.004, 0.0, 0.0))],
+              (wc, "Z", 1), 1.0)
+        B.cover(wc, "Z")
+        zigzag_leg(B, "pelvis", "thigh_@", "shank_@", "meta_@", "toes_@", k=0.25)
+    return B.ms
+
+
+def merge(*sets):
+    out = MuscleSet()
+    for m in sets:
+        out.muscles += m.muscles; out.wraps += m.wraps; out.sites += m.sites; out.covered |= m.covered
+    return out
+
+
+SETS = {"human_legs": human_legs, "human": lambda c: merge(human_legs(c), human_upper(c)), "quadruped": quadruped_set,
+        "bird": bird_set}

@@ -37,6 +37,9 @@ class QuadrupedEnv(FamilyEnv):
     # the nuchal ligament: an elastic band along the top of the neck carries the head for free (a horse's long, raised neck
     # held up by muscle alone kept its base at 71 % of its strength, at the limit a quarter of the time, and it could not walk)
     PASSIVE = {"neck": 1.5}
+    # QUAD_MUSCLES=1: line muscles on legs, back and belly (``muscles.quadruped_set``), anatomical joint ranges and leg
+    # strengths from muscle mass (``bodies.QuadSpec``); joint motors only where no muscle spans the axis
+    MUSCLES = "quadruped" if os.environ.get("QUAD_MUSCLES") else None
 
     def default_body(self):
         return canonical(QUADS[ONLY or "dog"])

@@ -280,24 +280,40 @@ class QuadSpec:
     energy: float = 1.0                 # energy reserve and refill (0.5 old, 1 adult, 2 playful young)
     jump_pitch: float = 0.65            # max trunk rotation about the hind feet at take-off (rad)
     jump_gain: float = 2.2              # take-off speed a hind-limb push can give, in units of sqrt(g * leg length)
+    # muscle strength of the hind and fore legs and of their lower segments (hock/carpus down) against the dog's: the hind
+    # legs push, the fore legs carry and brake; a horse's lower legs are mostly tendon and ligament
+    hind_power: float = 1.1
+    fore_power: float = 0.9
+    distal_power: float = 1.0
+    # joint ranges as angles between the bones (180: straight; above 180: overextended), fully bent and fully
+    # straightened (dog: goniometry of Labradors, Jaegger et al. 2002)
+    rom: dict = field(default_factory=lambda: dict(elbow=(36, 165), carpus=(32, 196), stifle=(42, 162), hock=(39, 164)))
+    # summed strength (maximal isometric force) of one leg's muscles in body weights, for the line-muscle model. Rough
+    # estimate from muscle mass and fibre length (F0 = 25 N/cm2 x mass / (density x fibre length)): a 30 kg dog's hind
+    # leg has about 3 kg of muscle with 6 cm fibres, about 40 body weights; smaller animals are relatively stronger
+    # (a cat about 95), a horse's legs about 20 and 12 (its fore legs stand on tendons and ligaments). The joint
+    # strengths above add up to about 2.5 times these, which is what the joint-motor bodies had
+    muscle_bw_hind: float = 40.0
+    muscle_bw_fore: float = 30.0
 
 # Numbers follow comparative anatomy: cats have ~20 mobile thoraco-lumbar vertebrae and bend ~110 degrees in the sagittal plane,
 # dogs ~100 degrees less than that, horses have a nearly rigid thoracolumbar column (~25 degrees) with a mobile lumbosacral joint.
 # jump_gain is the muscle side of the story: relative hind-limb power (cat ~3.4 sqrt(g L), dog ~2.2, horse ~1.35, pig ~1.0).
 QUADS = {
     "dog": QuadSpec("dog", 30.0, 1.0),
-    "cat": QuadSpec("cat", 4.5, 0.58, tail_n=6, leg_scale=0.95, spine_flex=1.7, tail_len=1.5, hind_scale=1.15, tail_mass=1.6, tail_power=2.5, neck_len=0.8, head_len=0.7, body_len=1.05,
+    "cat": QuadSpec("cat", 4.5, 0.58, hind_power=1.35, fore_power=0.8, muscle_bw_hind=95.0, muscle_bw_fore=60.0, rom=dict(elbow=(30, 165), carpus=(25, 200), stifle=(35, 165), hock=(30, 170)), tail_n=6, leg_scale=0.95, spine_flex=1.7, tail_len=1.5, hind_scale=1.15, tail_mass=1.6, tail_power=2.5, neck_len=0.8, head_len=0.7, body_len=1.05,
                     turn_rate=4.5, min_radius=0.45, n_neck=3, neck_rom=110.0, neck_nod=0.04, neck_speed_drop=0.05, tail_type="balance", n_spine=8, ext_rom=45.0, flex_rom=75.0, lat_rom=95.0, twist_rom=45.0, core_power=1.5, jump_gain=3.4, jump_pitch=1.05),
-    "horse": QuadSpec("horse", 500.0, 2.45, tail_n=5, leg_scale=1.22, cannon=1.45, spine_flex=0.35, neck_len=1.9, tail_len=0.8, head_len=1.2, body_len=0.95, chest_depth=1.35,
+    "horse": QuadSpec("horse", 500.0, 2.45, hind_power=1.15, fore_power=0.85, distal_power=0.5, muscle_bw_hind=20.0, muscle_bw_fore=12.0,
+                      rom=dict(elbow=(55, 160), carpus=(70, 182), stifle=(70, 150), hock=(60, 162)), tail_n=5, leg_scale=1.22, cannon=1.45, spine_flex=0.35, neck_len=1.9, tail_len=0.8, head_len=1.2, body_len=0.95, chest_depth=1.35,
                       neck_rise=2.2, head_drop=1.0,
                       turn_rate=1.2, min_radius=5.5, n_neck=5, neck_rom=140.0, neck_nod=0.14, neck_speed_drop=0.30, tail_type="hair", foot_type="hoof", n_spine=3, ext_rom=9.0, flex_rom=14.0, lat_rom=16.0, twist_rom=6.0, core_power=0.9, jump_gain=1.2, jump_pitch=0.3),
     "goat": QuadSpec("goat", 45.0, 0.95, leg_scale=1.0, cannon=1.15, spine_flex=0.9, neck_len=0.85, tail_len=0.3, tail_n=2, head_len=0.9, body_len=0.95,
                      n_spine=5, ext_rom=35.0, flex_rom=45.0, lat_rom=45.0, twist_rom=18.0, core_power=1.2, jump_gain=2.8, jump_pitch=0.6, n_neck=4, neck_rom=100.0, neck_nod=0.09, tail_type="wag_low", foot_type="hoof"),
     "wolf": QuadSpec("wolf", 40.0, 1.15, leg_scale=1.1, cannon=1.1, spine_flex=1.1, tail_len=1.0,
                      n_neck=4, neck_rom=100.0, neck_nod=0.07, neck_speed_drop=0.10, tail_type="wag_low", n_spine=6, ext_rom=32.0, flex_rom=52.0, lat_rom=60.0, twist_rom=22.0, core_power=1.15, jump_gain=2.5, jump_pitch=0.7),
-    "bear": QuadSpec("bear", 280.0, 1.35, leg_scale=0.85, cannon=0.9, spine_flex=0.7, neck_len=0.55, tail_len=0.12, tail_n=2, head_len=0.95, body_len=1.0, chest_depth=1.3,
+    "bear": QuadSpec("bear", 280.0, 1.35, hind_power=1.0, fore_power=1.0, muscle_bw_hind=25.0, muscle_bw_fore=25.0, leg_scale=0.85, cannon=0.9, spine_flex=0.7, neck_len=0.55, tail_len=0.12, tail_n=2, head_len=0.95, body_len=1.0, chest_depth=1.3,
                      turn_rate=2.4, min_radius=1.6, n_neck=3, neck_rom=80.0, neck_nod=0.05, neck_speed_drop=0.05, tail_type="wag_low", n_spine=4, ext_rom=25.0, flex_rom=40.0, lat_rom=35.0, twist_rom=15.0, core_power=1.0, jump_gain=1.1, jump_pitch=0.4),
-    "pig": QuadSpec("pig", 100.0, 1.0, tail_n=4, leg_scale=0.55, cannon=0.6, spine_flex=0.5, neck_len=0.5, tail_len=0.3, head_len=1.1, body_len=1.15, chest_depth=1.45,
+    "pig": QuadSpec("pig", 100.0, 1.0, hind_power=1.0, fore_power=1.05, muscle_bw_hind=25.0, muscle_bw_fore=25.0, tail_n=4, leg_scale=0.55, cannon=0.6, spine_flex=0.5, neck_len=0.5, tail_len=0.3, head_len=1.1, body_len=1.15, chest_depth=1.45,
                     turn_rate=2.0, min_radius=1.2, n_neck=2, neck_rom=50.0, neck_nod=0.10, neck_speed_drop=0.05, tail_type="curl", foot_type="hoof", n_spine=3, ext_rom=10.0, flex_rom=18.0, lat_rom=20.0, twist_rom=8.0, core_power=0.8, jump_gain=1.0, jump_pitch=0.25),
 }
 
@@ -351,6 +367,15 @@ def quadruped(spec: QuadSpec | str = "dog", load: float = 0.0, name=None, missin
             ("shank", d((0.20, 0, -0.98)), 0.20 * ls, 1.2, {"Y": (-30, 140)}, 150),
             ("meta", d((0, 0, -1.0)), 0.10 * ls * cn, 0.5, {"Y": (-30, 120)}, 70),
             ("paw", X, 0.06 * s, 0.3, {"Y": (-45, 70), "X": (-10, 10)}, 40)]
+    # strength: hind legs push, fore legs carry; the lower segments of a horse's legs are tendon more than muscle
+    pw = lambda leg, k: (sp.hind_power if leg is hind else sp.fore_power) * (sp.distal_power if k >= 2 else 1.0)
+    hind = [(p_, d_, l_, m_, lm_, tq_ * pw(hind, k)) for k, (p_, d_, l_, m_, lm_, tq_) in enumerate(hind)]
+    fore = [(p_, d_, l_, m_, lm_, tq_ * pw(fore, k)) for k, (p_, d_, l_, m_, lm_, tq_) in enumerate(fore)]
+    # hinge ranges from the anatomical angles between the bones (``rom``): the rest pose's angle and which way bends
+    hind[1] = hind[1][:4] + ({"Y": _hinge_lim(hind[0][1], hind[1][1], *sp.rom["stifle"])},) + hind[1][5:]
+    hind[2] = hind[2][:4] + ({"Y": _hinge_lim(hind[1][1], hind[2][1], *sp.rom["hock"])},) + hind[2][5:]
+    fore[1] = fore[1][:4] + ({"Y": _hinge_lim(fore[0][1], fore[1][1], *sp.rom["elbow"])},) + fore[1][5:]
+    fore[2] = fore[2][:4] + ({"Y": _hinge_lim(fore[1][1], fore[2][1], *sp.rom["carpus"])},) + fore[2][5:]
     if sp.foot_type == "hoof":          # one toe in a hoof: a short stiff last segment instead of a flexible pad
         hind[3] = ("paw", X, 0.075 * s * 0.8, 0.5, {"Y": (-15, 35), "X": (-4, 4)}, 60)
         fore[3] = ("paw", X, 0.06 * s * 0.8, 0.5, {"Y": (-15, 35), "X": (-4, 4)}, 60)
@@ -390,6 +415,16 @@ def quadruped(spec: QuadSpec | str = "dog", load: float = 0.0, name=None, missin
     _ground_legs(c)
     c.z0 = _rest_height(c)
     return c
+
+def _hinge_lim(p, c, bent, straight):
+    """Range (degrees about Y) of a hinge between a parent bone along ``p`` and a child along ``c`` (side view) that
+    goes from ``bent`` to ``straight`` degrees between the bones (180 straight, more: overextended)."""
+    phi = lambda v: math.degrees(math.atan2(v[2], v[0]))
+    a0 = (phi(-np.asarray(p)) - phi(c) + 180.0) % 360.0 - 180.0     # signed angle between the bones at rest
+    flex = -1.0 if a0 > 0 else 1.0                          # the rotation that closes the angle
+    ends = (flex * (abs(a0) - bent), -flex * (straight - abs(a0)))
+    return (round(min(ends), 1), round(max(ends), 1))
+
 
 def _ground_legs(c: Creature):
     """Shift each leg's hip attach so every foot rests on the same ground level in the rest pose."""

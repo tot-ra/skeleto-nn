@@ -254,6 +254,29 @@ Curriculum:
   `tests/test_muscles.py` checks them); `python muscle_atlas.py` draws the attachments and a twitch of each muscle.
   Standing, the relaxed muscles give 5 to 9 N m (iliopsoas pulling the hip forward, calf the heel up): a hanging
   relaxed leg rests with the knee a little bent and the toes down. Trained from scratch (`runs/motor/biped_muscle`).
+* **Muscles everywhere (`muscles.py`, `BIPED_MUSCLES=1`, `QUAD_MUSCLES=1`):** people also have trunk and arm
+  muscles (rectus abdominis, lumbar and thoracic erector spinae, external oblique; front, middle and back deltoid,
+  pectoralis major, latissimus dorsi, biceps, brachialis, triceps: 22 per side, 73 actions with the joint motors left
+  for hip rotation, shoulder girdle, spinal twist, wrist, neck and head). Quadrupeds get 11 per leg (gluteals,
+  hamstrings, iliopsoas, rectus femoris, vasti, gastrocnemius, superficial digital flexor, tibialis cranialis, long
+  digital extensor, abductors, adductors; fore: brachiocephalicus, supraspinatus, latissimus, teres, triceps,
+  biceps, brachialis, carpal extensor and flexors, digital flexor and extensor, abductors, pectorals) plus epaxial,
+  rectus abdominis and obliques. Birds: pectoralis and supracoracoideus on the keel (the supracoracoideus runs up
+  through the triosseal canal, a pulley over the shoulder, and lifts the wing), protractors, retractors, elbow and
+  wrist flexors and extensors, and the leg (birds do not train on them yet). Every joint a path crosses has a
+  wrapping surface; without them the checker found paths slipping to the wrong side of a bent joint (a dog's carpal
+  flexors extended the bent wrist, the shoulder's sphere wrap let the deltoid jump sides). At the very ends of a
+  range a few muscles turn, as in a body (a deltoid with the arm overhead, the pectoralis above 90 degrees of
+  abduction): the test checks the inner range.
+* **Quadruped anatomy, found while attaching the muscles:** the joint ranges let a dog's stifle straighten fully
+  (180 degrees between the bones; a dog's stops at about 162) and a horse's hock too, and the elbow bent only 30
+  degrees the anatomical way but 140 the other; the trained joint-motor dog walked with straight knees. Ranges now
+  come from the angle between the bones (Jaegger et al. 2002 for Labradors: elbow 36 to 165, carpus 32 to 196,
+  stifle 42 to 162, hock 39 to 164; cat and horse their own). The joint strengths summed to about 2.5 times what the
+  muscle mass of a real leg gives (a dog's hind leg about 40 body weights of muscle force, from 3 kg of muscle with
+  6 cm fibres at 25 N/cm2; a cat 95, a horse 20); the muscle model scales each leg to those (``QuadSpec.muscle_bw_*``)
+  and hind legs are stronger than fore legs (``hind_power``, ``fore_power``; a horse's lower legs are mostly tendon,
+  ``distal_power``).
 * **Motion prior from recordings (`--amp data/mocap/cmu_amp.npz`, `motor/amp.py`):** reward alone kept finding
   gaits no person uses. A discriminator (AMP, Peng et al. 2021) learns to tell the policy's transitions from 99
   recorded walks, runs, turns and stops of six people (CMU Motion Capture Database, `data/mocap/get_cmu.sh`); how

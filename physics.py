@@ -31,7 +31,7 @@ def hill(u):
 
 
 def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None,
-              passive=None, torque=False, muscles=None):
+              passive=None, torque=False, muscles=None, fixed_root=None):
     sk = creature.skel
     ms = muscles
     kids = sk.children
@@ -42,11 +42,11 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
     def body(i, ind):
         b = sk.bones[i]; sp = "  " * ind
         if sk.parent[i] < 0:
-            pos = "0 0 0"
+            pos = "0 0 0" if fixed_root is None else " ".join(f"{x:.4f}" for x in fixed_root)
         else:
             a = sk.attach[i]; pos = f"{a[0]:.5f} {a[1]:.5f} {a[2]:.5f}"
         s = f'{sp}<body name="{b.name}" pos="{pos}">\n'
-        if sk.parent[i] < 0:
+        if sk.parent[i] < 0 and fixed_root is None:         # (a fixed root: pinned in the air, for demonstrations)
             s += f'{sp}  <freejoint name="root"/>\n'
         mi = sk.mass[i]
         d = sk.dir[i] * sk.length[i]
@@ -59,9 +59,12 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
             gname = f"g_{b.name}"
             s += f'{sp}  <geom name="{gname}" type="capsule" fromto="0 0 0 {d[0]:.5f} {d[1]:.5f} {d[2]:.5f}" size="{max(b.radius, 0.008):.4f}" mass="{mi:.4f}" friction="{floor_friction} 0.01 0.001" contype="2" conaffinity="0"{col}/>\n'
         if ms is not None:                                  # muscle attachment sites and wrapping surfaces on this bone
-            for (bn, nm, p, r, hl) in ms.wraps:
+            for w in ms.wraps:
+                bn, nm, p, r, hl = w[:5]; kind = w[5] if len(w) > 5 else "cylinder"; za = w[6] if len(w) > 6 else (0, 1, 0)
                 if bn == b.name:
-                    s += f'{sp}  <geom name="{nm}" type="cylinder" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" zaxis="0 1 0" size="{r:.4f} {hl:.4f}" mass="0" contype="0" conaffinity="0" group="4"/>\n'
+                    geo = (f'type="sphere" size="{r:.4f}"' if kind == "sphere" else
+                           f'type="cylinder" zaxis="{za[0]} {za[1]} {za[2]}" size="{r:.4f} {hl:.4f}"')
+                    s += f'{sp}  <geom name="{nm}" {geo} pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" mass="0" contype="0" conaffinity="0" group="4"/>\n'
             for (bn, nm, p) in ms.sites:
                 if bn == b.name:
                     s += f'{sp}  <site name="{nm}" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" size="0.005" group="4"/>\n'
@@ -157,14 +160,15 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
 
 class PhysChar:
     def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS, passive=None,
-                 springs=None, torque=False, muscles=None):
+                 springs=None, torque=False, muscles=None, fixed_root=None):
         self.c = creature; self.sk = creature.skel
         self.ms = muscles; self.strength = 1.0             # muscles: a ``muscles.MuscleSet``; strength: fatigue scaling
         self.substeps = substeps                             # physics steps per control step (the physics step DT is fixed)
         self.torque = torque                                 # step() takes activations in [-1, 1], not target angles
         self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
                                                               terrain_friction=friction, soft_range=soft_range, passive=passive,
-                                                              torque=torque, muscles=muscles))
+                                                              torque=torque, muscles=muscles, fixed_root=fixed_root))
+        self.fixed = fixed_root is not None
         self.data = mujoco.MjData(self.model)
         m = self.model; sk = self.sk
         self.bid = [m.body(b.name).id for b in sk.bones]
@@ -238,13 +242,13 @@ class PhysChar:
         self.arm0 = arm                                    # moment arms standing (m), per muscle and joint axis
         self.lopt = np.maximum(lmax - lmin, 1e-3) / (FL_HI - FL_LO)
         self.loff = lmin - FL_LO * self.lopt
-        self.F0 = np.zeros(self.nm); self.r0 = np.zeros(self.nm)
+        self.F0 = np.zeros(self.nm); self.r0 = np.zeros(self.nm); self.m_bad = []
         for j, mu in enumerate(ms):
             bn, ax, sg = mu.primary; k = index[(bn, ax)]; b = sk.bones[sk.idx[bn]]
             tdir = b.tau * b.tau_dir.get(ax, (1.0, 1.0))[1 if sg > 0 else 0]
             r = sg * arm[j, k]
-            if r < 0.005:
-                raise ValueError(f"muscle {mu.name}: moment arm {r:.4f} m about {bn} {ax} has the wrong sign or is too small")
+            if r < 1e-4:                                   # a bad attachment: muscle_check.py lists them, tests fail
+                self.m_bad.append((mu.name, r)); r = 1e-3
             # strength is a joint's peak torque: F0 so that the best moment arm times force-length over the range
             # gives the muscle's share of it (a straight knee's extensors are weaker, as they are in a person)
             peak = 0.0
@@ -252,8 +256,17 @@ class PhysChar:
                 q = q0.copy(); q[k] = x; ll = lengths(q)[j]
                 qq = q.copy(); qq[k] = x + 1e-3; rr = -sg * (lengths(qq)[j] - ll) / 1e-3
                 peak = max(peak, rr * fl_active((ll - self.loff[j]) / self.lopt[j]))
-            self.F0[j] = mu.share * tdir / peak; self.r0[j] = r
+            self.F0[j] = mu.share * tdir / max(peak, 3e-4); self.r0[j] = r
+        # summed strength per group of muscles (one side), when the set gives it: a leg's muscles in body weights
+        for g, bw in (self.ms.targets or {}).items():
+            sel = np.array([mu.group == g and mu.side == "L" for mu in ms])
+            if sel.any():
+                k = bw * self.total_mass * 9.81 / self.F0[sel].sum()
+                self.F0[np.array([mu.group == g for mu in ms])] *= k
         self.m_act = np.zeros(self.nm); self.m_exc = np.zeros(self.nm); self.m_fact = np.zeros(self.nm)
+        # drawn thickness: a muscle's strength goes with its cross-section, so its diameter with the square root of F0
+        # (against the body weight, and in proportion to the body's size)
+        self.m_thick = 0.007 * (self.c.leg_len() / 0.86) * np.sqrt(self.F0 / (self.total_mass * 9.81))
 
     def muscle_state(self):
         """Normalised fibre length and shortening speed (in V_MAX) of every muscle (rigid tendons)."""
@@ -282,10 +295,11 @@ class PhysChar:
     def set_state(self, root_pos, root_R, qvec, root_vel=None, root_angvel=None, qd=None):
         d = self.data; m = self.model
         mujoco.mj_resetData(m, d)
-        d.qpos[0:3] = root_pos; d.qpos[3:7] = mat2quat(root_R)
+        if not self.fixed:
+            d.qpos[0:3] = root_pos; d.qpos[3:7] = mat2quat(root_R)
         d.qpos[self.qadr] = qvec
-        if root_vel is not None: d.qvel[0:3] = root_vel
-        if root_angvel is not None: d.qvel[3:6] = root_R.T @ root_angvel   # free joint angular velocity is in the body frame
+        if root_vel is not None and not self.fixed: d.qvel[0:3] = root_vel
+        if root_angvel is not None and not self.fixed: d.qvel[3:6] = root_R.T @ root_angvel   # free joint angular velocity is in the body frame
         if qd is not None: d.qvel[self.vadr] = qd
         d.ctrl[self.aid] = 0.0 if self.torque else qvec[self.free]
         if self.nm:
@@ -331,6 +345,8 @@ class PhysChar:
     # ---- measurements ------------------------------------------------------------------
     def root_pose(self):
         d = self.data
+        if self.fixed:
+            return d.xpos[self.bid[0]].copy(), d.xmat[self.bid[0]].reshape(3, 3).copy()
         return d.qpos[0:3].copy(), d.xmat[self.bid[0]].reshape(3, 3).copy()
 
     def limit_torque(self):

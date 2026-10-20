@@ -77,7 +77,9 @@ class BipedEnv(FamilyEnv):
     # Hill force-length-velocity, passive stretch, activation dynamics); joint torques at every joint or axis they do
     # not span. Even as torques, the hip sat on its extension stop and swung little: one-joint torques have no
     # hamstrings tying hip to knee, no stretched hip flexor pulling the thigh forward, no calf spanning knee and ankle
-    MUSCLES = "human_legs" if os.environ.get("BIPED_MUSCLES") else None
+    # (BIPED_MUSCLES=legs: the legs only; any other value: legs, trunk and arms, ``muscles.human_upper``)
+    MUSCLES = ({"legs": "human_legs"}.get(os.environ.get("BIPED_MUSCLES"), "human")
+               if os.environ.get("BIPED_MUSCLES") else None)
 
     def default_body(self):
         return HumanBody()

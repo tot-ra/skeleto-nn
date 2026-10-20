@@ -112,9 +112,9 @@ class Scene:
             i = sk.idx[e[0]]
             d.mocap_pos[self.mid[(actor.tag, "x", k)]] = S[i] + (E[i] - S[i]) * e[1] + R[i] @ np.array(e[2])
 
-    def pose_muscles(self, actor, paths, acts):
-        """Draw line muscles: ``paths`` world points per muscle (origin ... insertion), ``acts`` activation 0..1.
-        Relaxed: thin and pale; contracting: thick and deep red."""
+    def pose_muscles(self, actor, paths, acts, thick=None):
+        """Draw line muscles: ``paths`` world points per muscle (origin ... insertion), ``acts`` activation 0..1,
+        ``thick`` the diameter for each muscle's strength (m). Relaxed: thinner and pale; contracting: full and deep red."""
         d = self.data; m = self.model
         for k, (pts, a) in enumerate(zip(paths, acts)):
             a = float(np.clip(a, 0.0, 1.0))
@@ -125,7 +125,8 @@ class Scene:
                     m.geom_rgba[gid, 3] = 0.0; continue
                 p0, p1 = pts[g], pts[g + 1]
                 d.mocap_pos[body] = 0.5 * (p0 + p1); d.mocap_quat[body] = z_to_quat(p1 - p0)
-                m.geom_size[gid, :2] = (0.007 + 0.013 * a, 0.5 * np.linalg.norm(p1 - p0))
+                r = (0.007 + 0.013 * a) if thick is None else float(thick[k]) * (0.45 + 0.55 * a)
+                m.geom_size[gid, :2] = (r, 0.5 * np.linalg.norm(p1 - p0))
                 m.geom_rgba[gid] = (*col, 1.0)
 
     def set_prop(self, k, pos, quat=(1, 0, 0, 0)):

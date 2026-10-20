@@ -3,8 +3,10 @@
 Neural network powered character motion for **any skeleton**: people, 🐕 🐈‍⬛ 🐎 🦅 🐍
 
 A body is a tree of bones with joint limits, masses and a few anatomical and physiological numbers; what it does is
-decided by small networks that are trained, without motion capture, against the physical and physiological
-consequences of what they do (injury, pain, strain, energy, fatigue, falls, heat loss, blood loss, wind).
+decided by small networks that are trained against the physical and physiological consequences of what they do
+(injury, pain, strain, energy, fatigue, falls, heat loss, blood loss, wind), moving the body through its muscles.
+Nothing is replayed: the human motor network is additionally judged in training by a critic that has seen recorded
+human walks and runs, but at run time it only excites muscles in the physics.
 
 | network | what it decides | inputs | weights | state |
 |---|---|---|---|---|
@@ -17,6 +19,35 @@ the motor networks are trained by reinforcement learning in MuJoCo. Their forwar
 any language; a GDScript port runs both finished networks in the Reval Rebel game.
 
 ## Showcase
+
+### Muscles: where they attach, how strong they are, what each one does
+
+The motor networks do not turn joints: they excite muscles. Every limb and the trunk are moved by line muscles
+(`muscles.py`) that run from an origin to an insertion on the bones, over wrapping surfaces at the joints (femoral
+head, kneecap, condyles, the point of the hock, the bird's triosseal canal), and pull with Hill's force: activation
+(10 ms up, 40 ms down), force-length, force-velocity, and the passive stretch of a long muscle. Moment arms follow
+from the geometry and change with the angle; two-joint muscles (hamstrings, rectus femoris, gastrocnemius, biceps,
+triceps, the digital flexors) tie their joints together as in a body. Each muscle's strength is its share of the
+joint's, and a quadruped's legs are scaled to an estimate from muscle mass and fibre length: a dog's hind leg about 40
+body weights of force, its fore leg 30, a cat's 95 and 60, a horse's 20 and 12. Line width in the atlases goes with
+strength (diameter ~ square root of force). `python muscle_check.py` and `tests/test_muscles.py` check that every
+muscle pulls its joint the anatomical way over the range; the atlases come from the physics model itself
+(`python muscle_atlas.py`).
+
+<table>
+<tr><td colspan="2"><img src="showcase/motor/muscle_atlas_human.png" width="100%"><br><b>people</b>: 22 muscles per side (legs, trunk, shoulder, arm)</td></tr>
+<tr><td colspan="2"><img src="showcase/motor/muscle_atlas_quadruped.png" width="100%"><br><b>quadrupeds</b>: 11 per leg, back and belly; the hind legs push, the fore legs carry; joint ranges from goniometry (a dog's stifle bends 42 to 162 degrees)</td></tr>
+<tr><td colspan="2"><img src="showcase/motor/muscle_atlas_bird.png" width="100%"><br><b>birds</b>: the pectoralis pulls the wing down; the supracoracoideus, under it on the keel, lifts the wing through a pulley over the shoulder</td></tr>
+</table>
+
+Each muscle on its own: the body pinned by the pelvis, the joints the muscle does not cross held still, the muscle
+excited and let go. Red and thick while it contracts, pale and thin when relaxed; no network involved.
+
+<table><tr>
+<td width="33%" valign="top"><img src="showcase/motor/muscle_twitch_human.gif" width="100%"></td>
+<td width="33%" valign="top"><img src="showcase/motor/muscle_twitch_quadruped.gif" width="100%"></td>
+<td width="33%" valign="top"><img src="showcase/motor/muscle_twitch_bird.gif" width="100%"></td>
+</tr></table>
 
 ### Style network: one network for ground, weather, injury and state
 
@@ -74,20 +105,6 @@ the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
 </table>
 
 <!-- motor-status:start -->
-### Leg muscles: where they attach, what each one does
-
-People's legs are moved by 10 line muscles per leg (`muscles.py`), not by a motor in each joint: each runs from its
-origin to its insertion on the bones, wraps over the femoral head, the kneecap or the femoral condyles, and pulls
-with Hill's force (activation, force-length, force-velocity, passive stretch). Hamstrings, rectus femoris and
-gastrocnemius cross two joints each. Left: the attachments from the physics model (`python muscle_atlas.py`).
-Right: the body hung by the pelvis, each muscle excited on its own and let go, red and thick while it contracts,
-pale and thin when relaxed (no network involved). The trained walkers are drawn the same way.
-
-<table><tr>
-<td width="62%" valign="top"><img src="showcase/motor/muscle_atlas.png" width="100%"></td>
-<td width="38%" valign="top"><img src="showcase/motor/muscle_twitch.gif" width="100%"></td>
-</tr></table>
-
 ### Current state (updated automatically by `python -m motor.showcase`)
 
 The best network of each family so far, no harness, no clips: every joint from the network. The score is the population test mean (survival share x (0.3 + goal), at most 1.3).
