@@ -232,7 +232,8 @@ class Discriminator:
         self.torch = torch
         X = np.load(data_path)["X"]
         self.real = torch.tensor(X)
-        self.mean = torch.tensor(X.mean(0)); self.std = torch.tensor(X.std(0) + 1e-3)
+        self.mean = torch.tensor(X.mean(0)); self.std = torch.tensor(np.maximum(X.std(0), 0.05))   # a feature the reference holds still
+        # (a tucked bird leg, a planner's level trunk) at a 1e-3 floor made any deviation decisive: style 0.01
         self.net = nn.Sequential(nn.Linear(X.shape[1], hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 1))
         self.opt = torch.optim.Adam(self.net.parameters(), lr=lr)
         self.gp = gp

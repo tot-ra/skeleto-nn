@@ -62,6 +62,9 @@ def bird_clip(c, env, species, seconds, seed):
     for k in range(int(seconds * hz)):
         if k % int(bout * hz) == 0:                      # every bout a little stronger or weaker, faster or slower
             A.st["flap_amp"] = float(rng.uniform(0.8, 1.2)); A.st["flap_rate"] = float(rng.uniform(0.85, 1.15))
+            # and the neck and head carried a little differently (a reference held exactly still in some features
+            # lets the discriminator tell any deviation apart at once)
+            A.neck_q = tuple(np.array((0.3, 0.2, 0.2, 0.2, -0.75)) + rng.normal(0, 0.08, 5))
         S, E, _R = A.pose(k / hz)
         F.append(amp.features(amp.bird_points(c.skel, S, E), np.zeros(3), 0.0, span, amp.BIRD_SEGS))
     return np.array(F, np.float32)

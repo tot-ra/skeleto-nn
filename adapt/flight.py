@@ -53,8 +53,12 @@ class FlightActor:
         for l in self.c.legs:
             th, sh, me, to = l.chain
             q[th] = [0, 0.7, 0]; q[sh] = [0, 1.2, 0]; q[me] = [0, -0.9, 0]; q[to] = [0, 0.9, 0]
-        nk = self.c.neck
-        q[nk[0], 1] = -0.5; q[nk[1], 1] = 0.2; q[nk[2], 1] = 0.8; q[nk[3], 1] = 0.5
+        # neck reaching forward and up at about 45 degrees, head level, beak a little down (the old angles pointed the
+        # beak 63 degrees down)
+        nk = self.c.neck; nq = getattr(self, "neck_q", (0.3, 0.2, 0.2, 0.2, -0.75))
+        for k in range(4):
+            q[nk[k], 1] = nq[k]
+        q[self.c.head, 1] = nq[4]
         for kk, bn in enumerate(sk.bones):
             for ax, nm in enumerate("XYZ"):
                 if nm in bn.lim:
