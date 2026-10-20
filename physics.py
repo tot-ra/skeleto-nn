@@ -5,6 +5,7 @@ import math
 import numpy as np
 import mujoco
 from skeleton import Skeleton, AX
+from muscles import fl_active, fl_passive, FL_LO, FL_HI, V_MAX, TAU_ACT, TAU_DEACT
 
 CTRL_HZ = 30
 SUBSTEPS = 6
@@ -30,8 +31,9 @@ def hill(u):
 
 
 def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None,
-              passive=None, torque=False):
+              passive=None, torque=False, muscles=None):
     sk = creature.skel
+    ms = muscles
     kids = sk.children
     foot_idx = {l.chain[-1] for l in creature.legs}
     hand_idx = {a.chain[-1] for a in creature.arms}
@@ -56,6 +58,18 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
         else:
             gname = f"g_{b.name}"
             s += f'{sp}  <geom name="{gname}" type="capsule" fromto="0 0 0 {d[0]:.5f} {d[1]:.5f} {d[2]:.5f}" size="{max(b.radius, 0.008):.4f}" mass="{mi:.4f}" friction="{floor_friction} 0.01 0.001" contype="2" conaffinity="0"{col}/>\n'
+        if ms is not None:                                  # muscle attachment sites and wrapping surfaces on this bone
+            for (bn, nm, p, r, hl) in ms.wraps:
+                if bn == b.name:
+                    s += f'{sp}  <geom name="{nm}" type="cylinder" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" zaxis="0 1 0" size="{r:.4f} {hl:.4f}" mass="0" contype="0" conaffinity="0" group="4"/>\n'
+            for (bn, nm, p) in ms.sites:
+                if bn == b.name:
+                    s += f'{sp}  <site name="{nm}" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" size="0.005" group="4"/>\n'
+            for mu in ms.muscles:
+                for k, it in enumerate(mu.path):
+                    if it[0] == "site" and it[1] == b.name:
+                        p = it[2]
+                        s += f'{sp}  <site name="ms_{mu.name}_{k}" pos="{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}" size="0.006" group="4"/>\n'
         for (bn, t, off, kg, lab) in sk.extra:
             if sk.idx[bn] == i:
                 p = d * t + np.array(off)
@@ -96,6 +110,8 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
                     s += (f'{sp}  <joint name="j_{b.name}_{ax}" type="hinge" axis="{AX[ax][0]:.0f} {AX[ax][1]:.0f} {AX[ax][2]:.0f}" '
                           f'range="{lo:.2f} {hi:.2f}" limited="true" damping="{0.6 * mi ** 0.8 * 0.2:.4f}" armature="{arm:.5f}" stiffness="{stiff:.3f}"{soft}/>\n')
                     kv = (0.02 if wing else 0.08) * kp
+                    if ms is not None and (b.name, ax) in ms.covered:
+                        continue                                # moved by line muscles (``muscles.py``), no joint motor
                     if torque:
                         # muscle torque (``torque``): the command is the activation, the force follows it (PhysChar.step
                         # applies the force-velocity relation); a relaxed joint is free, not held at a target angle
@@ -116,6 +132,16 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
         ground = ground  # sloped ground is built from ramps
         for g in terrain.mjcf_geoms():
             ter += "    " + g.replace('contype="1" conaffinity="1"', f'contype="1" conaffinity="2" friction="{terrain_friction} 0.01 0.001"') + "\n"
+    tendons = ""
+    if ms is not None:
+        tendons = "  <tendon>\n"
+        for mu in ms.muscles:
+            tendons += f'    <spatial name="t_{mu.name}" width="0.006">\n'
+            for k, it in enumerate(mu.path):
+                tendons += (f'      <site site="ms_{mu.name}_{k}"/>\n' if it[0] == "site" else f'      <geom geom="{it[1]}" sidesite="{it[2]}"/>\n')
+            tendons += "    </spatial>\n"
+            acts.append(f'    <motor name="m_{mu.name}" tendon="t_{mu.name}" gear="1"/>\n')
+        tendons += "  </tendon>\n"
     xml = f'''<mujoco model="{sk.name}">
   <compiler angle="degree" autolimits="true"/>
   <option timestep="{DT:.6f}" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic"/>
@@ -124,20 +150,21 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
     {ground}
 {ter}
 {root}  </worldbody>
-  <actuator>
+{tendons}  <actuator>
 {''.join(acts)}  </actuator>
 </mujoco>'''
     return xml
 
 class PhysChar:
     def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS, passive=None,
-                 springs=None, torque=False):
+                 springs=None, torque=False, muscles=None):
         self.c = creature; self.sk = creature.skel
+        self.ms = muscles; self.strength = 1.0             # muscles: a ``muscles.MuscleSet``; strength: fatigue scaling
         self.substeps = substeps                             # physics steps per control step (the physics step DT is fixed)
         self.torque = torque                                 # step() takes activations in [-1, 1], not target angles
         self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
                                                               terrain_friction=friction, soft_range=soft_range, passive=passive,
-                                                              torque=torque))
+                                                              torque=torque, muscles=muscles))
         self.data = mujoco.MjData(self.model)
         m = self.model; sk = self.sk
         self.bid = [m.body(b.name).id for b in sk.bones]
@@ -152,12 +179,16 @@ class PhysChar:
                     jid = m.joint(f"j_{b.name}_{ax}").id
                     self.jq[(i, "XYZ".index(ax))] = m.jnt_qposadr[jid]
                     self.jv[(i, "XYZ".index(ax))] = m.jnt_dofadr[jid]
-                    self.act[(i, "XYZ".index(ax))] = m.actuator(f"a_{b.name}_{ax}").id
+                    if muscles is None or (b.name, ax) not in muscles.covered:
+                        self.act[(i, "XYZ".index(ax))] = m.actuator(f"a_{b.name}_{ax}").id
                     self.dof_list.append((i, "XYZ".index(ax)))
         self.nj = len(self.dof_list)
         self.dof_bone = np.array([d[0] for d in self.dof_list]); self.dof_ax = np.array([d[1] for d in self.dof_list])
         self.qadr = np.array([self.jq[d] for d in self.dof_list]); self.vadr = np.array([self.jv[d] for d in self.dof_list])
-        self.aid = np.array([self.act[d] for d in self.dof_list])
+        # joint axes with a joint motor (all of them unless line muscles move some): ``aid`` lists their actuators
+        self.free = np.array([k for k, d in enumerate(self.dof_list) if d in self.act], int)
+        self.jmotor = np.zeros(self.nj, bool); self.jmotor[self.free] = True
+        self.aid = np.array([self.act[self.dof_list[k]] for k in self.free], int)
         self.lo = np.array([math.radians(sk.bones[i].lim["XYZ"[a]][0]) for i, a in self.dof_list])
         self.hi = np.array([math.radians(sk.bones[i].lim["XYZ"[a]][1]) for i, a in self.dof_list])
         self.tau = np.array([sk.bones[i].tau for i, a in self.dof_list])
@@ -178,6 +209,68 @@ class PhysChar:
                if sk.bones[i].name.startswith(pre) and "XYZ"[a] == ax]
         self.sp_q = self.qadr[[s[0] for s in sel]]; self.sp_v = self.vadr[[s[0] for s in sel]]
         self.sp_k = np.array([s[1] * self.tau[s[0]] for s in sel]); self.sp_slack = np.array([s[2] for s in sel])
+        self.nm = 0
+        if muscles is not None:
+            self._init_muscles()
+        self.n_act = len(self.free) + self.nm                # step() takes joint activations, then muscle excitations
+
+    def _init_muscles(self):
+        """Muscle tables: tendon and actuator ids, fibre-length normalisation from the joint ranges each muscle spans,
+        and the strength F0 that gives its share of the primary joint's strength standing (``muscles.py``)."""
+        m = self.model; d = mujoco.MjData(m); sk = self.sk; ms = self.ms.muscles
+        self.nm = len(ms); self.mnames = [mu.name for mu in ms]
+        self.tid = np.array([m.tendon(f"t_{mu.name}").id for mu in ms]); self.mid = np.array([m.actuator(f"m_{mu.name}").id for mu in ms])
+        self.ret_m = np.array([mu.tendon_return for mu in ms])
+        index = {(sk.bones[i].name, "XYZ"[a]): k for k, (i, a) in enumerate(self.dof_list)}
+        cov = [index[c] for c in sorted(self.ms.covered)]
+
+        def lengths(q):
+            d.qpos[:] = m.qpos0; d.qpos[self.qadr] = q; mujoco.mj_fwdPosition(m, d); return d.ten_length[self.tid].copy()
+        q0 = np.zeros(self.nj); l0 = lengths(q0)
+        lmin = l0.copy(); lmax = l0.copy(); arm = np.zeros((self.nm, self.nj))
+        for k in cov:                                      # one joint axis at a time; lengths add up across joints
+            lo_l = np.zeros(self.nm); hi_l = np.zeros(self.nm)
+            for x in np.linspace(self.lo[k], self.hi[k], 13):
+                q = q0.copy(); q[k] = x; dl = lengths(q) - l0
+                lo_l = np.minimum(lo_l, dl); hi_l = np.maximum(hi_l, dl)
+            lmin += lo_l; lmax += hi_l
+            q = q0.copy(); q[k] = 1e-3; arm[:, k] = -(lengths(q) - l0) / 1e-3      # torque per newton of pull
+        self.arm0 = arm                                    # moment arms standing (m), per muscle and joint axis
+        self.lopt = np.maximum(lmax - lmin, 1e-3) / (FL_HI - FL_LO)
+        self.loff = lmin - FL_LO * self.lopt
+        self.F0 = np.zeros(self.nm); self.r0 = np.zeros(self.nm)
+        for j, mu in enumerate(ms):
+            bn, ax, sg = mu.primary; k = index[(bn, ax)]; b = sk.bones[sk.idx[bn]]
+            tdir = b.tau * b.tau_dir.get(ax, (1.0, 1.0))[1 if sg > 0 else 0]
+            r = sg * arm[j, k]
+            if r < 0.005:
+                raise ValueError(f"muscle {mu.name}: moment arm {r:.4f} m about {bn} {ax} has the wrong sign or is too small")
+            # strength is a joint's peak torque: F0 so that the best moment arm times force-length over the range
+            # gives the muscle's share of it (a straight knee's extensors are weaker, as they are in a person)
+            peak = 0.0
+            for x in np.linspace(self.lo[k], self.hi[k], 13):
+                q = q0.copy(); q[k] = x; ll = lengths(q)[j]
+                qq = q.copy(); qq[k] = x + 1e-3; rr = -sg * (lengths(qq)[j] - ll) / 1e-3
+                peak = max(peak, rr * fl_active((ll - self.loff[j]) / self.lopt[j]))
+            self.F0[j] = mu.share * tdir / peak; self.r0[j] = r
+        self.m_act = np.zeros(self.nm); self.m_exc = np.zeros(self.nm); self.m_fact = np.zeros(self.nm)
+
+    def muscle_state(self):
+        """Normalised fibre length and shortening speed (in V_MAX) of every muscle (rigid tendons)."""
+        d = self.data
+        lt = (d.ten_length[self.tid] - self.loff) / self.lopt
+        u = -d.ten_velocity[self.tid] / (V_MAX * self.lopt)
+        return lt, u
+
+    def muscle_paths(self):
+        """World points of every muscle's path (origin, wrap tangent points, via points, insertion)."""
+        d = self.data; out = []
+        for t in self.tid:
+            a, n = int(d.ten_wrapadr[t]), int(d.ten_wrapnum[t])
+            pts = d.wrap_xpos.reshape(-1, 3)[a:a + n].copy()
+            pts = pts[np.linalg.norm(pts, axis=1) > 0]       # pulleys and unwrapped surfaces leave zeros
+            out.append(pts)
+        return out
 
     # ---- state transfer ----------------------------------------------------------------
     def q_to_vec(self, q):
@@ -194,11 +287,18 @@ class PhysChar:
         if root_vel is not None: d.qvel[0:3] = root_vel
         if root_angvel is not None: d.qvel[3:6] = root_R.T @ root_angvel   # free joint angular velocity is in the body frame
         if qd is not None: d.qvel[self.vadr] = qd
-        d.ctrl[self.aid] = 0.0 if self.torque else qvec
+        d.ctrl[self.aid] = 0.0 if self.torque else qvec[self.free]
+        if self.nm:
+            d.ctrl[self.mid] = 0.0; self.m_act[:] = 0.0; self.m_exc[:] = 0.0; self.m_fact[:] = 0.0
         mujoco.mj_forward(m, d)
 
     def step(self, target_vec, ext_force=None, ext_torque=None, wrench=None, probe=None, pre=None):
         d = self.data; m = self.model
+        if self.nm:
+            self.m_exc = np.clip(np.asarray(target_vec[len(self.free):], float), 0.0, 1.0)   # muscles only pull
+            target_vec = target_vec[:len(self.free)]
+            h = m.opt.timestep
+            k_up, k_down = 1.0 - math.exp(-h / TAU_ACT), 1.0 - math.exp(-h / TAU_DEACT)
         if self.torque:
             a = np.clip(target_vec, -1.0, 1.0)
             # signed isometric torque the activation asks for; the force range (ECC_MAX times the strength) also carries
@@ -206,11 +306,16 @@ class PhysChar:
             fr = m.actuator_forcerange[self.aid]
             cap = np.where(a >= 0, fr[:, 1], -fr[:, 0]) / ECC_MAX * a
         else:
-            d.ctrl[self.aid] = np.clip(target_vec, self.lo * 1.05, self.hi * 1.05)
+            d.ctrl[self.aid] = np.clip(target_vec, self.lo[self.free] * 1.05, self.hi[self.free] * 1.05)
         d.xfrc_applied[:] = 0
         for _ in range(self.substeps):
             if self.torque:                                  # force-velocity: weaker while shortening, stronger stretched
-                d.ctrl[self.aid] = cap * hill(np.sign(cap) * d.qvel[self.vadr] / VMAX)
+                d.ctrl[self.aid] = cap * hill(np.sign(cap) * d.qvel[self.vadr[self.free]] / VMAX)
+            if self.nm:                                      # Hill muscles: activation, force-length, force-velocity, passive
+                self.m_act += (self.m_exc - self.m_act) * np.where(self.m_exc > self.m_act, k_up, k_down)
+                lt, u = self.muscle_state()
+                self.m_fact = self.strength * self.F0 * self.m_act * fl_active(lt) * hill(u)
+                d.ctrl[self.mid] = -(self.m_fact + self.F0 * fl_passive(lt))         # a tendon actuator pushes when > 0
             if wrench is not None:
                 d.xfrc_applied[self.bid[0], :] = wrench
             if ext_force is not None:

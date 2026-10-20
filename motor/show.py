@@ -77,7 +77,7 @@ def run(env, pi, ck, kw, T=None, assist=0.0):
     for t in range(T):
         a = mlp_np(np.clip((o - mean) / std, -10, 10).astype(np.float32), pi)
         o, _r, d, info = env.step(a)
-        frames.append(env.pc.bone_ends())
+        frames.append(env.pc.bone_ends() + ((env.pc.muscle_paths(), env.pc.m_act.copy()) if env.pc.nm else ()))
         costs.append(info["costs"]); goals.append(info["goal_now"]); speeds.append(info["speed"])
         if d:
             fell = True
@@ -92,13 +92,17 @@ def render_clip(env, frames, title, path, size=(480, 300), seconds=None):
     from render import Scene, Actor, caption, save_gif
     if seconds is not None:
         frames = frames[:int(seconds * env.CTRL_HZ)]
-    sc = Scene(None, [Actor(env.c, "a", base=(0.85, 0.6, 0.45))], size[0], size[1])
+    nm = env.pc.nm                                            # line muscles: the skeleton thin, the muscles drawn
+    sc = Scene(None, [Actor(env.c, "a", base=(0.85, 0.6, 0.45), muscles=nm, skeleton=nm > 0)], size[0], size[1])
     imgs = []
     bird = env.family == "bird"
     fps = 30 if bird else 15                                  # a 4.5 Hz wingbeat needs 30 frames a second
     step = max(1, env.CTRL_HZ // fps)
-    for k, (S, E, R) in enumerate(frames[::step]):
+    for k, fr in enumerate(frames[::step]):
+        S, E, R = fr[:3]
         sc.pose(sc.actors[0], S, E, R)
+        if nm:
+            sc.pose_muscles(sc.actors[0], *fr[3:5])
         look = np.array([S[0][0], S[0][1], S[0][2] if bird else 0.9 * env.c.z0])   # follow a flier up
         if bird:      # closer, from above and behind (both wings show), the height in the caption (a camera that
             sub = f"t={step * k / env.CTRL_HZ:.1f}s  height {S[0][2]:.1f} m"     # follows a flier hides whether it climbs or sinks)

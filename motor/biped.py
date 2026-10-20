@@ -73,6 +73,11 @@ class BipedEnv(FamilyEnv):
     # experiment (BIPED_ACHILLES=1): the Achilles tendon as a real spring, taut once the ankle dorsiflexes past neutral
     # (negative foot Y); 2 strengths per radian is about 220 N m/rad, 75 N m at 20 degrees, a third of a run's push-off
     SPRINGS = {"foot_": ("Y", 2.0, 0.0)} if os.environ.get("BIPED_ACHILLES") else {}
+    # BIPED_MUSCLES=1: line muscles on the legs (``muscles.human_legs``: 10 per leg with origins, insertions and wraps,
+    # Hill force-length-velocity, passive stretch, activation dynamics); joint torques at every joint or axis they do
+    # not span. Even as torques, the hip sat on its extension stop and swung little: one-joint torques have no
+    # hamstrings tying hip to knee, no stretched hip flexor pulling the thigh forward, no calf spanning knee and ankle
+    MUSCLES = "human_legs" if os.environ.get("BIPED_MUSCLES") else None
 
     def default_body(self):
         return HumanBody()

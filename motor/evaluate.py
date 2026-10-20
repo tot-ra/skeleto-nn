@@ -152,6 +152,7 @@ class Evaluator:
         self.prev_action = None
         self.totals = {t: 0.0 for t in TERMS}
         self.sustained = np.zeros(len(self.tau_max))
+        self.m_store = None
 
     # ------------------------------------------------------------------ measurements
     def contact_forces(self):
@@ -183,7 +184,7 @@ class Evaluator:
         and adds up the work of the elastic joints (a wingbeat is too fast to sample at the control rate)."""
         if self.elastic.any():
             pc = self.pc
-            pw = pc.data.actuator_force[pc.aid] * pc.data.qvel[pc.vadr] * pc.model.opt.timestep
+            pw = pc.data.qfrc_actuator[pc.vadr] * pc.data.qvel[pc.vadr] * pc.model.opt.timestep
             self.w_pos += np.maximum(pw, 0.0); self.w_neg += np.maximum(-pw, 0.0)
         reg, foot, bad = self.contact_forces()
         if self.peak is None:
@@ -199,7 +200,7 @@ class Evaluator:
     def step(self, action, dt, weights, goal_reward, strength_scale=1.0):
         """Score one control step. Returns (reward, {term: cost per second}, fell_contact)."""
         pc = self.pc; d = pc.data
-        tau = d.actuator_force[pc.aid].copy()
+        tau = d.qfrc_actuator[pc.vadr].copy()                 # net actuator torque per joint axis (motors and muscles)
         qd = pc.qdvec(); q = pc.qvec()
         # --- injury and pain from contact
         reg, foot, bad = self.peak if self.peak is not None else self.contact_forces()
@@ -238,8 +239,23 @@ class Evaluator:
             f = np.clip(self.sustained, 0.02, 1.0)
             strain += ENDURE_K * float(np.sum(1.0 / (ENDURE_B0 * f ** ENDURE_B1)))
         pw = tau * qd
-        p_met = (np.sum(np.maximum(pw, 0.0) * ~self.elastic) / MUSCLE_EFF + np.sum(np.maximum(-pw, 0.0) * ~self.elastic) / NEG_EFF
-                 + ISO * np.sum(np.abs(tau)) * math.sqrt(G / self.leg) * 0.1)
+        jm = ~self.elastic & pc.jmotor                        # joints driven by joint motors (line muscles are below)
+        p_met = (np.sum(np.maximum(pw, 0.0) * jm) / MUSCLE_EFF + np.sum(np.maximum(-pw, 0.0) * jm) / NEG_EFF
+                 + ISO * np.sum(np.abs(tau) * pc.jmotor) * math.sqrt(G / self.leg) * 0.1)
+        if pc.nm:
+            # line muscles: work of the contractile part (passive stretch is elastic and free); the Achilles and
+            # patellar tendons give back part of the braking work in the next push; holding a force costs as a joint
+            # motor's holding torque does, at the muscle's standing moment arm (activation x F0, not the force: a muscle
+            # shortening fast spends its activation for less force)
+            mp = pc.m_fact * (-d.ten_velocity[pc.tid])
+            wp, wn = np.maximum(mp, 0.0), np.maximum(-mp, 0.0)
+            # the tendon's store: filled by a share of the braking work, spent first on the next push (lasts a stride)
+            if getattr(self, "m_store", None) is None or len(self.m_store) != pc.nm:
+                self.m_store = np.zeros(pc.nm)
+            self.m_store = np.minimum(self.m_store * math.exp(-dt / 0.5) + pc.ret_m * wn * dt, 0.5 * pc.F0 * pc.lopt)
+            use = np.minimum(self.m_store, wp * dt); self.m_store -= use
+            p_met += (float(np.sum(wp - use / dt)) / MUSCLE_EFF + float(np.sum((1.0 - pc.ret_m) * wn)) / NEG_EFF
+                      + ISO * float(np.sum(pc.m_act * pc.strength * pc.F0 * pc.r0)) * math.sqrt(G / self.leg) * 0.1)
         if self.elastic.any():
             # elastic joints, work summed over every physics sub-step: tendons return ELASTIC_RETURN of the braking work
             # into the next stroke, the muscle does the rest. When all of it was counted as returned, beating twice as

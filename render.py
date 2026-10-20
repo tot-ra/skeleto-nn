@@ -9,6 +9,7 @@ PALETTE = {
     "human": [(0.55, 0.57, 0.62), (0.30, 0.45, 0.78), (0.93, 0.55, 0.20)],
     "dog": [(0.62, 0.45, 0.30), (0.30, 0.45, 0.78), (0.93, 0.55, 0.20)],
 }
+MUSCLE_SEG = 6          # capsule segments per drawn muscle path (origin, via and wrap points, insertion)
 SIDE_TINT = {"L": (0.22, 0.42, 0.80), "R": (0.92, 0.52, 0.18), "C": (0.55, 0.57, 0.62)}
 
 def mat2quat(R):
@@ -20,8 +21,10 @@ def z_to_quat(v):
 
 class Actor:
     """One creature instance in a scene."""
-    def __init__(self, creature, tag, tint_mode="sides", base=None):
+    def __init__(self, creature, tag, tint_mode="sides", base=None, muscles=0, skeleton=False):
         self.c = creature; self.tag = tag; self.tint_mode = tint_mode; self.base = base
+        self.muscles = muscles          # number of line muscles drawn (Scene.pose_muscles)
+        self.skeleton = skeleton        # thin bone-coloured bones, see-through trunk: the muscles show
 
 class Scene:
     def __init__(self, terrain=None, actors=(), width=480, height=300, props=(), light_dir=(-0.4, 0.5, -1.0), sky=(0.66, 0.80, 0.94)):
@@ -35,6 +38,8 @@ class Scene:
                     col = tuple(0.5 * x + 0.5 * y for x, y in zip(SIDE_TINT[b.side], a.base))
                 if b.group in ("foot",): col = tuple(0.55 * x for x in col)
                 rgba = f'{col[0]:.3f} {col[1]:.3f} {col[2]:.3f} 1'
+                if a.skeleton:
+                    rgba = "0.92 0.89 0.80 0.35" if b.shape != "capsule" else "0.92 0.89 0.80 1"
                 nm = f"{a.tag}_{i}"
                 if b.shape == "box":
                     hs = b.size
@@ -45,11 +50,15 @@ class Scene:
                     hs = b.size
                     geom = f'<geom type="ellipsoid" size="{hs[0]:.4f} {hs[1]:.4f} {hs[2]:.4f}" rgba="{rgba}"/>'
                 else:
-                    geom = f'<geom type="capsule" fromto="0 0 0 0 0 {b.length:.5f}" size="{max(b.radius, 0.004):.4f}" rgba="{rgba}"/>'
+                    rad = max(b.radius * (0.3 if a.skeleton else 1.0), 0.004)
+                    geom = f'<geom type="capsule" fromto="0 0 0 0 0 {b.length:.5f}" size="{rad:.4f}" rgba="{rgba}"/>'
                 parts.append(f'<body name="{nm}" mocap="true">{geom}</body>')
                 # joint knob so that bent limbs read as joints
                 if b.group in ("leg", "arm") and b.shape == "capsule":
-                    parts.append(f'<body name="{nm}_j" mocap="true"><geom type="sphere" size="{b.radius * 1.12:.4f}" rgba="{rgba}"/></body>')
+                    parts.append(f'<body name="{nm}_j" mocap="true"><geom type="sphere" size="{b.radius * (0.45 if a.skeleton else 1.12):.4f}" rgba="{rgba}"/></body>')
+            for k in range(a.muscles):              # each muscle: MUSCLE_SEG capsule segments along its path
+                for g in range(MUSCLE_SEG):
+                    parts.append(f'<body name="{a.tag}_m{k}_{g}" mocap="true"><geom name="{a.tag}_mg{k}_{g}" type="capsule" size="0.01 0.01" rgba="0.8 0.2 0.2 0"/></body>')
             for k, e in enumerate(sk.extra):
                 parts.append(f'<body name="{a.tag}_x{k}" mocap="true"><geom type="sphere" size="{0.045 * max(e[3], 1.0) ** (1/3):.4f}" rgba="0.55 0.45 0.35 0.9"/></body>')
         for k, p in enumerate(props):
@@ -76,6 +85,10 @@ class Scene:
             for i, b in enumerate(a.c.skel.bones):
                 if b.group in ("leg", "arm") and b.shape == "capsule":
                     self.mid[(a.tag, i, "j")] = self.model.body_mocapid[self.model.body(f"{a.tag}_{i}_j").id]
+            for k in range(a.muscles):
+                for g in range(MUSCLE_SEG):
+                    self.mid[(a.tag, "m", k, g)] = (self.model.body_mocapid[self.model.body(f"{a.tag}_m{k}_{g}").id],
+                                                    self.model.geom(f"{a.tag}_mg{k}_{g}").id)
             for k in range(len(a.c.skel.extra)):
                 self.mid[(a.tag, "x", k)] = self.model.body_mocapid[self.model.body(f"{a.tag}_x{k}").id]
         for k in range(len(props)):
@@ -98,6 +111,22 @@ class Scene:
         for k, e in enumerate(sk.extra):
             i = sk.idx[e[0]]
             d.mocap_pos[self.mid[(actor.tag, "x", k)]] = S[i] + (E[i] - S[i]) * e[1] + R[i] @ np.array(e[2])
+
+    def pose_muscles(self, actor, paths, acts):
+        """Draw line muscles: ``paths`` world points per muscle (origin ... insertion), ``acts`` activation 0..1.
+        Relaxed: thin and pale; contracting: thick and deep red."""
+        d = self.data; m = self.model
+        for k, (pts, a) in enumerate(zip(paths, acts)):
+            a = float(np.clip(a, 0.0, 1.0))
+            col = np.array([0.86, 0.62, 0.58]) * (1 - a) + np.array([0.80, 0.02, 0.02]) * a
+            for g in range(MUSCLE_SEG):
+                body, gid = self.mid[(actor.tag, "m", k, g)]
+                if g + 1 >= len(pts) or np.linalg.norm(pts[g + 1] - pts[g]) < 1e-6:
+                    m.geom_rgba[gid, 3] = 0.0; continue
+                p0, p1 = pts[g], pts[g + 1]
+                d.mocap_pos[body] = 0.5 * (p0 + p1); d.mocap_quat[body] = z_to_quat(p1 - p0)
+                m.geom_size[gid, :2] = (0.007 + 0.013 * a, 0.5 * np.linalg.norm(p1 - p0))
+                m.geom_rgba[gid] = (*col, 1.0)
 
     def set_prop(self, k, pos, quat=(1, 0, 0, 0)):
         m = self.mid[("prop", k)]; self.data.mocap_pos[m] = pos; self.data.mocap_quat[m] = quat

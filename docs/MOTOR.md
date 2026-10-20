@@ -237,7 +237,23 @@ Curriculum:
   the harness fading about twenty times slower (`--fade 0.0001 --fade-ok 0.0002`). Under that slow harness the
   network folded its legs (knees at 150 degrees, feet off the ground) and hung from the harness's spring to the
   standing height: free for muscle torques, and without falls the curriculum raised the goal speeds anyway. For muscle
-  torques the harness now carries a fixed share of the weight (up to 60 %) with no height spring.
+  torques the harness now carries a fixed share of the weight (up to 60 %) with no height spring. That run walked
+  with the harness at half and human knees (0 to 28 degrees at up to 8 rad/s), but the hip sat at 18 to 26 degrees,
+  on its extension stop (25), and hardly swung; without the harness it fell within a second.
+* **Line muscles on the legs (`BIPED_MUSCLES=1`, `muscles.py`):** one torque per joint axis has no anatomy: no
+  hamstrings tying hip extension to knee flexion, no rectus femoris or gastrocnemius across two joints, no stretched
+  hip flexor pulling an extended thigh forward. Each leg now has 10 muscles (iliopsoas, gluteus maximus and medius,
+  adductors, hamstrings, rectus femoris, vasti, gastrocnemius, soleus, tibialis anterior) as MuJoCo spatial tendons
+  from origin to insertion, over wrapping cylinders at the femoral head, the kneecap and the femoral condyles. The
+  force is Hill's: activation (10 ms up, 40 ms down) x force-length x force-velocity, plus the passive force of a
+  stretched muscle; moment arms come from the geometry and change with the angle. Joint motors stay on the axes the
+  muscles do not span (hip rotation, ankle inversion, toes, trunk, arms). Energy is counted per muscle: the work of
+  the contractile part, holding cost from activation (a muscle shortening fast spends its activation for less force),
+  and the Achilles and patellar tendons store a share of the braking work for the next push.
+  `python muscle_check.py` prints every moment arm over the joint ranges (a bad attachment shows as a wrong sign;
+  `tests/test_muscles.py` checks them); `python muscle_atlas.py` draws the attachments and a twitch of each muscle.
+  Standing, the relaxed muscles give 5 to 9 N m (iliopsoas pulling the hip forward, calf the heel up): a hanging
+  relaxed leg rests with the knee a little bent and the toes down. Trained from scratch (`runs/motor/biped_muscle`).
 * **Speed cap per family** (`MAX_SPEED`): 3 m/s for people, 2 Froude (a gallop) for quadrupeds, 4 units for birds.
   `--reset-curriculum` keeps a checkpoint's weights and starts the harness and the goals over.
 

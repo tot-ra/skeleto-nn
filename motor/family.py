@@ -20,6 +20,7 @@ import numpy as np
 import mujoco
 
 from physics import PhysChar, DT
+from muscles import SETS
 from motor import evaluate as ev
 
 G = 9.81
@@ -113,6 +114,7 @@ class FamilyEnv:
     MOVING_START_MAX = None  # cap on a moving start's speed (speed units); faster goals are reached by speeding up
     RUN_FROM = None       # goals faster than this (speed units) get the run harness (run_assist: upright only, no height)
     TORQUE = False        # actions are muscle activations (torque with force-velocity), not target angles (physics)
+    MUSCLES = None        # a line-muscle set (``muscles.SETS`` key): Hill muscles on spanned joints, joint motors elsewhere
     SPRINGS = {}          # bone name prefix -> one-sided elastic spring (axis, strengths per radian, slack; physics.PhysChar)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
@@ -143,9 +145,10 @@ class FamilyEnv:
         self.b = body
         self.c = self.make_creature(body)
         self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))), passive=self.PASSIVE,
-                           springs=self.SPRINGS, torque=self.TORQUE)
+                           springs=self.SPRINGS, torque=self.TORQUE or self.MUSCLES is not None,
+                           muscles=SETS[self.MUSCLES](self.c) if self.MUSCLES else None)
         self.J = self.pc.nj
-        self.act_dim = self.J
+        self.act_dim = self.pc.n_act
         self.base_force = self.pc.model.actuator_forcerange[self.pc.aid].copy()
         sc = np.maximum(np.abs(self.pc.lo), np.abs(self.pc.hi)) * self.act_scale_base
         for j, (i, _a) in enumerate(self.pc.dof_list):
@@ -164,6 +167,12 @@ class FamilyEnv:
             sign[j] = -1.0 if a in (0, 2) else 1.0            # rotations about X and Z flip in a reflection through y = 0
         self.m_perm, self.m_sign = perm, sign
         self.a_perm, self.a_sign = perm, sign                 # actions mirror like joints unless a family adds outputs
+        self.prev_perm, self.prev_sign = perm, sign
+        if pc.nm:                                             # joint motors left, then muscles (VAS_L <-> VAS_R)
+            fpos = {int(j): k for k, j in enumerate(pc.free)}
+            ap = [fpos[int(perm[j])] for j in pc.free] + [len(pc.free) + pc.mnames.index(mirror_name(n)) for n in pc.mnames]
+            self.a_perm = np.array(ap); self.a_sign = np.concatenate([sign[pc.free], np.ones(pc.nm)])
+            self.prev_perm, self.prev_sign = self.a_perm, self.a_sign
         names = [l.name for l in self.c.legs]
         self.leg_perm = np.array([names.index(mirror_name(n, names)) for n in names])
         self.sore_perm = np.array([self.SORES.index(mirror_name(k, self.SORES)) for k in self.SORES])
@@ -195,7 +204,7 @@ class FamilyEnv:
         self.goal_world = np.array(goal, float)
         self.ev = ev.Evaluator(self.pc, sores)
         self.ev.endure = self.ENDURE
-        if self.TENDONS:                                      # elastic leg tendons (bone name prefix -> share returned)
+        if self.TENDONS and not self.pc.nm:                   # elastic leg tendons (line muscles carry their own) (bone name prefix -> share returned)
             ret = [max([v for k, v in self.TENDONS.items() if self.pc.sk.bones[i].name.startswith(k)] or [0.0])
                    for i, _a in self.pc.dof_list]
             self.ev.tendons(ret)
@@ -215,7 +224,7 @@ class FamilyEnv:
                     q0[j] = val
         self.pc.set_state(np.array([0, 0, self.c.z0 + 0.01]), Rz, np.clip(q0, self.pc.lo, self.pc.hi), root_vel=v0)
         # muscle state: the current target as a share of the range, starting from the pose the body starts in
-        self.prev_a = (np.zeros(self.J) if self.TORQUE else
+        self.prev_a = (np.zeros(self.act_dim) if self.TORQUE or self.pc.nm else
                        np.clip(np.clip(q0, self.pc.lo, self.pc.hi) / np.maximum(self.act_scale, 1e-6), -1, 1))
         self.steps = 0; self.ep_ret = 0.0; self.ep_goal = 0.0; self.goal_ema = 1.0
         self.strength = 1.0
@@ -238,7 +247,7 @@ class FamilyEnv:
 
     def obs_layout(self):
         J = self.J
-        parts = [("g", 3), ("v", 3), ("w", 3), ("z", 1), ("q", J), ("qd", J), ("prev", J), ("contact", len(self.c.legs)),
+        parts = [("g", 3), ("v", 3), ("w", 3), ("z", 1), ("q", J), ("qd", J), ("prev", len(self.prev_sign)), ("contact", len(self.c.legs)),
                  ("reserve", 1), ("cmd", 2), ("body", self.BODY_DIM), ("env", 3), ("sores", len(self.SORES)),
                  ("profile", len(ev.TERMS))]
         out, k = {}, 0
@@ -254,9 +263,11 @@ class FamilyEnv:
             m[..., sl.start + idx] = -o[..., sl.start + idx]
         neg(L["g"], 1); neg(L["v"], 1); neg(L["w"], 0); neg(L["w"], 2); neg(L["cmd"], 1); neg(L["env"], 2)
         sign = __import__("torch").tensor(self.m_sign, dtype=o.dtype) if torch_ else self.m_sign
-        for key in ("q", "qd", "prev"):
+        for key in ("q", "qd"):
             sl = L[key]
             m[..., sl] = o[..., sl][..., self.m_perm] * sign
+        psign = __import__("torch").tensor(self.prev_sign, dtype=o.dtype) if torch_ else self.prev_sign
+        m[..., L["prev"]] = o[..., L["prev"]][..., self.prev_perm] * psign
         for key, perm in (("contact", self.leg_perm), ("sores", self.sore_perm)):
             sl = L[key]
             m[..., sl] = o[..., sl][..., perm]
@@ -295,11 +306,12 @@ class FamilyEnv:
         pc = self.pc
         self.strength = 0.55 + 0.45 * self.ev.reserve
         pc.model.actuator_forcerange[pc.aid] = self.base_force * self.strength
+        pc.strength = self.strength
         # activation dynamics: the muscle target moves toward the command with a 50 ms time constant; commands
         # that flip every 33 ms cannot make the body vibrate (and cost energy no real muscle could spend)
         alpha = 1.0 - math.exp(-1.0 / (self.CTRL_HZ * ACTIVATION_TAU))
         act = self.prev_a + alpha * (a - self.prev_a)
-        target = act if self.TORQUE else np.clip(act * self.act_scale, pc.lo, pc.hi)
+        target = act if (self.TORQUE or pc.nm) else np.clip(act * self.act_scale, pc.lo, pc.hi)
         self.wind.update()
 
         def pre():

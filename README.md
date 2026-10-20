@@ -74,6 +74,20 @@ the horse, the pig and a dog on ice still fall. Earlier runs, for the record:
 </table>
 
 <!-- motor-status:start -->
+### Leg muscles: where they attach, what each one does
+
+People's legs are moved by 10 line muscles per leg (`muscles.py`), not by a motor in each joint: each runs from its
+origin to its insertion on the bones, wraps over the femoral head, the kneecap or the femoral condyles, and pulls
+with Hill's force (activation, force-length, force-velocity, passive stretch). Hamstrings, rectus femoris and
+gastrocnemius cross two joints each. Left: the attachments from the physics model (`python muscle_atlas.py`).
+Right: the body hung by the pelvis, each muscle excited on its own and let go, red and thick while it contracts,
+pale and thin when relaxed (no network involved). The trained walkers are drawn the same way.
+
+<table><tr>
+<td width="62%" valign="top"><img src="showcase/motor/muscle_atlas.png" width="100%"></td>
+<td width="38%" valign="top"><img src="showcase/motor/muscle_twitch.gif" width="100%"></td>
+</tr></table>
+
 ### Current state (updated automatically by `python -m motor.showcase`)
 
 The best network of each family so far, no harness, no clips: every joint from the network. The score is the population test mean (survival share x (0.3 + goal), at most 1.3).
