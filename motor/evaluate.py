@@ -59,6 +59,11 @@ NEG_EFF = 1.2              # negative work costs about a fifth as much
 # and swinging them against the legs' turning saved nothing (the feet took the twist for free)
 ISO = 2.4
 MUSCLE_FATIGUE = 2.0       # fatigue cost of the strength-weighted tired share of the muscles (muscles.FATIGUE)
+# a person keeps the head about level (the eyes and the balance organs want it so): the cost of tilting the head's
+# axis more than HEAD_FREE from vertical, per rad^2, where the family asks for it (``Evaluator.head_up``). Only head
+# spin was costed, and a muscle walker let its head hang face down, its axis 77 degrees from vertical (8 at rest)
+HEAD_LEVEL = 4.0
+HEAD_FREE = math.radians(25)
 HEAD_REST = 3.0           # pain per body weight resting on the head (where the head may touch the ground at all)
 RESERVE_TAU = 60.0         # s: how fast a reserve that is drained by twice the sustainable power empties
 FLIGHT_UNIT = 6.0          # flight power unit in m g sqrt(g span): the cheapest searched level-flight crow wingbeat costs 1
@@ -298,6 +303,10 @@ class Evaluator:
         if head >= 0:
             w = d.cvel[pc.bid[head]][:3]
             gaze = float(w @ w) / 10.0
+            if getattr(self, "head_up", False):
+                ax = d.xmat[pc.bid[head]].reshape(3, 3) @ pc.sk.dir[head]
+                tilt_h = math.acos(max(-1.0, min(1.0, float(ax[2]) / (float(np.linalg.norm(ax)) + 1e-9))))
+                gaze += HEAD_LEVEL * max(0.0, tilt_h - HEAD_FREE) ** 2
         # --- smoothness
         smooth = 0.0 if self.prev_action is None else float(np.mean((action - self.prev_action) ** 2))
         self.prev_action = np.array(action, copy=True)

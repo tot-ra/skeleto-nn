@@ -124,6 +124,7 @@ class FamilyEnv:
     TORQUE = False        # actions are muscle activations (torque with force-velocity), not target angles (physics)
     MUSCLES = None        # a line-muscle set (``muscles.SETS`` key): Hill muscles on spanned joints, joint motors elsewhere
     SPRINGS = {}          # bone name prefix -> one-sided elastic spring (axis, strengths per radian, slack; physics.PhysChar)
+    HEAD_UP = False       # the head is kept about level (evaluate.HEAD_LEVEL)
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
     HARNESS_CHEST = False  # the weight-share harness holds the chest as well as the pelvis (a sling under both ends)
@@ -236,6 +237,7 @@ class FamilyEnv:
         self.goal_world = np.array(goal, float)
         self.ev = ev.Evaluator(self.pc, sores)
         self.ev.endure = self.ENDURE
+        self.ev.head_up = self.HEAD_UP
         if self.TENDONS and not self.pc.nm:                   # elastic leg tendons (line muscles carry their own) (bone name prefix -> share returned)
             ret = [max([v for k, v in self.TENDONS.items() if self.pc.sk.bones[i].name.startswith(k)] or [0.0])
                    for i, _a in self.pc.dof_list]

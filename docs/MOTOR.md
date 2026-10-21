@@ -297,6 +297,9 @@ Curriculum:
   walk was never trained. The top speed now follows the episodes whose goal is in its top fifth (`fast_fell`,
   `fast_goal` in the log), and 15 % of moving goals are drawn above it (`AHEAD_SHARE`, `AHEAD_SPEED`; `ahead_fell`),
   kept out of the curriculum's statistics.
+* **A hanging head:** only head spin was costed (`gaze`), and the muscle walker let its head hang face down, the
+  head's axis 77 degrees from vertical while walking (8 at rest), the chest leaning 23-26 degrees. Tilting the head
+  more than 25 degrees now costs (`evaluate.HEAD_LEVEL`, `FamilyEnv.HEAD_UP`; people only, since animals graze).
 * **Species variety tied to the spread:** see `FamilyEnv.SPECIES_SHARE`: at a spread of 0.1 the quadruped trained on
   the dog alone for a day and a cat fell in every episode within 0.6 s.
 * **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by

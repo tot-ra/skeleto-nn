@@ -63,6 +63,7 @@ class BipedEnv(FamilyEnv):
     # the Achilles tendon returns about half of the ankle's braking work in running, the patellar tendon about a third of
     # the knee's: without them a bouncing run cost more than a shuffle (cadence 257 a minute, 8 % flight at 2.9 m/s)
     TENDONS = {"foot": 0.5, "shank": 0.3}
+    HEAD_UP = True
     ENDURE = True        # a held-out arm tires its shoulder within minutes; a walker's arms hang and swing
     ACTION_BOUND = 0.95  # arms back inside the clip range, where exploration changes the command
     # a moving start puts both feet down in a stride, joints still, the whole body at up to the goal speed: at 3 to 4 m/s
