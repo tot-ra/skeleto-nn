@@ -39,6 +39,11 @@ def heading(R):
     return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
 
 
+def yaw_R_(a):
+    c, s = math.cos(a), math.sin(a)
+    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+
+
 def mirror_name(name, known=None):
     """The name of the other side: thigh_L <-> thigh_R, leg_HL <-> leg_HR; names without a side are their own mirror.
     With ``known``, a swapped name that does not exist there means the name has no side."""
@@ -138,6 +143,10 @@ class FamilyEnv:
     AHEAD_SHARE = 0.15
     AHEAD_SPEED = 0.25
     TOUCH_OK = ()         # bone groups whose ground contact is not a fall (it still counts as injury and pain)
+    # reference starts (``motor.rsi``): this share of moving starts begins in a recorded frame of a walk or run at about
+    # the goal speed (pose, root and joint velocities), the rest from ``stride_pose``. Training only
+    RSI = None            # path of the start poses (``python -m motor.rsi``)
+    RSI_SHARE = 0.0
 
     def _stalled(self, goal, sp):
         """``goal``: the progress toward the goal this step (the goal score, or turning toward it). Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns
@@ -263,7 +272,23 @@ class FamilyEnv:
                 j = self.dof_index.get(key)
                 if j is not None:
                     q0[j] = val
-        if self.dropping:
+        ref = None
+        if (self.RSI and body is None and not self.dropping and sp > 0.1 and rng.random() < self.RSI_SHARE):
+            if not hasattr(self, "_starts"):
+                from motor.rsi import Starts
+                self._starts = Starts(self.RSI, self.pc)
+            s = self.leg / self._starts.leg                    # a shorter body: the same stride, scaled down
+            ref = self._starts.pick(rng, sp / s)
+        self.from_ref = ref is not None
+        if ref is not None:
+            H = yaw_R_(math.atan2(self.goal_world[1], self.goal_world[0]))
+            q0 = np.clip(ref["q"] + rng.normal(0, 0.02, self.J), self.pc.lo, self.pc.hi)
+            R0 = H @ ref["R"]
+            args = dict(root_vel=H @ ref["v"] * s, root_angvel=H @ ref["w"], qd=ref["qd"])
+            self.pc.set_state(np.array([0, 0, float(ref["z"]) * s]), R0, q0, **args)
+            dz = self._ground_gap()
+            self.pc.set_state(np.array([0, 0, float(ref["z"]) * s - dz]), R0, q0, **args)
+        elif self.dropping:
             roll, pitch = rng.uniform(-math.pi, math.pi), rng.normal(0.0, 0.3)
             Rx = np.array([[1, 0, 0], [0, math.cos(roll), -math.sin(roll)], [0, math.sin(roll), math.cos(roll)]])
             Ry = np.array([[math.cos(pitch), 0, math.sin(pitch)], [0, 1, 0], [-math.sin(pitch), 0, math.cos(pitch)]])
@@ -281,6 +306,12 @@ class FamilyEnv:
         if self.pc.nm and body is None and rng.random() < 0.5:
             self.pc.m_mf[:] = rng.uniform(0.0, 0.6) * rng.uniform(0.2, 1.0, self.pc.nm)
         return self.obs()
+
+    def _ground_gap(self):
+        """Least distance from any body part to the floor (negative: into it), for the pose just set."""
+        m = self.pc.model; d = self.pc.data; fl = self.pc.floor; ft = np.zeros(6)
+        return min(mujoco.mj_geomDistance(m, d, g, fl, 1.0, ft) for g in range(m.ngeom)
+                   if g != fl and m.geom_contype[g] == 2)
 
     # ------------------------------------------------------------------ observation
     def obs(self):
@@ -433,6 +464,7 @@ class FamilyEnv:
         info = dict(trunc=trunc and not done, costs=costs, goal_now=goal, speed=float(np.linalg.norm(pc.data.qvel[0:2])),
                     stalled=stalled)
         if done or trunc:
-            info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps, goal_sp=self.goal_sp)
+            info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps, goal_sp=self.goal_sp,
+                        rsi=self.from_ref)
             self.episode_done(done, self.ep_goal / self.steps)
         return self.obs(), r, done, info

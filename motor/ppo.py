@@ -87,7 +87,7 @@ def worker(conn, family, seed, env_kw, kick=None, amp=False):
             if "ep_ret" in info:
                 # a stall is a failure for the curriculum too, or standing still raises the goal speeds
                 infos.append((info["ep_ret"], info["ep_len"], info["fell"] or info.get("stalled", False), info["goal"],
-                              info.get("goal_sp", -1.0)))
+                              info.get("goal_sp", -1.0), info.get("rsi", False)))
             if done or info["trunc"]:
                 obs = env.reset(); AB = rng.standard_normal((2, env.act_dim))
                 if amp: f = env.amp_features()
@@ -252,6 +252,11 @@ def main():
         ahead = [i for i in infos if i[4] > max_speed + 1e-6]
         ahead_fell = np.mean([i[2] for i in ahead]) if ahead else float("nan")
         infos = [i for i in infos if not i[4] > max_speed + 1e-6]
+        # and so do episodes started from a recorded stride (``FamilyEnv.RSI``): the curriculum judges the starts the
+        # network will meet outside training
+        from_rec = [i for i in infos if i[5]]
+        rsi_fell = np.mean([i[2] for i in from_rec]) if from_rec else float("nan")
+        infos = [i for i in infos if not i[5]]
         n_ep = len(infos)
         el = np.mean([i[1] for i in infos]) if n_ep else float("nan")
         fell = np.mean([i[2] for i in infos]) if n_ep else float("nan")
@@ -295,7 +300,7 @@ def main():
         line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} run_assist={run_assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
                 f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs}"
                 + (f" style={amp_s:.3f} d_real={amp_d[0]:.2f} d_fake={amp_d[1]:.2f}" if disc is not None else "")
-                + (f" fast_fell={fast_fell:.2f} fast_goal={fast_goal:.2f} ahead_fell={ahead_fell:.2f}" if fast_fell is not None else "")
+                + (f" fast_fell={fast_fell:.2f} fast_goal={fast_goal:.2f} ahead_fell={ahead_fell:.2f} rsi_fell={rsi_fell:.2f}" if fast_fell is not None else "")
                 + f" t={(time.time() - t_start) / 60:.1f}m")
         print(line, flush=True); log.write(line + "\n"); log.flush()
         if it % 10 == 9:

@@ -300,6 +300,13 @@ Curriculum:
 * **A hanging head:** only head spin was costed (`gaze`), and the muscle walker let its head hang face down, the
   head's axis 77 degrees from vertical while walking (8 at rest), the chest leaning 23-26 degrees. Tilting the head
   more than 25 degrees now costs (`evaluate.HEAD_LEVEL`, `FamilyEnv.HEAD_UP`; people only, since animals graze).
+* **No fast stride to start from:** a walker from the made-up mid-stride start (`stride_pose`) held 0.6 m/s but fell
+  in 2 of 6 episodes at 0.9 m/s and 3 of 6 at 1.1, and never walked faster than about 1 m/s. A third of people's moving
+  starts (`FamilyEnv.RSI`, `RSI_SHARE`) now begin in a recorded frame of a CMU walk or run at about the goal speed:
+  pose, root and joint velocities, fitted to the body by `python -m motor.rsi data/mocap/cmu data/mocap/cmu_rsi.npz`
+  (damped least squares on 21 marked joints, 2.4 cm mean error, 14616 frames with mirrors). Only the start comes from
+  the recording; the episode is scored like any other and is kept out of the curriculum's statistics (`rsi_fell`).
+  The network trained before this fell from such starts within a second (muscles start slack in mid-stride).
 * **Species variety tied to the spread:** see `FamilyEnv.SPECIES_SHARE`: at a spread of 0.1 the quadruped trained on
   the dog alone for a day and a cat fell in every episode within 0.6 s.
 * **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by

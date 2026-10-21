@@ -71,6 +71,10 @@ class BipedEnv(FamilyEnv):
     # a walk either), and the falls taught that going fast means falling. Run speeds are reached by speeding up
     MOVING_START_MAX = 1.5
     LEG_CONTACTS = True
+    # a third of moving starts from a recorded stride (CMU walks and runs fitted to the body, ``motor.rsi``): from the
+    # made-up mid-stride pose a walker never got past about 0.9 m/s without falling (2 of 6 at 0.9, 3 of 6 at 1.1)
+    RSI = os.path.join(os.path.dirname(__file__), "..", "data", "mocap", "cmu_rsi.npz")
+    RSI_SHARE = 0.35
     AHEAD_SPEED = 0.5     # m/s above the curriculum's top speed
     # with starts capped, both networks sped up to about 1.8 m/s and no further (a quick walk, 2 to 6 % flight): every
     # try at a run had fallen within a second. Goals past a walk get a harness that only keeps the trunk upright, so a
