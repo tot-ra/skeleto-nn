@@ -155,6 +155,10 @@ def main():
         mean, var, cnt = ck["mean"], ck["var"], ck["cnt"]; assist = ck.get("assist", 0.0); it0 = ck.get("it", 0)
         run_assist = ck.get("run_assist", args.run_assist0)
         max_speed = ck.get("max_speed", ref.MAX_SPEED); spread = ck.get("spread", 1.0)
+        # the smoothed signals too: started over from one round's falls, a restart took a walker's top speed from 1.0
+        # to the 0.8 floor within 150 rounds
+        cur = ck.get("curriculum") or {}
+        fell_s, goal_s, fast_fell, fast_goal = (cur.get(k) for k in ("fell_s", "goal_s", "fast_fell", "fast_goal"))
         if args.reset_curriculum:            # keep the weights, start the harness and the goals over
             assist, max_speed, spread = args.assist0, args.speed0, args.spread
     m_perm = torch.tensor(ref.a_perm); m_sign = torch.tensor(ref.a_sign, dtype=torch.float32)
@@ -172,7 +176,8 @@ def main():
     def save(it):
         torch.save(dict(pi=pi.state_dict(), vf=vf.state_dict(), logstd=logstd.data, mean=mean, var=var, cnt=cnt, it=it,
                         assist=assist, run_assist=run_assist, max_speed=max_speed, spread=spread, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args),
-                        disc=disc.state() if disc else None),
+                        disc=disc.state() if disc else None,
+                        curriculum=dict(fell_s=fell_s, goal_s=goal_s, fast_fell=fast_fell, fast_goal=fast_goal)),
                    os.path.join(out, "ckpt.pt"))
 
     log = open(os.path.join(out, "log.csv"), "a"); t_start = time.time()
