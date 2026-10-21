@@ -43,13 +43,13 @@ muscle pulls its joint the anatomical way over the range; the atlases come from 
 ### Motor network
 
 <!-- motor-status:biped:start -->
-**Current network** (`python -m motor.showcase`, updated 2026-10-21 01:16): 19,000 training iterations, score 0.82 of 1.3 (survival share x (0.3 + goal)); 44 line muscles, shown with the 30% harness it still trains with (it carries part of the weight and keeps the pelvis upright).
+**Current network** (`python -m motor.showcase`, updated 2026-10-21 23:04): 49,440 training iterations, score 0.86 of 1.3 (survival share x (0.3 + goal)); 44 line muscles, no harness.
 
 <table><tr>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk_slow.gif" width="100%"><br><b>walk 0.8 m/s</b>: held 8.0 s, 0.72 m/s, goal 0.77</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 0.99 m/s, goal 0.57</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: fell at 1.2 s, 1.05 m/s, goal 0.55</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_stand.gif" width="100%"><br><b>standing still</b>: held 8.0 s, 0.03 m/s, goal 0.91</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk_slow.gif" width="100%"><br><b>walk 0.8 m/s</b>: held 8.0 s, 0.68 m/s, goal 0.78</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 0.97 m/s, goal 0.66</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: fell at 3.1 s, 0.41 m/s, goal 0.14</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_stand.gif" width="100%"><br><b>standing still</b>: held 8.0 s, 0.02 m/s, goal 0.93</td>
 </tr></table>
 
 <img src="showcase/motor/latest/biped_emg.png" width="100%">
@@ -96,13 +96,13 @@ One network for dog, cat, wolf, goat, horse, pig and bear on one canonical skele
 down from 2 to 5 body lengths and has to land on its feet, turning with its spine and tail.
 
 <!-- motor-status:quadruped:start -->
-**Current network** (`python -m motor.showcase`, updated 2026-10-21 01:17): 22,030 training iterations, score 0.18 of 1.3 (survival share x (0.3 + goal)); 66 line muscles, shown with the 30% harness it still trains with (it carries part of the weight and keeps the pelvis upright).
+**Current network** (`python -m motor.showcase`, updated 2026-10-21 23:04): 54,210 training iterations, score 0.20 of 1.3 (survival share x (0.3 + goal)); 66 line muscles, no harness.
 
 <table><tr>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 0.46 m/s, goal 0.26</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: fell at 0.7 s, 0.54 m/s, goal 0.27</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: fell at 0.4 s, 1.20 m/s, goal 0.52</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_drop.gif" width="100%"><br><b>cat dropped upside down</b>: fell at 0.5 s, 0.14 m/s, goal 0.90</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 0.51 m/s, goal 0.24</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: fell at 2.3 s, 0.08 m/s, goal 0.11</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: fell at 1.2 s, 2.98 m/s, goal 0.21</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_drop.gif" width="100%"><br><b>cat dropped upside down</b>: fell at 0.5 s, 0.18 m/s, goal 0.86</td>
 </tr></table>
 
 <img src="showcase/motor/latest/quadruped_emg.png" width="100%">
@@ -130,13 +130,13 @@ Crow, gull, heron, sparrow and duck. Birds still fly on joint torques (the bird 
 flight environment); the old procedural flap-and-glide flight is the style reference.
 
 <!-- motor-status:bird:start -->
-**Current network** (`python -m motor.showcase`, updated 2026-10-21 01:16): 58,730 training iterations, score 0.50 of 1.3 (survival share x (0.3 + goal)); joint torques, shown with the 13% harness it still trains with (it carries part of the weight and keeps the pelvis upright).
+**Current network** (`python -m motor.showcase`, updated 2026-10-21 23:04): 100,590 training iterations, score 0.13 of 1.3 (survival share x (0.3 + goal)); joint torques, shown with the 3% harness it still trains with (it carries part of the weight and keeps the pelvis upright).
 
 <table><tr>
-<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_cruise.gif" width="100%"><br><b>crow, level flight</b>: fell at 5.0 s, height 5.1 → 0.2 m, 7.4 m/s, goal 0.32</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_turn.gif" width="100%"><br><b>crow, turn</b>: fell at 5.0 s, height 4.9 → 0.2 m, 7.4 m/s, goal 0.32</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_climb.gif" width="100%"><br><b>crow, climb</b>: held 8.0 s, height 5.2 → 1.3 m, 7.2 m/s, goal 0.28</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/bird_gull.gif" width="100%"><br><b>gull</b>: held 8.0 s, height 8.9 → 2.4 m, 7.8 m/s, goal 0.34</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_cruise.gif" width="100%"><br><b>crow, level flight</b>: fell at 1.7 s, height 5.1 → 0.5 m, 9.4 m/s, goal 0.40</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_turn.gif" width="100%"><br><b>crow, turn</b>: fell at 1.5 s, height 4.9 → 0.3 m, 9.6 m/s, goal 0.41</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_crow_climb.gif" width="100%"><br><b>crow, climb</b>: fell at 1.5 s, height 5.2 → 0.5 m, 9.5 m/s, goal 0.40</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/bird_gull.gif" width="100%"><br><b>gull</b>: fell at 1.7 s, height 8.9 → 0.9 m, 8.7 m/s, goal 0.24</td>
 </tr></table>
 <!-- motor-status:bird:end -->
 

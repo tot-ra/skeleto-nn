@@ -1,107 +1,107 @@
 {
  "biped": {
-  "score": 0.818,
-  "it": 19000,
+  "score": 0.861,
+  "it": 49440,
   "rounds": null,
-  "assist": 0.3,
+  "assist": 0.0,
   "muscles": 44,
   "clips": [
    {
     "name": "walk_slow",
     "title": "walk 0.8 m/s",
     "gif": "showcase/motor/latest/biped_walk_slow.gif",
-    "result": "held 8.0 s, 0.72 m/s, goal 0.77"
+    "result": "held 8.0 s, 0.68 m/s, goal 0.78"
    },
    {
     "name": "walk",
     "title": "walk 1.3 m/s",
     "gif": "showcase/motor/latest/biped_walk.gif",
-    "result": "held 8.0 s, 0.99 m/s, goal 0.57"
+    "result": "held 8.0 s, 0.97 m/s, goal 0.66"
    },
    {
     "name": "turn",
     "title": "walk to the left",
     "gif": "showcase/motor/latest/biped_turn.gif",
-    "result": "fell at 1.2 s, 1.05 m/s, goal 0.55"
+    "result": "fell at 3.1 s, 0.41 m/s, goal 0.14"
    },
    {
     "name": "stand",
     "title": "standing still",
     "gif": "showcase/motor/latest/biped_stand.gif",
-    "result": "held 8.0 s, 0.03 m/s, goal 0.91"
+    "result": "held 8.0 s, 0.02 m/s, goal 0.93"
    }
   ],
   "emg": "showcase/motor/latest/biped_emg.png",
-  "updated": "2026-10-21 01:16"
+  "updated": "2026-10-21 23:04"
  },
  "quadruped": {
-  "score": 0.18,
-  "it": 22030,
+  "score": 0.199,
+  "it": 54210,
   "rounds": null,
-  "assist": 0.3,
+  "assist": 0.0,
   "muscles": 66,
   "clips": [
    {
     "name": "dog_walk",
     "title": "dog, walk",
     "gif": "showcase/motor/latest/quadruped_dog_walk.gif",
-    "result": "held 8.0 s, 0.46 m/s, goal 0.26"
+    "result": "held 8.0 s, 0.51 m/s, goal 0.24"
    },
    {
     "name": "cat_walk",
     "title": "cat, walk",
     "gif": "showcase/motor/latest/quadruped_cat_walk.gif",
-    "result": "fell at 0.7 s, 0.54 m/s, goal 0.27"
+    "result": "fell at 2.3 s, 0.08 m/s, goal 0.11"
    },
    {
     "name": "horse_walk",
     "title": "horse, walk",
     "gif": "showcase/motor/latest/quadruped_horse_walk.gif",
-    "result": "fell at 0.4 s, 1.20 m/s, goal 0.52"
+    "result": "fell at 1.2 s, 2.98 m/s, goal 0.21"
    },
    {
     "name": "cat_drop",
     "title": "cat dropped upside down",
     "gif": "showcase/motor/latest/quadruped_cat_drop.gif",
-    "result": "fell at 0.5 s, 0.14 m/s, goal 0.90"
+    "result": "fell at 0.5 s, 0.18 m/s, goal 0.86"
    }
   ],
   "emg": "showcase/motor/latest/quadruped_emg.png",
-  "updated": "2026-10-21 01:17"
+  "updated": "2026-10-21 23:04"
  },
  "bird": {
-  "score": 0.499,
-  "it": 58730,
+  "score": 0.13,
+  "it": 100590,
   "rounds": null,
-  "assist": 0.13,
+  "assist": 0.03,
   "muscles": 0,
   "clips": [
    {
     "name": "crow_cruise",
     "title": "crow, level flight",
     "gif": "showcase/motor/latest/bird_crow_cruise.gif",
-    "result": "fell at 5.0 s, height 5.1 → 0.2 m, 7.4 m/s, goal 0.32"
+    "result": "fell at 1.7 s, height 5.1 → 0.5 m, 9.4 m/s, goal 0.40"
    },
    {
     "name": "crow_turn",
     "title": "crow, turn",
     "gif": "showcase/motor/latest/bird_crow_turn.gif",
-    "result": "fell at 5.0 s, height 4.9 → 0.2 m, 7.4 m/s, goal 0.32"
+    "result": "fell at 1.5 s, height 4.9 → 0.3 m, 9.6 m/s, goal 0.41"
    },
    {
     "name": "crow_climb",
     "title": "crow, climb",
     "gif": "showcase/motor/latest/bird_crow_climb.gif",
-    "result": "held 8.0 s, height 5.2 → 1.3 m, 7.2 m/s, goal 0.28"
+    "result": "fell at 1.5 s, height 5.2 → 0.5 m, 9.5 m/s, goal 0.40"
    },
    {
     "name": "gull",
     "title": "gull",
     "gif": "showcase/motor/latest/bird_gull.gif",
-    "result": "held 8.0 s, height 8.9 → 2.4 m, 7.8 m/s, goal 0.34"
+    "result": "fell at 1.7 s, height 8.9 → 0.9 m, 8.7 m/s, goal 0.24"
    }
   ],
   "emg": null,
-  "updated": "2026-10-21 01:16"
+  "updated": "2026-10-21 23:04"
  }
 }
