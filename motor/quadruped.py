@@ -49,6 +49,8 @@ class QuadrupedEnv(FamilyEnv):
     if MUSCLES:
         PASSIVE = {"neck": 1.5, "trunk": 1.0}
 
+    SPECIES_SHARE = 0.0 if ONLY else 0.6
+
     def default_body(self):
         return canonical(QUADS[ONLY or "dog"])
 
@@ -56,7 +58,8 @@ class QuadrupedEnv(FamilyEnv):
         if ONLY:                                            # an experiment on one species (QUAD_ONLY=horse)
             sp = QUADS[ONLY]; jitter = lambda: math.exp(rng.normal(0, 0.08 * spread))
             return canonical(dataclasses.replace(sp, mass=sp.mass * jitter() ** 3, scale=sp.scale * jitter()))
-        sp = QUADS[SPECIES[int(rng.choice(len(SPECIES), p=SPECIES_WEIGHT))]] if rng.random() < spread else QUADS["dog"]
+        sp = (QUADS[SPECIES[int(rng.choice(len(SPECIES), p=SPECIES_WEIGHT))]] if rng.random() < max(spread, self.SPECIES_SHARE)
+              else QUADS["dog"])
         jitter = lambda: math.exp(rng.normal(0, 0.08 * spread))
         sp = dataclasses.replace(sp, mass=sp.mass * jitter() ** 3, scale=sp.scale * jitter(), leg_scale=sp.leg_scale * jitter(),
                                  vigor=float(np.clip(sp.vigor * jitter() ** 2, 0.5, 1.4)))

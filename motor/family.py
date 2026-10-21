@@ -127,6 +127,10 @@ class FamilyEnv:
     ENDURE = False        # local muscle endurance in the strain cost (motor/evaluate.py, ENDURE_*)
     ASSIST_RECOVER = 0.3  # when most episodes fail, the harness comes back up to this much (never to full: no home)
     HARNESS_CHEST = False  # the weight-share harness holds the chest as well as the pelvis (a sling under both ends)
+    # least share of bodies drawn from the other species, whatever the curriculum's spread: the spread also brings
+    # wind, ice and sores, and when it fell to 0.1 a quadruped worker kept one body for about 40 episodes and nine in
+    # ten new ones were dogs, so a day of training went to the dog and a cat fell in every episode in 0.6 s
+    SPECIES_SHARE = 0.0
     TOUCH_OK = ()         # bone groups whose ground contact is not a fall (it still counts as injury and pain)
 
     def _stalled(self, goal, sp):
@@ -193,8 +197,9 @@ class FamilyEnv:
     # ------------------------------------------------------------------ episode
     def reset(self, body=None, friction=None, wind=None, sores=None, goal=None, profile=None, drop=None):
         rng = self.rng
-        if body is not None or not hasattr(self, "ev") or (rng.random() < 0.25 and rng.random() < self.spread):
-            self._build(body or (self.sample_body(rng, self.spread) if rng.random() < self.spread else self.default_body()))
+        vary = max(self.spread, self.SPECIES_SHARE)
+        if body is not None or not hasattr(self, "ev") or (rng.random() < 0.25 and rng.random() < vary):
+            self._build(body or (self.sample_body(rng, self.spread) if rng.random() < vary else self.default_body()))
         m = self.pc.model
         self.friction = float(friction if friction is not None else (rng.uniform(0.08, 0.3) if rng.random() < 0.2 * self.spread else rng.uniform(0.6, 1.2)))
         m.geom_friction[:, 0] = self.friction
