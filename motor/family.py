@@ -148,6 +148,28 @@ class FamilyEnv:
     RSI = None            # path of the start poses (``python -m motor.rsi``)
     RSI_SHARE = 0.0
 
+    # a harness of its own for every kind of body (``body_kind``), up to this much: it comes up while that kind's
+    # episodes fail and fades while they hold, toward KIND_FAIL. The curriculum's harness is shared, and once the dog
+    # walked without it a cat or a horse folded to the floor in 0.13 to 0.3 s: four to nine steps of an episode against
+    # a dog's 400, under 1 % of the training samples, so in eight hours neither learned to stand
+    KIND_ASSIST = 0.0
+    KIND_FAIL = 0.3
+
+    def body_kind(self):
+        return None
+
+    def assist_now(self):
+        if not self.KIND_ASSIST:
+            return self.assist
+        return max(self.assist, self.kind_assist.get(self.body_kind(), 0.0))
+
+    def _kind_done(self, failed):
+        if self.KIND_ASSIST and not self.dropping:
+            k = self.body_kind(); a = self.kind_assist.get(k, 0.0)
+            step = 0.02
+            a += step if failed else -step * self.KIND_FAIL / (1.0 - self.KIND_FAIL)
+            self.kind_assist[k] = float(np.clip(a, 0.0, self.KIND_ASSIST))
+
     def _stalled(self, goal, sp):
         """``goal``: the progress toward the goal this step (the goal score, or turning toward it). Standing still when asked to move is a dead end, not a safe choice: without this, staying up earns
         ALIVE every step while trying to walk risks the fall cost, so the safest policy ignores the goal."""
@@ -167,6 +189,7 @@ class FamilyEnv:
         self.max_speed = 4.0
         self.moving_start = 0.7
         self.SORES = tuple(self.sores())
+        self.kind_assist = {}
         self._build(self.default_body())
         self.obs_dim = len(self.reset())
 
@@ -367,23 +390,24 @@ class FamilyEnv:
             return None
         run = (self.RUN_FROM is not None and self.run_assist > 0
                and float(np.linalg.norm(self.goal_world)) > self.RUN_FROM * self.speed_unit())
-        if self.assist <= 0 and not run:
+        A = self.assist_now()
+        if A <= 0 and not run:
             return None
         pc = self.pc; d = pc.data
         p, R = pc.root_pose()
-        k = self.assist * pc.total_mass / 75.0
+        k = A * pc.total_mass / 75.0
         v = d.qvel[0:3]
         if self.TORQUE or pc.nm:
             # a fixed share of the weight, no spring to the standing height: under a height spring, muscle-torque
             # legs folded up (knees at 150 degrees, feet off the ground) and hung in the harness for free
-            Fz = self.assist * 0.6 * pc.total_mass * G - k * 300.0 * v[2]
+            Fz = A * 0.6 * pc.total_mass * G - k * 300.0 * v[2]
         else:
-            Fz = self.assist * 0.5 * pc.total_mass * G + k * (3000.0 * (self.c.z0 - p[2]) - 300.0 * v[2])
+            Fz = A * 0.5 * pc.total_mass * G + k * (3000.0 * (self.c.z0 - p[2]) - 300.0 * v[2])
         # the run harness only keeps the trunk upright: no height, so the body can bounce and leave the ground
         kt = k + (self.run_assist * pc.total_mass / 75.0 if run else 0.0)
         zx, zy = R[0, 2], R[1, 2]
         wv_w = R @ d.qvel[3:6]
-        return np.array([0.0, 0.0, max(Fz, 0.0) if self.assist > 0 else 0.0, kt * (800.0 * zy - 60.0 * wv_w[0]),
+        return np.array([0.0, 0.0, max(Fz, 0.0) if A > 0 else 0.0, kt * (800.0 * zy - 60.0 * wv_w[0]),
                          kt * (-800.0 * zx - 60.0 * wv_w[1]), kt * (-18.0 * wv_w[2])])
 
     def step(self, a):
@@ -410,7 +434,7 @@ class FamilyEnv:
                     # half the lift under the chest, with its own damping: a relaxed back cannot carry the front
                     ch = pc.bid[pc.sk.idx["chest"]]; half = 0.5 * wrench[2]
                     wrench = wrench.copy(); wrench[2] = half
-                    d.xfrc_applied[ch, 2] = max(half - self.assist * pc.total_mass / 75.0 * 150.0 * d.cvel[ch][5], 0.0)
+                    d.xfrc_applied[ch, 2] = max(half - self.assist_now() * pc.total_mass / 75.0 * 150.0 * d.cvel[ch][5], 0.0)
                 d.xfrc_applied[pc.bid[0], :] = wrench
         pc.step(target, pre=pre, probe=self.ev.probe)
         self.steps += 1
@@ -465,6 +489,7 @@ class FamilyEnv:
                     stalled=stalled)
         if done or trunc:
             info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps, goal_sp=self.goal_sp,
-                        rsi=self.from_ref)
+                        rsi=self.from_ref, kind_assist=self.assist_now() if self.KIND_ASSIST else 0.0)
+            self._kind_done(done)
             self.episode_done(done, self.ep_goal / self.steps)
         return self.obs(), r, done, info

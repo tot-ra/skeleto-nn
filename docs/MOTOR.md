@@ -307,6 +307,11 @@ Curriculum:
   (damped least squares on 21 marked joints, 2.4 cm mean error, 14616 frames with mirrors). Only the start comes from
   the recording; the episode is scored like any other and is kept out of the curriculum's statistics (`rsi_fell`).
   The network trained before this fell from such starts within a second (muscles start slack in mid-stride).
+* **One harness for every species:** the curriculum's harness is shared, and once the dog walked without it a cat
+  or a horse folded to the floor within 0.13 to 0.3 s. Those episodes were four to nine steps long against a dog's
+  400, under 1 % of the samples, so after eight hours with species in training neither stood. Every species now has
+  a harness of its own (`FamilyEnv.KIND_ASSIST`, `body_kind`; `kind_assist` in the log): it comes up 0.02 with each
+  failed episode of that species and fades while its episodes hold, toward 30 % failures.
 * **Species variety tied to the spread:** see `FamilyEnv.SPECIES_SHARE`: at a spread of 0.1 the quadruped trained on
   the dog alone for a day and a cat fell in every episode within 0.6 s.
 * **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by

@@ -51,6 +51,10 @@ class QuadrupedEnv(FamilyEnv):
 
     SPECIES_SHARE = 0.0 if ONLY else 0.6
     LEG_CONTACTS = True
+    KIND_ASSIST = 1.0 if MUSCLES else 0.0                 # a harness per species (``FamilyEnv.KIND_ASSIST``)
+
+    def body_kind(self):
+        return self.b.name
 
     def default_body(self):
         return canonical(QUADS[ONLY or "dog"])
