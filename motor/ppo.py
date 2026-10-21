@@ -86,7 +86,8 @@ def worker(conn, family, seed, env_kw, kick=None, amp=False):
             costs.append([info["costs"][t] for t in sorted(info["costs"])])
             if "ep_ret" in info:
                 # a stall is a failure for the curriculum too, or standing still raises the goal speeds
-                infos.append((info["ep_ret"], info["ep_len"], info["fell"] or info.get("stalled", False), info["goal"]))
+                infos.append((info["ep_ret"], info["ep_len"], info["fell"] or info.get("stalled", False), info["goal"],
+                              info.get("goal_sp", -1.0)))
             if done or info["trunc"]:
                 obs = env.reset(); AB = rng.standard_normal((2, env.act_dim))
                 if amp: f = env.amp_features()
@@ -146,7 +147,7 @@ def main():
     logstd = nn.Parameter(torch.full((ad,), -2.5))
     opt = torch.optim.Adam(list(pi.parameters()) + list(vf.parameters()) + [logstd], lr=args.lr)
     mean = np.zeros(od, np.float32); var = np.ones(od, np.float32); cnt = 1e-4
-    assist = args.assist0; it0 = 0; fell_s = goal_s = None; max_speed = args.speed0; spread = args.spread; run_assist = args.run_assist0
+    assist = args.assist0; it0 = 0; fell_s = goal_s = fast_fell = fast_goal = None; max_speed = args.speed0; spread = args.spread; run_assist = args.run_assist0
     if args.init:
         ck = torch.load(args.init, weights_only=False)
         pi.load_state_dict(ck["pi"]); vf.load_state_dict(ck["vf"]); logstd.data = ck["logstd"]
@@ -247,6 +248,10 @@ def main():
                 sym_l = float(lsym)
             with torch.no_grad():
                 logstd.clamp_(-3.0, -1.5)
+        # episodes with a goal above the top speed (``AHEAD_SHARE``) try ahead and stay out of the curriculum's statistics
+        ahead = [i for i in infos if i[4] > max_speed + 1e-6]
+        ahead_fell = np.mean([i[2] for i in ahead]) if ahead else float("nan")
+        infos = [i for i in infos if not i[4] > max_speed + 1e-6]
         n_ep = len(infos)
         el = np.mean([i[1] for i in infos]) if n_ep else float("nan")
         fell = np.mean([i[2] for i in infos]) if n_ep else float("nan")
@@ -260,16 +265,29 @@ def main():
         if n_ep:
             fell_s = fell if fell_s is None else 0.95 * fell_s + 0.05 * fell
             goal_s = goal if goal_s is None else 0.95 * goal_s + 0.05 * goal
+        # the top speed grows by the episodes near it: those with a goal in its top fifth. All falls together stayed
+        # at 0.4-0.5 (tired starts, wind, sores, packs) and held a walker's top speed at 0.8 m/s for days, while the
+        # speed itself was not what failed
+        fast = [i for i in infos if i[4] >= 0.8 * max_speed]
+        if fast:
+            ff, fg = np.mean([i[2] for i in fast]), np.mean([i[3] for i in fast])
+            fast_fell = ff if fast_fell is None else 0.95 * fast_fell + 0.05 * ff
+            fast_goal = fg if fast_goal is None else 0.95 * fast_goal + 0.05 * fg
         assist = max(0.0, assist - args.fade)
         run_assist = max(0.0, run_assist - args.run_fade)
         # goal speeds and variety grow slowly while the goal is met (fast growth ran past what the body could learn
         # twice) and shrink back when most episodes fail
+        by_speed = fast_fell is not None                    # families that report goal speeds (not birds)
+        if by_speed and fast_goal > ref.GOAL_OK and fast_fell < max(ref.FAIL_OK, fell_s + 0.05):
+            max_speed = min(ref.MAX_SPEED, max_speed + 0.005)
+        elif by_speed and fast_fell > 0.6:
+            max_speed = max(args.speed0, max_speed - 0.01)
         if n_ep and goal_s > ref.GOAL_OK and fell_s < ref.FAIL_OK:
             assist = max(0.0, assist - args.fade_ok)
-            max_speed = min(ref.MAX_SPEED, max_speed + 0.005)
+            if not by_speed: max_speed = min(ref.MAX_SPEED, max_speed + 0.005)
             spread = min(1.0, spread + 0.003)
         elif n_ep and fell_s > 0.6:
-            max_speed = max(args.speed0, max_speed - 0.01)
+            if not by_speed: max_speed = max(args.speed0, max_speed - 0.01)
             spread = max(args.spread, spread - 0.003)
             if assist < ref.ASSIST_RECOVER:                  # how far the harness comes back is the family's
                 assist = min(args.assist0, assist + 0.002)   # the smoothed signal stays up for many rounds
@@ -277,6 +295,7 @@ def main():
         line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} run_assist={run_assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
                 f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs}"
                 + (f" style={amp_s:.3f} d_real={amp_d[0]:.2f} d_fake={amp_d[1]:.2f}" if disc is not None else "")
+                + (f" fast_fell={fast_fell:.2f} fast_goal={fast_goal:.2f} ahead_fell={ahead_fell:.2f}" if fast_fell is not None else "")
                 + f" t={(time.time() - t_start) / 60:.1f}m")
         print(line, flush=True); log.write(line + "\n"); log.flush()
         if it % 10 == 9:

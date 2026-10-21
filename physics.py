@@ -37,7 +37,7 @@ def soft_share(soft_range, b):
 
 
 def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=False, terrain_friction=1.0, soft_range=None,
-              passive=None, torque=False, muscles=None, fixed_root=None):
+              passive=None, torque=False, muscles=None, fixed_root=None, leg_contacts=False):
     sk = creature.skel
     ms = muscles
     kids = sk.children
@@ -151,6 +151,16 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
             tendons += "    </spatial>\n"
             acts.append(f'    <motor name="m_{mu.name}" tendon="t_{mu.name}" gear="1"/>\n')
         tendons += "  </tendon>\n"
+    # body parts never touch each other (contype 2, conaffinity 0), so a leg passed through the other: a walker set
+    # one foot in front of the other, legs crossing like scissors, which saves the hip abductors their work.
+    # ``leg_contacts``: explicit pairs between the bones of different legs (contype stays 2, so the ground-contact
+    # tests elsewhere do not see them)
+    pairs = ""
+    if leg_contacts:
+        chains = [list(l.chain) for l in creature.legs]
+        pairs = "  <contact>\n" + "".join(
+            f'    <pair geom1="g_{sk.bones[a].name}" geom2="g_{sk.bones[b].name}" friction="0.3 0.3 0.005 0.0001 0.0001"/>\n'
+            for x in range(len(chains)) for y in range(x + 1, len(chains)) for a in chains[x] for b in chains[y]) + "  </contact>\n"
     xml = f'''<mujoco model="{sk.name}">
   <compiler angle="degree" autolimits="true"/>
   <option timestep="{DT:.6f}" gravity="0 0 -9.81" integrator="implicitfast" cone="elliptic"/>
@@ -159,21 +169,22 @@ def build_xml(creature, terrain=None, kp_scale=1.0, floor_friction=1.0, visual=F
     {ground}
 {ter}
 {root}  </worldbody>
-{tendons}  <actuator>
+{pairs}{tendons}  <actuator>
 {''.join(acts)}  </actuator>
 </mujoco>'''
     return xml
 
 class PhysChar:
     def __init__(self, creature, terrain=None, kp_scale=1.0, friction=1.0, soft_range=None, substeps=SUBSTEPS, passive=None,
-                 springs=None, torque=False, muscles=None, fixed_root=None):
+                 springs=None, torque=False, muscles=None, fixed_root=None, leg_contacts=False):
         self.c = creature; self.sk = creature.skel
         self.ms = muscles; self.strength = 1.0             # muscles: a ``muscles.MuscleSet``; strength: fatigue scaling
         self.substeps = substeps                             # physics steps per control step (the physics step DT is fixed)
         self.torque = torque                                 # step() takes activations in [-1, 1], not target angles
         self.model = mujoco.MjModel.from_xml_string(build_xml(creature, terrain, kp_scale, floor_friction=friction,
                                                               terrain_friction=friction, soft_range=soft_range, passive=passive,
-                                                              torque=torque, muscles=muscles, fixed_root=fixed_root))
+                                                              torque=torque, muscles=muscles, fixed_root=fixed_root,
+                                                              leg_contacts=leg_contacts))
         self.fixed = fixed_root is not None
         self.data = mujoco.MjData(self.model)
         m = self.model; sk = self.sk

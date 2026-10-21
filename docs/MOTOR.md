@@ -289,6 +289,16 @@ Curriculum:
 * **A dog on its chin:** walking under a 30 % harness, the muscle dog's paws carried 0.37 body weights in front and
   0.34 behind (a real dog about 60:40), and its head on the ground 0.11: a head may touch the ground (grazing), but
   that touch was free. Load on the head now hurts (`evaluate.HEAD_REST`, 3 pain per body weight).
+* **Legs through each other:** body parts never collided with each other, and a walker set one foot in front of the
+  other with its legs crossing like scissors, which spares the hip abductors. Bipeds and quadrupeds now have contact
+  pairs between the bones of different legs (`FamilyEnv.LEG_CONTACTS`, `physics.build_xml(leg_contacts=...)`).
+* **Top speed held by unrelated falls:** the goal speeds grew only while fewer than 30 % of all episodes failed, and
+  tired starts, wind, sores and packs kept a walker at 40-50 % for days, so its top speed stayed at 0.8 m/s and a 1.3 m/s
+  walk was never trained. The top speed now follows the episodes whose goal is in its top fifth (`fast_fell`,
+  `fast_goal` in the log), and 15 % of moving goals are drawn above it (`AHEAD_SHARE`, `AHEAD_SPEED`; `ahead_fell`),
+  kept out of the curriculum's statistics.
+* **Species variety tied to the spread:** see `FamilyEnv.SPECIES_SHARE`: at a spread of 0.1 the quadruped trained on
+  the dog alone for a day and a cat fell in every episode within 0.6 s.
 * **Tail muscles and a cat's fall (`muscles.quadruped_set`, `FamilyEnv.reset(drop=...)`):** the tail is moved by
   muscles, not joint motors: levators above, depressors below and lateral flexors at the side, in two runs (from the
   sacrum over the first two joints, from the second vertebra over the last two), so it can swing and curl in an S;

@@ -69,6 +69,8 @@ class BipedEnv(FamilyEnv):
     # about half of those starts fell within a second (from rest the same networks never fell, but never sped up past
     # a walk either), and the falls taught that going fast means falling. Run speeds are reached by speeding up
     MOVING_START_MAX = 1.5
+    LEG_CONTACTS = True
+    AHEAD_SPEED = 0.5     # m/s above the curriculum's top speed
     # with starts capped, both networks sped up to about 1.8 m/s and no further (a quick walk, 2 to 6 % flight): every
     # try at a run had fallen within a second. Goals past a walk get a harness that only keeps the trunk upright, so a
     # run can be practised before it can be balanced; it fades with time (ppo --run-assist0, --run-fade)

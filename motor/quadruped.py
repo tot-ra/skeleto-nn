@@ -50,6 +50,7 @@ class QuadrupedEnv(FamilyEnv):
         PASSIVE = {"neck": 1.5, "trunk": 1.0}
 
     SPECIES_SHARE = 0.0 if ONLY else 0.6
+    LEG_CONTACTS = True
 
     def default_body(self):
         return canonical(QUADS[ONLY or "dog"])

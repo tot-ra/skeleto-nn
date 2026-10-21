@@ -131,6 +131,11 @@ class FamilyEnv:
     # wind, ice and sores, and when it fell to 0.1 a quadruped worker kept one body for about 40 episodes and nine in
     # ten new ones were dogs, so a day of training went to the dog and a cat fell in every episode in 0.6 s
     SPECIES_SHARE = 0.0
+    LEG_CONTACTS = False  # the legs collide with each other (physics.build_xml ``leg_contacts``)
+    # a share of moving goals is drawn above the curriculum's top speed, up to this much more (speed units), so the
+    # network tries faster before the curriculum asks for it; these episodes stay out of the curriculum's statistics
+    AHEAD_SHARE = 0.15
+    AHEAD_SPEED = 0.25
     TOUCH_OK = ()         # bone groups whose ground contact is not a fall (it still counts as injury and pain)
 
     def _stalled(self, goal, sp):
@@ -158,7 +163,7 @@ class FamilyEnv:
     def _build(self, body):
         self.b = body
         self.c = self.make_creature(body)
-        self.pc = PhysChar(self.c, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))), passive=self.PASSIVE,
+        self.pc = PhysChar(self.c, leg_contacts=self.LEG_CONTACTS, soft_range=self.SOFT_RANGE, substeps=int(round(1.0 / (DT * self.CTRL_HZ))), passive=self.PASSIVE,
                            springs=self.SPRINGS, torque=self.TORQUE or self.MUSCLES is not None,
                            muscles=SETS[self.MUSCLES](self.c) if self.MUSCLES else None)
         self.J = self.pc.nj
@@ -215,8 +220,17 @@ class FamilyEnv:
                 sores[self.SORES[int(rng.integers(len(self.SORES)))]] = float(rng.uniform(0.3, 1.0))
         self.sores_now = sores
         self.profile = profile or ev.sample_profile(rng, self.spread)
+        self.goal_sp = -1.0                                 # goal speed in curriculum units (-1: given, not drawn)
         if goal is None:
-            speed = 0.0 if rng.random() < 0.15 else rng.uniform(0.3, max(0.4, min(self.MAX_SPEED, self.max_speed * self.speed_scale()))) * self.speed_unit()
+            top = max(0.4, min(self.MAX_SPEED, self.max_speed * self.speed_scale()))
+            if rng.random() < 0.15:
+                speed = 0.0
+            elif rng.random() < self.AHEAD_SHARE:
+                speed = rng.uniform(top, min(self.MAX_SPEED, top + self.AHEAD_SPEED * self.speed_scale()))
+            else:
+                speed = rng.uniform(0.3, top)
+            self.goal_sp = speed / self.speed_scale()
+            speed *= self.speed_unit()
             ang = rng.uniform(-math.pi, math.pi) if rng.random() < 0.3 * self.spread else rng.normal(0, 0.05 + 0.25 * self.spread)
             goal = np.array([speed * math.cos(ang), speed * math.sin(ang)])
         self.goal_world = np.array(goal, float)
@@ -417,6 +431,6 @@ class FamilyEnv:
         info = dict(trunc=trunc and not done, costs=costs, goal_now=goal, speed=float(np.linalg.norm(pc.data.qvel[0:2])),
                     stalled=stalled)
         if done or trunc:
-            info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps)
+            info.update(ep_ret=self.ep_ret, ep_len=self.steps, fell=fell, goal=self.ep_goal / self.steps, goal_sp=self.goal_sp)
             self.episode_done(done, self.ep_goal / self.steps)
         return self.obs(), r, done, info
