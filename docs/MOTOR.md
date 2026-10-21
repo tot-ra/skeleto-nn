@@ -316,6 +316,12 @@ Curriculum:
   2.5-unit beat sinking about 1 m/s; the old evolved flier itself now stays up 1.8 s in its own world. Bird PPO is
   stopped until the wing model gets work: flapping costs about eight times a real crow's power, so level flight
   sits at the edge of the sustainable power.
+* **Normalisation that blinded the network to other bodies:** observations are normalised by a running mean and
+  variance over all of training, and after days on the dog the body vector's spread was 0.001 to 0.04 (sores and
+  wind alike). A cat's vector normalised to -46, clipped to -10, and every other species, the wolf too, folded to
+  the floor in 0.2 to 0.4 s; given the dog's vector, the same network kept a wolf and a cat standing for 5 s. The
+  body, ground and wind and sore inputs now normalise by a spread of at least 0.3 (`var_floor` in `motor/ppo.py`):
+  with no other change the horse, goat and wolf then held up to 2.2, 3.5 and 3.2 s.
 * **One harness for every species:** the curriculum's harness is shared, and once the dog walked without it a cat
   or a horse folded to the floor within 0.13 to 0.3 s. Those episodes were four to nine steps long against a dog's
   400, under 1 % of the samples, so after eight hours with species in training neither stood. Every species now has

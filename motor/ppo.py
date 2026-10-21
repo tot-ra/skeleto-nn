@@ -148,6 +148,16 @@ def main():
     logstd = nn.Parameter(torch.full((ad,), -2.5))
     opt = torch.optim.Adam(list(pi.parameters()) + list(vf.parameters()) + [logstd], lr=args.lr)
     mean = np.zeros(od, np.float32); var = np.ones(od, np.float32); cnt = 1e-4
+    # least spread of the inputs that describe the body and the conditions (body vector, ground and wind, sores): a
+    # quadruped trained on the dog for days had a body-vector spread of 0.001 to 0.04, so a cat's vector normalised to
+    # -46 (clipped to -10) and every other species folded to the floor in 0.2 to 0.4 s; told it was a dog, the same
+    # network kept a wolf and a cat standing
+    var_floor = np.zeros(od, np.float32)
+    if hasattr(ref, "obs_layout"):
+        for key in ("body", "env", "sores"):
+            sl = ref.obs_layout().get(key)
+            if sl is not None:
+                var_floor[sl] = 0.3 ** 2
     assist = args.assist0; it0 = 0; fell_s = goal_s = fast_fell = fast_goal = None; max_speed = args.speed0; spread = args.spread; run_assist = args.run_assist0
     if args.init:
         ck = torch.load(args.init, weights_only=False)
@@ -159,6 +169,7 @@ def main():
         # to the 0.8 floor within 150 rounds
         cur = ck.get("curriculum") or {}
         fell_s, goal_s, fast_fell, fast_goal = (cur.get(k) for k in ("fell_s", "goal_s", "fast_fell", "fast_goal"))
+        var = np.maximum(var, var_floor)
         if args.reset_curriculum:            # keep the weights, start the harness and the goals over
             assist, max_speed, spread = args.assist0, args.speed0, args.spread
     m_perm = torch.tensor(ref.a_perm); m_sign = torch.tensor(ref.a_sign, dtype=torch.float32)
@@ -213,6 +224,7 @@ def main():
         raw = O * norm[1] + norm[0]
         bm, bv, bc = raw.mean(0), raw.var(0), len(raw); d = bm - mean; tot = cnt + bc
         mean = (mean + d * bc / tot).astype(np.float32); var = ((var * cnt + bv * bc + d ** 2 * cnt * bc / tot) / tot).astype(np.float32); cnt = tot
+        var = np.maximum(var, var_floor)
         To = torch.tensor(O); Ta = torch.tensor(A); Tlp = torch.tensor(LP)
         Tadv = torch.tensor((ADV - ADV.mean()) / (ADV.std() + 1e-6)); Tret = torch.tensor(RET)
         TK = torch.tensor(np.concatenate([r[10] for r in res])); TKM = torch.tensor(np.concatenate([r[11] for r in res]))
