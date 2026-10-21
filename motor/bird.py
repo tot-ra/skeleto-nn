@@ -36,7 +36,9 @@ class BirdEnv(FamilyEnv):
     family = "bird"
     BODY_DIM = 7
     MAX_SPEED = 4.0
-    ASSIST_RECOVER = 1.0   # a flier that cannot yet stay up gets the whole harness back (stall ends a hover under it)
+    # a flier that falls gets part of the harness back, not all of it: with falls read smoothed over rounds, a full
+    # harness came back within 200 rounds and the bird stopped beating its wings under it (energy 2.7 -> 0.13)
+    ASSIST_RECOVER = 0.3
     GOAL_OK = 0.35         # the climb rate is scored tightly (CLIMB_TOL), so a met flight scores lower than a met walk
     FAIL_OK = 0.5          # a flight ends at any touch of the ground, so more of them fail while the goals are met
     # exploration noise floor: 0.2 (log -1.6) until the wingbeat was found (a glider's 0.08 never found one); 0.12 once

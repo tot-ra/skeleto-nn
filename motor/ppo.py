@@ -272,7 +272,7 @@ def main():
             max_speed = max(args.speed0, max_speed - 0.01)
             spread = max(args.spread, spread - 0.003)
             if assist < ref.ASSIST_RECOVER:                  # how far the harness comes back is the family's
-                assist = min(args.assist0, assist + 0.01)
+                assist = min(args.assist0, assist + 0.002)   # the smoothed signal stays up for many rounds
         costs = " ".join(f"{k}={v:.3f}" for k, v in zip(cost_names, cm) if k not in ("heat", "breath"))
         line = (f"{it} sps={N / (time.time() - t0):.0f} ep_len={el:.0f} failed={fell:.2f} goal={goal:.3f} assist={assist:.2f} run_assist={run_assist:.2f} vmax={max_speed:.2f} spread={spread:.2f} "
                 f"std={logstd.exp().mean().item():.3f} sym={sym_l:.4f} {costs}"
