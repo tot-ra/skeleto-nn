@@ -146,7 +146,7 @@ def main():
     logstd = nn.Parameter(torch.full((ad,), -2.5))
     opt = torch.optim.Adam(list(pi.parameters()) + list(vf.parameters()) + [logstd], lr=args.lr)
     mean = np.zeros(od, np.float32); var = np.ones(od, np.float32); cnt = 1e-4
-    assist = args.assist0; it0 = 0; max_speed = args.speed0; spread = args.spread; run_assist = args.run_assist0
+    assist = args.assist0; it0 = 0; fell_s = goal_s = None; max_speed = args.speed0; spread = args.spread; run_assist = args.run_assist0
     if args.init:
         ck = torch.load(args.init, weights_only=False)
         pi.load_state_dict(ck["pi"]); vf.load_state_dict(ck["vf"]); logstd.data = ck["logstd"]
@@ -254,15 +254,21 @@ def main():
         # curriculum: lower the harness when episodes run long and few fall
         # curriculum: the harness fades with time (so standing still under it never becomes a home) and faster while
         # the goal is met; goal speeds grow while it is met
+        # the curriculum reads falls and goal smoothed over rounds: a round holds few episodes, and single rounds over
+        # 0.6 failed (episodes started tired, rough ground) gave back 0.01 each while the steady fade took 0.0001, so the
+        # harness of the walkers and quadrupeds sat at its recovery level of 0.3 for days with a mean of 0.33-0.47 failed
+        if n_ep:
+            fell_s = fell if fell_s is None else 0.95 * fell_s + 0.05 * fell
+            goal_s = goal if goal_s is None else 0.95 * goal_s + 0.05 * goal
         assist = max(0.0, assist - args.fade)
         run_assist = max(0.0, run_assist - args.run_fade)
         # goal speeds and variety grow slowly while the goal is met (fast growth ran past what the body could learn
         # twice) and shrink back when most episodes fail
-        if n_ep and goal > ref.GOAL_OK and fell < ref.FAIL_OK:
+        if n_ep and goal_s > ref.GOAL_OK and fell_s < ref.FAIL_OK:
             assist = max(0.0, assist - args.fade_ok)
             max_speed = min(ref.MAX_SPEED, max_speed + 0.005)
             spread = min(1.0, spread + 0.003)
-        elif n_ep and fell > 0.6:
+        elif n_ep and fell_s > 0.6:
             max_speed = max(args.speed0, max_speed - 0.01)
             spread = max(args.spread, spread - 0.003)
             if assist < ref.ASSIST_RECOVER:                  # how far the harness comes back is the family's
