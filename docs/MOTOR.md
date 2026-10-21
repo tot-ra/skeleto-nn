@@ -307,6 +307,15 @@ Curriculum:
   (damped least squares on 21 marked joints, 2.4 cm mean error, 14616 frames with mirrors). Only the start comes from
   the recording; the episode is scored like any other and is kept out of the curriculum's statistics (`rsi_fell`).
   The network trained before this fell from such starts within a second (muscles start slack in mid-stride).
+* **Birds: no level flight in this physics (2026-10-21).** The bird run had trained level flight up to halfway
+  (curriculum knob 1.5), then lost it within 400 rounds and fell back to glides at spread 0, where 60 % of its
+  training flights still failed: it beat its wings at full stroke in glides too (about 3 energy units against 1.4
+  sustainable), emptied its reserve within the 15 s flight and touched down near the end. No checkpoint held level
+  flight without the harness for more than 2.5 s. A CMA-ES search of the evolved flier's wingbeat with reflexes
+  (`flier.Flier`, 150 generations, through the motor env's activation and action range) found nothing better than a
+  2.5-unit beat sinking about 1 m/s; the old evolved flier itself now stays up 1.8 s in its own world. Bird PPO is
+  stopped until the wing model gets work: flapping costs about eight times a real crow's power, so level flight
+  sits at the edge of the sustainable power.
 * **One harness for every species:** the curriculum's harness is shared, and once the dog walked without it a cat
   or a horse folded to the floor within 0.13 to 0.3 s. Those episodes were four to nine steps long against a dog's
   400, under 1 % of the samples, so after eight hours with species in training neither stood. Every species now has
