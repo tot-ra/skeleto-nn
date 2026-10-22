@@ -1,7 +1,7 @@
 {
  "biped": {
-  "score": 0.861,
-  "it": 49440,
+  "score": 0.879,
+  "it": 68460,
   "rounds": null,
   "assist": 0.0,
   "muscles": 44,
@@ -10,33 +10,33 @@
     "name": "walk_slow",
     "title": "walk 0.8 m/s",
     "gif": "showcase/motor/latest/biped_walk_slow.gif",
-    "result": "held 8.0 s, 0.68 m/s, goal 0.78"
+    "result": "held 8.0 s, 0.73 m/s, goal 0.84"
    },
    {
     "name": "walk",
     "title": "walk 1.3 m/s",
     "gif": "showcase/motor/latest/biped_walk.gif",
-    "result": "held 8.0 s, 0.97 m/s, goal 0.66"
+    "result": "held 8.0 s, 1.00 m/s, goal 0.70"
    },
    {
     "name": "turn",
     "title": "walk to the left",
     "gif": "showcase/motor/latest/biped_turn.gif",
-    "result": "fell at 3.1 s, 0.41 m/s, goal 0.14"
+    "result": "fell at 2.0 s, 0.82 m/s, goal 0.24"
    },
    {
     "name": "stand",
     "title": "standing still",
     "gif": "showcase/motor/latest/biped_stand.gif",
-    "result": "held 8.0 s, 0.02 m/s, goal 0.93"
+    "result": "held 8.0 s, 0.02 m/s, goal 0.94"
    }
   ],
   "emg": "showcase/motor/latest/biped_emg.png",
-  "updated": "2026-10-21 23:04"
+  "updated": "2026-10-22 10:07"
  },
  "quadruped": {
-  "score": 0.199,
-  "it": 54210,
+  "score": 0.228,
+  "it": 72980,
   "rounds": null,
   "assist": 0.0,
   "muscles": 66,
@@ -45,29 +45,29 @@
     "name": "dog_walk",
     "title": "dog, walk",
     "gif": "showcase/motor/latest/quadruped_dog_walk.gif",
-    "result": "held 8.0 s, 0.51 m/s, goal 0.24"
+    "result": "held 8.0 s, 0.75 m/s, goal 0.37"
    },
    {
     "name": "cat_walk",
     "title": "cat, walk",
     "gif": "showcase/motor/latest/quadruped_cat_walk.gif",
-    "result": "fell at 2.3 s, 0.08 m/s, goal 0.11"
+    "result": "fell at 1.3 s, 0.92 m/s, goal 0.25"
    },
    {
     "name": "horse_walk",
     "title": "horse, walk",
     "gif": "showcase/motor/latest/quadruped_horse_walk.gif",
-    "result": "fell at 1.2 s, 2.98 m/s, goal 0.21"
+    "result": "fell at 1.2 s, 2.13 m/s, goal 0.32"
    },
    {
     "name": "cat_drop",
     "title": "cat dropped upside down",
     "gif": "showcase/motor/latest/quadruped_cat_drop.gif",
-    "result": "fell at 0.5 s, 0.18 m/s, goal 0.86"
+    "result": "fell at 0.5 s, 0.45 m/s, goal 0.72"
    }
   ],
   "emg": "showcase/motor/latest/quadruped_emg.png",
-  "updated": "2026-10-21 23:04"
+  "updated": "2026-10-22 10:07"
  },
  "bird": {
   "score": 0.13,

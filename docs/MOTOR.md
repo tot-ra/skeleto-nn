@@ -307,6 +307,9 @@ Curriculum:
   (damped least squares on 21 marked joints, 2.4 cm mean error, 14616 frames with mirrors). Only the start comes from
   the recording; the episode is scored like any other and is kept out of the curriculum's statistics (`rsi_fell`).
   The network trained before this fell from such starts within a second (muscles start slack in mid-stride).
+  Nine hours later (2026-10-22) the walker from normal starts and without the harness fell in 0 of 8 episodes at
+  0.9 and at 1.1 m/s and in 1 of 8 at 1.3 m/s (before: 2 of 6, 3 of 6, 2 of 6); 56-60 % of the recorded-stride
+  starts still fell, against about 75 % at first.
 * **Birds: no level flight in this physics (2026-10-21).** The bird run had trained level flight up to halfway
   (curriculum knob 1.5), then lost it within 400 rounds and fell back to glides at spread 0, where 60 % of its
   training flights still failed: it beat its wings at full stroke in glides too (about 3 energy units against 1.4
@@ -322,6 +325,8 @@ Curriculum:
   the floor in 0.2 to 0.4 s; given the dog's vector, the same network kept a wolf and a cat standing for 5 s. The
   body, ground and wind and sore inputs now normalise by a spread of at least 0.3 (`var_floor` in `motor/ppo.py`):
   with no other change the horse, goat and wolf then held up to 2.2, 3.5 and 3.2 s.
+  After nine hours of training with the floor and the per-species harness, every species but the horse finished some
+  10 s episodes (random goals, no harness), but most still ended within one or two seconds, the dog's too.
 * **One harness for every species:** the curriculum's harness is shared, and once the dog walked without it a cat
   or a horse folded to the floor within 0.13 to 0.3 s. Those episodes were four to nine steps long against a dog's
   400, under 1 % of the samples, so after eight hours with species in training neither stood. Every species now has

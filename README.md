@@ -43,13 +43,13 @@ muscle pulls its joint the anatomical way over the range; the atlases come from 
 ### Motor network
 
 <!-- motor-status:biped:start -->
-**Current network** (`python -m motor.showcase`, updated 2026-10-21 23:04): 49,440 training iterations, score 0.86 of 1.3 (survival share x (0.3 + goal)); 44 line muscles, no harness.
+**Current network** (`python -m motor.showcase`, updated 2026-10-22 10:07): 68,460 training iterations, score 0.88 of 1.3 (survival share x (0.3 + goal)); 44 line muscles, no harness.
 
 <table><tr>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk_slow.gif" width="100%"><br><b>walk 0.8 m/s</b>: held 8.0 s, 0.68 m/s, goal 0.78</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 0.97 m/s, goal 0.66</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: fell at 3.1 s, 0.41 m/s, goal 0.14</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/biped_stand.gif" width="100%"><br><b>standing still</b>: held 8.0 s, 0.02 m/s, goal 0.93</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk_slow.gif" width="100%"><br><b>walk 0.8 m/s</b>: held 8.0 s, 0.73 m/s, goal 0.84</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_walk.gif" width="100%"><br><b>walk 1.3 m/s</b>: held 8.0 s, 1.00 m/s, goal 0.70</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_turn.gif" width="100%"><br><b>walk to the left</b>: fell at 2.0 s, 0.82 m/s, goal 0.24</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/biped_stand.gif" width="100%"><br><b>standing still</b>: held 8.0 s, 0.02 m/s, goal 0.94</td>
 </tr></table>
 
 <img src="showcase/motor/latest/biped_emg.png" width="100%">
@@ -96,13 +96,13 @@ One network for dog, cat, wolf, goat, horse, pig and bear on one canonical skele
 down from 2 to 5 body lengths and has to land on its feet, turning with its spine and tail.
 
 <!-- motor-status:quadruped:start -->
-**Current network** (`python -m motor.showcase`, updated 2026-10-21 23:04): 54,210 training iterations, score 0.20 of 1.3 (survival share x (0.3 + goal)); 66 line muscles, no harness.
+**Current network** (`python -m motor.showcase`, updated 2026-10-22 10:07): 72,980 training iterations, score 0.23 of 1.3 (survival share x (0.3 + goal)); 66 line muscles, no harness.
 
 <table><tr>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 0.51 m/s, goal 0.24</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: fell at 2.3 s, 0.08 m/s, goal 0.11</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: fell at 1.2 s, 2.98 m/s, goal 0.21</td>
-<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_drop.gif" width="100%"><br><b>cat dropped upside down</b>: fell at 0.5 s, 0.18 m/s, goal 0.86</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_dog_walk.gif" width="100%"><br><b>dog, walk</b>: held 8.0 s, 0.75 m/s, goal 0.37</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_walk.gif" width="100%"><br><b>cat, walk</b>: fell at 1.3 s, 0.92 m/s, goal 0.25</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_horse_walk.gif" width="100%"><br><b>horse, walk</b>: fell at 1.2 s, 2.13 m/s, goal 0.32</td>
+<td width="25%" valign="top"><img src="showcase/motor/latest/quadruped_cat_drop.gif" width="100%"><br><b>cat dropped upside down</b>: fell at 0.5 s, 0.45 m/s, goal 0.72</td>
 </tr></table>
 
 <img src="showcase/motor/latest/quadruped_emg.png" width="100%">
