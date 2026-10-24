@@ -60,9 +60,9 @@ plan ID ADVANCE SPEED MOVE_X MOVE_Z FACE_X FACE_Z MODE PHASE
 plan 23 0 0.7 0 1 0 1 locomotion 0
 ```
 
-`ADVANCE` is an index into the preceding generated plan, not wall-clock time; it selects
+`ADVANCE` is an index into the preceding generated plan within the same mode, not wall-clock time; it selects
 the next four context frames. Speeds are metres per second in the source body's scale.
-The consumer must account for character scale and initial heading. `ID` also supplies the
+The consumer must account for character scale and its chosen coordinate frame. Reval Rebel sends body-local movement with facing +Z; its actor owns yaw, and the retargeter removes predicted root yaw. `ID` also supplies the
 random seed; a command stream is reproducible on the same build/backend.
 
 Modes:
@@ -78,7 +78,7 @@ Modes:
 
 Locomotion calls the pretrained agent. Action modes call the pretrained stateless
 in-betweening API with four source and four goal frames and a 24-frame horizon. Goal
-keyframes are constraints, not learned muscle policies or playback clips. The network
+keyframes are absolute neutral-relative constraints, not offsets compounded onto the last action, learned muscle policies or playback clips. The target root stays upright, and switching modes resets the agent context to idle. The network
 generates the transition; the game still owns its action clock, collision decisions,
 jump trajectory, and exact hand/foot contacts. Do not describe this as learned physics.
 
@@ -88,10 +88,25 @@ The consumer must validate lengths, finite numbers and quaternion norms, buffer 
 and keep the game thread independent of inference. Invalid input returns an error object;
 startup failure exits nonzero. `quit` or stdin EOF exits. The game must own and close the child.
 
+## Sustained gait regression
+
+```sh
+python -m runtime.test_native --worker runs/native_runtime/skeleto_motion_worker \
+  --bundle runs/native_runtime --long
+```
+
+This checks 256 consecutive real-weight plans across walking, repeated ladder/door/jump goals,
+and walking again. It rejects accumulated knee angles and falling root orientations. The game
+also checks startup turns before metadata arrives, 90/180-degree turns, slope-frame consistency,
+foot-contact release, and a long route at its actual 1.5 m/s walk speed. The source body's walking
+range is limited to 2 m/s by the game adapter; its 8 m/s sprint uses the authored run clip.
+No pretrained weights were retrained for these fixes.
+
 ## Reval Rebel integration
 
 `scripts/motion/neural_motion_driver.gd` drives the hero only and smoothly yields to authored
-combat, swimming, riding and other actions. `motion_contact_modifier.gd` places feet on the
+combat, sprinting, sitting/lying, swimming, riding and other actions. Playback uses the protocol
+frame rate (30 FPS), including action plans. `motion_contact_modifier.gd` places feet on the
 city's actual `walk_height` surfaces and makes the right hand follow a door leaf's handle.
 The fixed smithy ladder supplies rung targets and phase; the game owns ascent, descent, stamina and its loft layer.
 Slopes and existing stair flights use the same ground query, not a new movement mechanic.

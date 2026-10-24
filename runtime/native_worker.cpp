@@ -51,6 +51,7 @@ struct Runtime {
     std::map<std::string, unsigned> indices;
     std::vector<float> last_roots, last_rotations;
     uint64_t last_frames{};
+    std::string current_mode = "locomotion";
 
     ~Runtime() {
         mb_motion_free(motion);
@@ -101,23 +102,17 @@ struct Runtime {
 
     // Goal keyframes constrain the pretrained in-betweening model. These are
     // not output clips: mb_model_infer generates the transition in every call.
-    void rotate_goal(std::vector<float> & rotations, unsigned frame,
-                     const std::string & name, unsigned axis, float angle) {
+    void set_goal(std::vector<float> & rotations, unsigned frame,
+                  const std::string & name, unsigned axis, float angle) {
         const auto found = indices.find(name);
         if (found == indices.end()) throw std::runtime_error("goal joint missing: " + name);
         float * q = rotations.data() + frame * stride + found->second * 4;
-        float v[3]{};
-        v[axis] = std::sin(angle * 0.5F);
-        const float w = std::cos(angle * 0.5F);
-        const std::array<float, 4> result{
-            w*q[0]+v[0]*q[3]+v[1]*q[2]-v[2]*q[1],
-            w*q[1]-v[0]*q[2]+v[1]*q[3]+v[2]*q[0],
-            w*q[2]+v[0]*q[1]-v[1]*q[0]+v[2]*q[3],
-            w*q[3]-v[0]*q[0]-v[1]*q[1]-v[2]*q[2]};
-        std::copy(result.begin(), result.end(), q);
+        std::fill(q, q + 4, 0.0F);
+        q[axis] = std::sin(angle * 0.5F);
+        q[3] = std::cos(angle * 0.5F);
     }
 
-    void constrained_goal(const std::string & mode, float phase, uint64_t seed) {
+    void constrained_goal(const std::string & mode, float phase, uint64_t seed, float fx, float fz) {
         uint64_t frames{}, count{};
         const float * roots{};
         const float * rotations{};
@@ -127,27 +122,34 @@ struct Runtime {
         check(mb_motion_get_local_rotations_xyzw(motion, &rotations, &count, error_buffer, sizeof error_buffer));
         std::vector<float> source_rotations(rotations, rotations + 4 * stride);
         auto target_roots = source_roots;
-        auto target_rotations = source_rotations;
+        // Absolute neutral-relative targets: never compound offsets from a prior action.
+        std::vector<float> target_rotations(4 * stride, 0.0F);
         for (unsigned f = 0; f < 4; ++f) {
+            for (unsigned j = 0; j < joints; ++j) target_rotations[f * stride + j * 4 + 3] = 1.0F;
+            const float yaw = std::atan2(fx, fz);
+            target_rotations[f * stride + 1] = std::sin(yaw * 0.5F);
+            target_rotations[f * stride + 3] = std::cos(yaw * 0.5F);
+            target_roots[f * 3 + 1] = mode == "jump_start" ? 0.70F :
+                (mode == "jump_land" ? 0.72F + phase * 0.067193F : 0.787193F);
             if (mode == "door") {
-                rotate_goal(target_rotations, f, "right_shoulder_pitch_skel", 0, -0.9F);
-                rotate_goal(target_rotations, f, "right_elbow_skel", 0, -0.45F);
+                set_goal(target_rotations, f, "right_shoulder_pitch_skel", 0, -0.9F);
+                set_goal(target_rotations, f, "right_elbow_skel", 0, 0.45F);
             } else if (mode == "ladder") {
                 for (const std::string side : {"left", "right"}) {
                     const float cycle = std::sin(6.2831853F * phase + (side == "left" ? 0.0F : 3.1415927F));
-                    rotate_goal(target_rotations, f, side + "_shoulder_pitch_skel", 0, -1.7F - cycle * 0.3F);
-                    rotate_goal(target_rotations, f, side + "_elbow_skel", 0, -0.7F);
-                    rotate_goal(target_rotations, f, side + "_hip_pitch_skel", 0, -0.45F - cycle * 0.3F);
-                    rotate_goal(target_rotations, f, side + "_knee_skel", 0, 0.85F + cycle * 0.45F);
+                    set_goal(target_rotations, f, side + "_shoulder_pitch_skel", 0, -1.7F - cycle * 0.3F);
+                    set_goal(target_rotations, f, side + "_elbow_skel", 0, 0.7F);
+                    set_goal(target_rotations, f, side + "_hip_pitch_skel", 0, -0.45F - cycle * 0.3F);
+                    set_goal(target_rotations, f, side + "_knee_skel", 0, 0.85F + cycle * 0.45F);
                 }
             } else {
                 const float bend = mode == "jump_air" ? 0.85F :
                     (mode == "jump_land" ? 0.55F * (1.0F-phase) : 0.6F);
                 for (const std::string side : {"left", "right"}) {
-                    rotate_goal(target_rotations, f, side + "_hip_pitch_skel", 0, -bend * 0.5F);
-                    rotate_goal(target_rotations, f, side + "_knee_skel", 0, bend);
-                    rotate_goal(target_rotations, f, side + "_ankle_pitch_skel", 0, -bend * 0.5F);
-                    rotate_goal(target_rotations, f, side + "_shoulder_pitch_skel", 0, -0.35F);
+                    set_goal(target_rotations, f, side + "_hip_pitch_skel", 0, -bend * 0.5F);
+                    set_goal(target_rotations, f, side + "_knee_skel", 0, bend);
+                    set_goal(target_rotations, f, side + "_ankle_pitch_skel", 0, -bend * 0.5F);
+                    set_goal(target_rotations, f, side + "_shoulder_pitch_skel", 0, -0.35F);
                 }
             }
         }
@@ -184,6 +186,13 @@ struct Runtime {
             throw std::runtime_error("invalid movement request");
         if (mode != "locomotion" && mode != "jump_start" && mode != "jump_air" &&
             mode != "jump_land" && mode != "door" && mode != "ladder") throw std::runtime_error("unknown motion goal");
+        if (mode != current_mode) {
+            check(mb_agent_reset(agent, styles.at("idle"), error_buffer, sizeof error_buffer));
+            last_frames = 0;
+            last_roots.clear();
+            last_rotations.clear();
+            current_mode = mode;
+        }
         context(advance);
         mb_motion_free(motion);
         motion = nullptr;
@@ -195,7 +204,7 @@ struct Runtime {
         check(mb_command_set_facing_direction(command, fx, 0, fz, error_buffer, sizeof error_buffer));
         check(mb_command_set_seed(command, id, error_buffer, sizeof error_buffer));
         check(mb_agent_plan(agent, command, &motion, error_buffer, sizeof error_buffer));
-        if (mode != "locomotion") constrained_goal(mode, phase, id);
+        if (mode != "locomotion") constrained_goal(mode, phase, id, fx, fz);
         uint64_t count{};
         const float * roots{};
         const float * rotations{};
