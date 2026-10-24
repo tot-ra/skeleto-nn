@@ -9,6 +9,97 @@ such as monkeys, bears, kangaroos and penguins, birds, snakes) gets its own poli
 environment, the goal and a motivation profile are inputs, so one network covers every individual and situation of
 that family. A second, smaller network will later copy each policy without physics, so that a game can run it.
 
+## Guarded fine-tuning (2026-10-25)
+
+Training has resumed after the October 22 pause. It is separate from `runtime/` (the deployed MotionBricks G1
+kinematic controller). These local MuJoCo policies still have no engine pose export or game integration.
+No new production animal art or gameplay mechanic is introduced by this training work.
+
+The first paired evaluation rejected all three new checkpoints. People gained mean score (0.5102 to 0.5486)
+but lost some difficult-body/ice/turn behavior. Quadrupeds lost mean score (0.2352 to 0.2157); a real-dog prior
+applied to every species was harmful. Birds changed little (0.1525 to 0.1555) and lost tilt/height quality.
+These values compare 8-second scenarios, three seeds and zero harness; they are not comparable with older
+README showcase scores that used fewer selected situations. Full evidence: [`motor_training_20261025.json`](../results/motor_training_20261025.json).
+
+### Real dog reference and rights
+
+`motor/dog_mocap.py` imports Han et al., *Lifelike Agility and Play in Quadrupedal Robots using Reinforcement
+Learning and Generative Pre-trained Models*, [Figshare version 1](https://doi.org/10.6084/m9.figshare.24968946.v1).
+The publisher API declares **CC BY 4.0**. The importer preserves the full author list, title, DOI, license URL,
+archive hash and modifications in `source.json`. Carry that attribution with derived training data and any
+redistributed resulting weights. This source is distinct from AI4Animation, whose dog recordings are
+[CC BY-NC 4.0](https://github.com/sebastianstarke/AI4Animation#copyright-information) and are not used here.
+
+The checked archive is 73,545,752 bytes, SHA-256 `651a4099b4660f898a5bfcd24769ba4142a0ec30daa328a2aebc3d31b51b8b34`.
+Of 33 source clips, the importer selects 23 locomotion/idle recordings; jumps, hits and play need different goals.
+BVH uses intrinsic declared Euler order; this Biped exporter stores full local translation channels, so those axes
+replace OFFSET. Adding them would double bone lengths. Centimetres/Y-up become metres/Z-up by a right-handed
+cyclic transform. Only comparable thigh/shank/back/neck/head/tail directions are used: recorded forepaws and the
+physics metapodials are not falsely equated. Heading and velocity come from the hips.
+
+Whole-clip SHA-based splitting happens before downsampling/mirroring: **15 train / 8 holdout clips**, **30,776 /
+14,758 paired transitions**, 30 Hz. No transition crosses a file boundary. `--amp-species dog` confines the dog prior
+and discriminator updates to dog transitions; physical rewards still train every species. It is not a cat, horse
+or bird recording. The original procedural prior remains available for other families.
+
+```sh
+.venv/bin/python -m motor.dog_mocap --download \
+  --archive runs/dog_source/raw_bvh_data.zip --out runs/dog_source
+```
+
+### Selection and continuation
+
+`motor/benchmark.py` creates fresh deterministic environments for each case and reports survival, goal tracking,
+facing, tilt, a planted-foot endpoint slip proxy, and commanded flight-height error. It covers the seven training
+quadrupeds (dog, cat, wolf, goat, horse, pig, bear) and four birds (crow, gull, heron, duck), including difficult
+situations inherited from `motor/show.py`. It verifies checkpoint dimensions, finite observations and source hashes.
+Foot slip is a kinematic proxy, not a contact-force validation. Endpoint height error on unequal episode lengths
+is conservative and must be read alongside survival. Eight seconds and three seeds do not certify production quality.
+
+`motor/finetune.py` runs bounded rounds in a new directory. It retains every candidate, command, source hash and
+report. The source fingerprint must stay unchanged while a job runs. Checkpoints save atomically and preserve
+Adam state. A frozen `--anchor` policy labels the learner's current states, limiting catastrophic forgetting.
+`--reset-amp` is required for legacy critic states without source provenance, or when data/schema changes;
+new critics carry exact reference SHA-256, segment schema and sample rate. `--reset-curriculum` also clears the
+old smoothed success/failure statistics. PPO has an explicit seed for repeatable new experiments.
+
+Promotion needs a mean gain of at least 0.005, with no case losing more than 0.03 survival/score, acquiring more
+failures, adding more than 5 degrees of tilt or 0.1 m/s slip, losing more than 0.05 facing or 0.1 contact fraction,
+or adding more than 0.25 wingspans of flight-height error. Guards apply against both the latest champion and the
+immutable original, preventing slow accumulated regressions. Missing slip samples cannot masquerade as zero slip.
+Final seeds **404/505/606** are disjoint from the repeated selection seeds **101/202/303** and run only at the end.
+`--amp-holdout` also checks the critic on untouched recorded clips at the end; that LSGAN response is explicitly
+not a flight, locomotion or game-quality certificate. A rejected round never seeds the next one.
+
+Example bounded continuation (choose a fresh name; do not overwrite the published run):
+
+```sh
+nice -n 19 .venv/bin/python -m motor.finetune --family quadruped \
+  --init runs/motor/quad_muscle/ckpt.pt --anchor runs/motor/quad_muscle/ckpt.pt \
+  --name quad_realism --workers 2 --rounds 6 --minutes 10 --lr .00001 \
+  --amp runs/dog_source/dog_train_amp.npz --amp-holdout runs/dog_source/dog_holdout_amp.npz \
+  --amp-species dog --amp-w .25 --reset-amp
+```
+
+Birds can warm up with `--bird-species gull --reset-curriculum --speed0 2 --assist0 .05 --spread .05`
+before returning to family training. This changes the training body, not evaluation scenarios or network dimensions.
+The older `runs/snap/bird3_r107.pt` is a promising gull starting point, not a newly trained or generally accepted
+checkpoint: one of three full gull episodes still fails and other birds sink. There are no new measured real-bird
+flight recordings in this work; the flight prior is procedural. Takeoff, landing, perching and bird walking remain
+unimplemented in the physical policy.
+
+Keep **at most 9 simulation workers in total**, `nice -n 19`, and BLAS/OpenMP thread limits at 1. The new runner
+sets those limits for its children. Three family jobs with two workers each use six simulation workers; evaluation
+adds transient environments. Jobs are finite; `runs/finetune/<name>/history.json` records state/champion/decisions,
+`roundNNN.log` contains training, and `active.lock` identifies the live supervisor. Local checkpoints remain ignored
+by Git and must be backed up separately. No weight is automatically copied into the game or the published showcase.
+
+Verification: `python -m pytest tests/test_motor.py tests/test_muscles.py tests/test_training_review.py` — **38 passed**;
+a real two-iteration PPO run with dog masking/global anchoring passed, and an end-to-end bird runner smoke completed
+train, rejection, preserved champion and separate final holdout. The smoke's one-second episodes validate plumbing
+only; the measured quality report above uses eight seconds. Independent read-only review checked BVH conventions,
+source splitting, mask alignment, anchoring and promotion logic.
+
 ## The evaluation system (`motor/evaluate.py`)
 
 Behaviour is never judged by how it looks. Every control step (30 Hz) the MuJoCo simulation is measured and each

@@ -87,7 +87,7 @@ class QuadrupedEnv(FamilyEnv):
         from motor.amp import features, quad_points, QUAD_SEGS
         pc = self.pc; d = pc.data
         S, E, _R = pc.bone_ends(); _p, R = pc.root_pose()
-        return features(quad_points(pc.sk, S, E), d.qvel[0:3].copy(), float((R @ d.qvel[3:6])[2]), self.leg, QUAD_SEGS)
+        return features(quad_points(pc.sk, S, E), d.qvel[0:3].copy(), float((R @ d.qvel[3:6])[2]), self.leg, getattr(self, "amp_segments", QUAD_SEGS))
 
     def drop_share(self):
         return float(self.c.params["spec"].get("drop_share", 0.0))

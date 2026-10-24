@@ -14,7 +14,7 @@ and scene goal constraints. It is the deployment path now integrated into Reval 
 | **Style network** (`adapt/`, [docs/ADAPT.md](docs/ADAPT.md)) | how a body moves in its situation: stride, crouch, lean, arms out or hugged, a hand on a wound, limp, shiver, wingbeat | body, 24 situation channels (friction, sinking feet, wetness, cold, wind, darkness, smoke, blood loss, pain per region, fatigue, load ...) | [`results/style_net.json`](results/style_net.json), MLP 31-64-64-24, about 7,800 weights | works: 99.9 % of a per-case optimisation; trained in about 25 s on a CPU |
 | **Jump network** (`adapt/leap.py`, [docs/ADAPT.md](docs/ADAPT.md#jumping-by-context-adaptleappy)) | whether and how to jump: hop, vault with the hands, pull up onto a ledge, drop, jump into water, or refuse | the ground ahead as a profile (height and water depth every quarter leg length), body, the same 24 channels | [`results/leap_net.json`](results/leap_net.json), MLP scored per landing place, about 14,000 weights | works: 91 % of a per-case optimisation, 95 % the same jump-or-stay decision |
 | **Native pretrained runtime** (`runtime/`, [build and protocol](runtime/README.md)) | live human locomotion and constrained jump/reach/ladder transitions | previous pose, velocity, facing, goal keyframes | external NVIDIA MotionBricks G1 weights, about 183M parameters | integrated into the game and exported on macOS arm64; no runtime Python or server |
-| **Motor networks**, one per body family (`motor/`, [docs/MOTOR.md](docs/MOTOR.md)) | every joint, 30 times a second | body, environment, goal, the body's state, a motivation profile | none yet | research paused 2026-10-22; last measured results below; not deployed to the game |
+| **Motor networks**, one per body family (`motor/`, [docs/MOTOR.md](docs/MOTOR.md)) | every joint, 30 times a second | body, environment, goal, the body's state, a motivation profile | local checkpoints in `runs/` | training resumed 2026-10-25 with per-species regression gates; not deployed to the game |
 
 The style and jump networks are trained on differentiable consequence models (fast and exact, but reduced-order);
 the motor networks are trained by reinforcement learning in MuJoCo. Their forward passes are a few lines of code in
@@ -25,7 +25,8 @@ any language; a GDScript port runs both finished networks in the Reval Rebel gam
 The [native pretrained runtime](runtime/README.md) now drives the hero in **Reval Rebel**.
 The initial game integration was committed as `a29ac7d38`; the native runtime landed here in `a28ee77`.
 The subsequent native stability fix is `81d4946`; the corrected game poses are shown below.
-The muscle-training experiments below remain paused at their last measured state from 2026-10-22.
+The muscle-training experiments resumed on 2026-10-25; their separate measured state and limits are described below.
+The published motor GIF blocks still carry their original capture dates.
 
 ![Corrected neural gait: turns, stairs, rung ladder and authored sprint](showcase/runtime/reval_actions.gif)
 
@@ -65,6 +66,34 @@ Verified on **macOS arm64, Apple M5 Pro, two CPU threads**:
 The complete game suite is not green: existing release-artifact and city-fixture failures were recorded separately.
 The pretrained model uses its specific NVIDIA license; the runtime packages the required license and attribution files.
 See [build, deployment, protocol and licensing](runtime/README.md) for the reproducible path.
+
+## Motor training resumed (2026-10-25)
+
+People, quadrupeds and birds now have a guarded fine-tuning path, with immutable starting weights,
+frozen-policy anchoring, and a paired benchmark covering **all seven training quadrupeds and all four training birds**.
+The first 860,160 control steps were evaluated on 108 fixed episodes per version (8 seconds, seeds 101/202/303).
+**None of those three candidates passed promotion.** Better average reward alone does not establish realism.
+
+| Family | Starting score | First candidate | Decision |
+|---|---:|---:|---|
+| People | 0.5102 | 0.5486 | Rejected: some bodies/situations regressed despite the higher mean. |
+| Quadrupeds | 0.2352 | 0.2157 | Rejected: a pure dog prior hurt other species. The next stage restricts this prior to dog transitions and anchors the other bodies. |
+| Birds | 0.1525 | 0.1555 | Rejected: tilt/height regressed. A preserved checkpoint with a better gull is a separate curriculum starting point. |
+
+A new importer uses the authors' **CC BY 4.0** [Lifelike Agility dog recordings](https://doi.org/10.6084/m9.figshare.24968946.v1),
+not AI4Animation's non-commercial motion. It verifies the archive SHA-256, keeps the full attribution,
+uses anatomically comparable segment directions, and splits whole recordings before mirroring or building transitions:
+15 training clips / 8 untouched clips, 30,776 / 14,758 transitions. Raw recordings and local checkpoints stay outside Git.
+
+The benchmark separately checks survival, direction, tilt, foot slip and flight height. Every accepted round must
+improve the current champion and preserve the **original** baseline; final seeds 404/505/606 never select rounds.
+A reference-critic check on held-out recordings measures reference generalization only, not policy realism.
+The research policies are still **not wired into the game**. The game's current human runtime remains MotionBricks G1;
+these runs do not fine-tune those 183M parameters. Full bird flight, reliable turns/runs and robust multi-species
+quadruped locomotion remain unfinished.
+
+See [training commands, constraints and provenance](docs/MOTOR.md#guarded-fine-tuning-2026-10-25) and
+[complete baseline/candidate evidence](results/motor_training_20261025.json).
 
 ## How the bodies move
 
@@ -203,9 +232,9 @@ flight environment); the old procedural flap-and-glide flight is the style refer
 | Evaluation system (`motor/evaluate.py`): injury, pain, strain, energy, fatigue, balance, gaze | works; each term responds to its own consequence (tests) |
 | Line muscles (`muscles.py`): Hill model, wraps, two-joint muscles, strength from muscle mass | works for people, quadrupeds and birds; attachments checked over the joint ranges (tests) |
 | Motion prior (`motor/amp.py`): recorded human motion, the old procedural gaits and flight as references | works in training |
-| People motor network (muscles) | walks under a 30 % harness; learning to stand straight on its own muscles rather than its ligaments |
-| Quadruped motor network (muscles) | dog, cat and horse walk under a 30 % harness; cat drop landings in training |
-| Bird motor network | crow flies on its own; flight style from the reference; muscles not yet in flight |
+| People motor network (muscles) | straight walking without a harness; turns, running and difficult bodies remain unstable; new candidates are regression-gated |
+| Quadruped motor network (muscles) | separate family training; recorded dog prior now scoped to dogs; no production-quality family checkpoint yet |
+| Bird motor network | research flight on torques; gull curriculum starting point found, crow/gull/heron/duck evaluated; robust flight is unfinished |
 | Mixed-body (monkey, bear on two legs, kangaroo, penguin) and snake motor networks | not started |
 | A distilled pose network that a game runs without physics | not started |
 

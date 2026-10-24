@@ -34,8 +34,12 @@ def mlp_np(x, layers, act=np.tanh):
     return x
 
 
-def worker(conn, family, seed, env_kw, kick=None, amp=False):
+def worker(conn, family, seed, env_kw, kick=None, amp=None, amp_species=None):
     env = make_env(family, seed=seed, **env_kw)
+    if amp:
+        with np.load(amp) as data:
+            if "segments" in data:
+                env.amp_segments = data["segments"].tolist()
     rng = np.random.default_rng(seed + 7)
     obs = env.reset()
     conn.send(("ready", env.obs_dim, env.act_dim))
@@ -62,7 +66,7 @@ def worker(conn, family, seed, env_kw, kick=None, amp=False):
         _, W, norm, n = msg
         mean, std = norm
         O, A, LP, R, D, V, infos, costs = [], [], [], [], [], [], [], []
-        K, KM, FP = [], [], []
+        K, KM, FP, FM = [], [], [], []
         f = env.amp_features() if amp else None
         for _ in range(n):
             o = np.clip((obs - mean) / std, -10, 10).astype(np.float32)
@@ -73,11 +77,12 @@ def worker(conn, family, seed, env_kw, kick=None, amp=False):
             a = mu + np.exp(ls) * eps
             lp = float(-0.5 * np.sum(((a - mu) / np.exp(ls)) ** 2 + 2 * ls + math.log(2 * math.pi)))
             v = float(mlp_np(o, W["v"])[0])
-            t = teachers.get(env.c.skel.name) if teachers else None
+            t = teachers.get(env.c.skel.name, teachers.get("*")) if teachers else None
             K.append(t.act(obs) if t is not None else np.zeros_like(mu)); KM.append(t is not None)
+            apply_prior = not amp_species or getattr(env.b, "name", "") in amp_species
             obs2, r, done, info = env.step(a)
             if amp:                                          # the motion-prior transition: features before and after
-                f2 = env.amp_features(); FP.append(np.concatenate([f, f2])); f = f2
+                f2 = env.amp_features(); FP.append(np.concatenate([f, f2])); FM.append(apply_prior); f = f2
             O.append(o); A.append(a); LP.append(lp); V.append(v)
             if info["trunc"] and not done:
                 o2 = np.clip((obs2 - mean) / std, -10, 10).astype(np.float32)
@@ -98,11 +103,22 @@ def worker(conn, family, seed, env_kw, kick=None, amp=False):
         conn.send(("data", np.array(O, np.float32), np.array(A, np.float32), np.array(LP, np.float32),
                    np.array(R, np.float32), np.array(D, np.float32), np.array(V, np.float32),
                    float(mlp_np(o, W["v"])[0]), infos, np.mean(costs, 0), np.array(K, np.float32), np.array(KM, bool),
-                   np.array(FP, np.float32) if amp else None))
+                   np.array(FP, np.float32) if amp else None, np.array(FM, bool) if amp else None))
+
+
+def motion_prior_rewards(disc, transitions, masks):
+    """A dog-only prior must not reward/train its critic on another body's motion."""
+    styles = [disc.reward(fp)[0] * mask for fp,mask in zip(transitions,masks)]
+    eligible = np.concatenate([fp[mask] for fp,mask in zip(transitions,masks)])
+    if not len(eligible):
+        return styles, float('nan'), (float('nan'),float('nan'))
+    score=float(np.mean(np.concatenate(styles)[np.concatenate(masks)]))
+    return styles,score,disc.update(eligible)
 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--family", default="biped"); ap.add_argument("--name", required=True)
     ap.add_argument("--workers", type=int, default=16); ap.add_argument("--steps", type=int, default=1024)
     ap.add_argument("--hours", type=float, default=3.0); ap.add_argument("--iters", type=int, default=100000)
@@ -113,7 +129,7 @@ def main():
     ap.add_argument("--alive", type=float, default=None); ap.add_argument("--fall-cost", type=float, default=None)
     ap.add_argument("--cost-scale", type=float, default=1.0, help="multiplies every evaluation cost")
     ap.add_argument("--hidden", type=int, default=512)
-    ap.add_argument("--kick", default=None, help="kickstarting teachers, body=ckpt[,body=ckpt]")
+    ap.add_argument("--kick", default=None, help="kickstarting teachers, body=ckpt[,body=ckpt]; *=ckpt anchors every body")
     ap.add_argument("--kick-weight", type=float, default=1.0, help="weight of the pull toward the teachers' actions")
     ap.add_argument("--vwarm", type=int, default=0,
                     help="first iterations train only the value function (after the reward changed: a critic fitted to the "
@@ -127,16 +143,25 @@ def main():
     ap.add_argument("--run-fade", type=float, default=0.0004, help="run harness lost per iteration")
     ap.add_argument("--amp", default=None, help="motion-prior transitions (motor/amp.py npz): a reward for looking human")
     ap.add_argument("--amp-w", type=float, default=2.0, help="motion-prior reward per second at a perfect score")
+    ap.add_argument("--reset-amp", action="store_true", help="Start a fresh discriminator after changing the reference dataset/schema")
+    ap.add_argument("--bird-species", choices=["crow", "gull", "heron", "duck"], help="Optional single-species warm-up before family training")
+    ap.add_argument("--amp-species", help="Apply a single-species reference only to these comma-separated body names")
     args = ap.parse_args()
     import torch, torch.nn as nn
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
     torch.set_num_threads(2)                 # leave the cores to the simulation workers
     out = os.path.join("runs", "motor", args.name); os.makedirs(out, exist_ok=True)
     env_kw = dict(spread=args.spread, alive=args.alive, fall_cost=args.fall_cost, cost_scale=args.cost_scale)
+    if args.bird_species:
+        if args.family != "bird":
+            ap.error("--bird-species requires --family bird")
+        env_kw["training_species"] = args.bird_species
     ref = make_env(args.family, seed=0, **env_kw)
     ctx = mp.get_context("spawn"); conns = []
     for i in range(args.workers):
         a, b = ctx.Pipe()
-        ctx.Process(target=worker, args=(b, args.family, 1000 + i, env_kw, args.kick, bool(args.amp)), daemon=True).start(); conns.append(a)
+        ctx.Process(target=worker, args=(b, args.family, 1000 + args.seed * args.workers + i, env_kw, args.kick, args.amp, set(args.amp_species.split(",")) if args.amp_species else None), daemon=True).start(); conns.append(a)
     dims = [c.recv() for c in conns]; od, ad = dims[0][1], dims[0][2]
     print(f"{args.family}: obs {od}, act {ad}, {args.workers} workers", flush=True)
 
@@ -162,6 +187,10 @@ def main():
     if args.init:
         ck = torch.load(args.init, weights_only=False)
         pi.load_state_dict(ck["pi"]); vf.load_state_dict(ck["vf"]); logstd.data = ck["logstd"]
+        if ck.get("optimizer") is not None:
+            opt.load_state_dict(ck["optimizer"])
+            for group in opt.param_groups:
+                group["lr"] = args.lr
         mean, var, cnt = ck["mean"], ck["var"], ck["cnt"]; assist = ck.get("assist", 0.0); it0 = ck.get("it", 0)
         run_assist = ck.get("run_assist", args.run_assist0)
         max_speed = ck.get("max_speed", ref.MAX_SPEED); spread = ck.get("spread", 1.0)
@@ -172,12 +201,13 @@ def main():
         var = np.maximum(var, var_floor)
         if args.reset_curriculum:            # keep the weights, start the harness and the goals over
             assist, max_speed, spread = args.assist0, args.speed0, args.spread
+            fell_s = goal_s = fast_fell = fast_goal = None
     m_perm = torch.tensor(ref.a_perm); m_sign = torch.tensor(ref.a_sign, dtype=torch.float32)
     disc = None
     if args.amp:
         from motor.amp import Discriminator
         disc = Discriminator(args.amp)
-        if args.init and ck.get("disc") is not None:
+        if args.init and ck.get("disc") is not None and not args.reset_amp:
             disc.load(ck["disc"])
 
     def export():
@@ -185,11 +215,12 @@ def main():
         return dict(pi=lay(pi), v=lay(vf), logstd=logstd.detach().numpy().copy())
 
     def save(it):
-        torch.save(dict(pi=pi.state_dict(), vf=vf.state_dict(), logstd=logstd.data, mean=mean, var=var, cnt=cnt, it=it,
+        torch.save(dict(optimizer=opt.state_dict(), pi=pi.state_dict(), vf=vf.state_dict(), logstd=logstd.data, mean=mean, var=var, cnt=cnt, it=it,
                         assist=assist, run_assist=run_assist, max_speed=max_speed, spread=spread, family=args.family, obs_dim=od, act_dim=ad, hidden=args.hidden, args=vars(args),
                         disc=disc.state() if disc else None,
                         curriculum=dict(fell_s=fell_s, goal_s=goal_s, fast_fell=fast_fell, fast_goal=fast_goal)),
-                   os.path.join(out, "ckpt.pt"))
+                   os.path.join(out, "ckpt.pt.part"))
+        os.replace(os.path.join(out, "ckpt.pt.part"), os.path.join(out, "ckpt.pt"))
 
     log = open(os.path.join(out, "log.csv"), "a"); t_start = time.time()
     gamma, lam = ref.GAMMA, 0.95
@@ -203,11 +234,11 @@ def main():
         res = [c.recv() for c in conns]
         O = np.concatenate([r[1] for r in res]); A = np.concatenate([r[2] for r in res]); LP = np.concatenate([r[3] for r in res])
         advs, rets = [], []
-        amp_s = amp_d = (float("nan"),) * 2
+        amp_s = float("nan"); amp_d = (float("nan"),) * 2
         if disc is not None:                                 # the motion prior: how human each transition looks
             FPs = [r[12] for r in res]
-            styles = [disc.reward(fp)[0] for fp in FPs]
-            amp_s = float(np.mean(np.concatenate(styles))); amp_d = disc.update(np.concatenate(FPs))
+            masks = [r[13] for r in res]
+            styles, amp_s, amp_d = motion_prior_rewards(disc,FPs,masks)
         for k_r, r in enumerate(res):
             rew, dn, v, lastv = r[4], r[5], r[6], r[7]
             if disc is not None:

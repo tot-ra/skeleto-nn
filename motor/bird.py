@@ -61,16 +61,23 @@ class BirdEnv(FamilyEnv):
     HOLD = 1.0             # harness attitude stiffness in m g x wingspan per radian
     GLIDE_SINK = 0.45      # sink rate (units) of the first goals: a glide at a crow's glide ratio of about 7
 
+    def __init__(self, *args, training_species=None, **kwargs):
+        if training_species is not None and training_species not in SPECIES:
+            raise ValueError(f"unsupported bird curriculum species: {training_species}")
+        self.training_species = training_species
+        super().__init__(*args, **kwargs)
+
     # ------------------------------------------------------------------ family hooks
     def default_body(self):
-        return BIRDS["crow"]
+        return BIRDS[self.training_species or "crow"]
 
     def level(self):
         """How level the cruise goals are (0: glides, 1: level flight), from the curriculum's speed knob."""
         return float(np.clip(self.max_speed - 1.0, 0.0, 1.0))
 
     def sample_body(self, rng, spread):
-        sp = BIRDS[SPECIES[int(rng.integers(len(SPECIES)))]] if rng.random() < spread else BIRDS["crow"]
+        sp = (BIRDS[self.training_species] if self.training_species else
+              BIRDS[SPECIES[int(rng.integers(len(SPECIES)))]] if rng.random() < spread else BIRDS["crow"])
         j = lambda: math.exp(rng.normal(0, 0.08 * spread))
         return dataclasses.replace(sp, mass=sp.mass * j() ** 3, scale=sp.scale * j(), wing_len=sp.wing_len * j())
 

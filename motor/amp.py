@@ -12,7 +12,7 @@ frame (x forward, y left, z up), and the hip velocity in sqrt(g leg) (leg: thigh
 consecutive control steps (30 Hz). Left and right mirrored copies double the data.
 """
 from __future__ import annotations
-import glob, math, os, sys
+import glob, math, os, sys, hashlib
 import numpy as np
 
 G = 9.81
@@ -231,7 +231,13 @@ class Discriminator:
     def __init__(self, data_path, lr=1e-4, hidden=256, gp=5.0):
         import torch, torch.nn as nn
         self.torch = torch
-        X = np.load(data_path)["X"]
+        with np.load(data_path) as data:
+            X = data["X"].copy()
+            self.reference = dict(sha256=hashlib.sha256(open(data_path,"rb").read()).hexdigest(),
+                                  segments=data["segments"].tolist() if "segments" in data else None,
+                                  hz=float(data["hz"]) if "hz" in data else None)
+        if X.ndim != 2 or len(X) < 2 or not np.all(np.isfinite(X)):
+            raise ValueError("invalid AMP reference")
         self.real = torch.tensor(X)
         self.mean = torch.tensor(X.mean(0)); self.std = torch.tensor(np.maximum(X.std(0), 0.05))   # a feature the reference holds still
         # (a tucked bird leg, a planner's level trunk) at a 1e-3 floor made any deviation decisive: style 0.01
@@ -262,9 +268,11 @@ class Discriminator:
         return np.mean(out, 0)
 
     def state(self):
-        return dict(net=self.net.state_dict(), opt=self.opt.state_dict())
+        return dict(net=self.net.state_dict(), opt=self.opt.state_dict(), reference=self.reference)
 
     def load(self, st):
+        if st.get("reference") != self.reference:
+            raise ValueError("AMP reference/schema changed or legacy checkpoint lacks provenance; use --reset-amp explicitly")
         self.net.load_state_dict(st["net"]); self.opt.load_state_dict(st["opt"])
 
 
