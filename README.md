@@ -23,17 +23,26 @@ any language; a GDScript port runs both finished networks in the Reval Rebel gam
 ## Game integration (2026-10-25)
 
 The [native pretrained runtime](runtime/README.md) now drives the hero in **Reval Rebel**.
-The game integration is committed as `a29ac7d38`; the native runtime landed here in `a28ee77`.
+The initial game integration was committed as `a29ac7d38`; the native runtime landed here in `a28ee77`.
+The subsequent native stability fix is `81d4946`; the corrected game poses are shown below.
 The muscle-training experiments below remain paused at their last measured state from 2026-10-22.
 
-![Native neural animation: walking, uphill, stairs, jump, opening a door, and a rung ladder](showcase/runtime/reval_actions.gif)
+![Corrected neural gait: turns, stairs, rung ladder and authored sprint](showcase/runtime/reval_actions.gif)
 
-*Captured in a Godot verification scene using the same hero, native driver and contact modifiers as the game;
-the ladder shot uses the actual smithy geometry. The full city was checked separately through its normal input path.*
+*Excerpts from a 76-second regression at the real 1.5 m/s city walk speed: 90/180-degree turns,
+stairs, the actual smithy ladder, walking again and the 8 m/s authored sprint. The full city was checked separately
+through its normal input path.*
+
+The first version had real integration bugs: a turn during model startup was baked into the skeleton bind,
+predicted root yaw competed with game heading, and repeated action goals accumulated joint angles.
+The fix uses a rig-local bind, body-local commands, game-owned yaw, absolute neutral-relative goals and a fresh
+context on mode changes. Playback now uses 30 FPS; stale foot contacts release before dragging the pelvis down.
+No model weights were retrained. Sprinting uses its authored run clip: this bundle contains walking styles,
+and the game no longer sends its 8 m/s sprint to that model.
 
 | Operation | Current implementation |
 |---|---|
-| Standing, walking and changing pace | Live MotionBricks G1 pose generation on CPU, retargeted to the existing human rig. A separate trained sprint style is not claimed. |
+| Standing, walking and changing pace | Live MotionBricks G1 pose generation on CPU, retargeted to the existing human rig. The 8 m/s city sprint uses the authored run clip; walking weights are not extrapolated to sprint speeds. |
 | Uphill and stairs | Neural locomotion plus terrain sampling and two-bone foot IK; the game owns root movement and elevation. |
 | Jump | Pretrained transitions toward takeoff, airborne and landing goals, blended with the existing clips and game phase clock. |
 | Open a door | A reaching goal plus hand IK targeting the actual ring on the swinging leaf; no automatic approach from outside arm reach. |
@@ -45,11 +54,12 @@ and riding. Missing runtime assets or late inference preserve clip playback and 
 
 Verified on **macOS arm64, Apple M5 Pro, two CPU threads**:
 
-- 100 related Godot tests passed; a final focused rerun passed 40 tests.
+- 64 focused Godot tests passed, including startup turns, all facing combinations, slope-frame consistency, foot-contact release and frame-rate checks.
+- A 256-plan real-weight regression passed across walking, repeated ladder/door/jump goals and walking again; the 76-second game-rig audit recorded no facing/tilt violations.
 - All six native protocol modes passed real-weight checks, including malformed-request recovery; three packaging tests passed.
-- The real city completed `E → climb → loft → E → descend` with active native ladder poses.
-- The exported `.app` loaded weights from `Contents/Resources/neural_runtime` and passed its live-pose smoke check.
-- Warmed capture samples were 44–97 ms per inference. Concurrent heavy builds also produced delays above one second;
+- The real city completed `E → climb → loft → E → descend` with active native ladder poses: 1,306 pose samples, no facing/tilt violations.
+- The corrected exported `.app` loaded weights from `Contents/Resources/neural_runtime` and passed a smoke check that turns the hero before model readiness and measures the final body pose.
+- Initial warmed capture samples were 44–97 ms per inference. Concurrent heavy builds also produced delays above one second;
   these samples are not a whole-game performance guarantee, and short action phases can finish before a neural reply.
 
 The complete game suite is not green: existing release-artifact and city-fixture failures were recorded separately.
