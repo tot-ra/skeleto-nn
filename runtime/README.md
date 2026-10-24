@@ -1,5 +1,7 @@
 # Native pretrained motion runtime
 
+[Current game integration and GIF (2026-10-25)](../README.md#game-integration-2026-10-25).
+
 This is the game deployment path. It uses pretrained NVIDIA MotionBricks weights through
 the Apache-2.0 `motion-bricks.cpp` port and MIT GGML. It does not depend on Python, PyTorch,
 MuJoCo, a running server, or network access while the game runs. Python and CMake are build tools only.

@@ -13,12 +13,48 @@ and scene goal constraints. It is the deployment path now integrated into Reval 
 |---|---|---|---|---|
 | **Style network** (`adapt/`, [docs/ADAPT.md](docs/ADAPT.md)) | how a body moves in its situation: stride, crouch, lean, arms out or hugged, a hand on a wound, limp, shiver, wingbeat | body, 24 situation channels (friction, sinking feet, wetness, cold, wind, darkness, smoke, blood loss, pain per region, fatigue, load ...) | [`results/style_net.json`](results/style_net.json), MLP 31-64-64-24, about 7,800 weights | works: 99.9 % of a per-case optimisation; trained in about 25 s on a CPU |
 | **Jump network** (`adapt/leap.py`, [docs/ADAPT.md](docs/ADAPT.md#jumping-by-context-adaptleappy)) | whether and how to jump: hop, vault with the hands, pull up onto a ledge, drop, jump into water, or refuse | the ground ahead as a profile (height and water depth every quarter leg length), body, the same 24 channels | [`results/leap_net.json`](results/leap_net.json), MLP scored per landing place, about 14,000 weights | works: 91 % of a per-case optimisation, 95 % the same jump-or-stay decision |
-| **Native pretrained runtime** (`runtime/`, [build and protocol](runtime/README.md)) | live human locomotion and constrained jump/reach transitions | previous pose, velocity, facing, goal keyframes | external NVIDIA MotionBricks G1 weights, about 183M parameters | working CPU deployment path; no runtime Python or server |
+| **Native pretrained runtime** (`runtime/`, [build and protocol](runtime/README.md)) | live human locomotion and constrained jump/reach/ladder transitions | previous pose, velocity, facing, goal keyframes | external NVIDIA MotionBricks G1 weights, about 183M parameters | integrated into the game and exported on macOS arm64; no runtime Python or server |
 | **Motor networks**, one per body family (`motor/`, [docs/MOTOR.md](docs/MOTOR.md)) | every joint, 30 times a second | body, environment, goal, the body's state, a motivation profile | none yet | research paused 2026-10-22; last measured results below; not deployed to the game |
 
 The style and jump networks are trained on differentiable consequence models (fast and exact, but reduced-order);
 the motor networks are trained by reinforcement learning in MuJoCo. Their forward passes are a few lines of code in
 any language; a GDScript port runs both finished networks in the Reval Rebel game.
+
+## Game integration (2026-10-25)
+
+The [native pretrained runtime](runtime/README.md) now drives the hero in **Reval Rebel**.
+The game integration is committed as `a29ac7d38`; the native runtime landed here in `a28ee77`.
+The muscle-training experiments below remain paused at their last measured state from 2026-10-22.
+
+![Native neural animation: walking, uphill, stairs, jump, opening a door, and a rung ladder](showcase/runtime/reval_actions.gif)
+
+*Captured in a Godot verification scene using the same hero, native driver and contact modifiers as the game;
+the ladder shot uses the actual smithy geometry. The full city was checked separately through its normal input path.*
+
+| Operation | Current implementation |
+|---|---|
+| Standing, walking and changing pace | Live MotionBricks G1 pose generation on CPU, retargeted to the existing human rig. A separate trained sprint style is not claimed. |
+| Uphill and stairs | Neural locomotion plus terrain sampling and two-bone foot IK; the game owns root movement and elevation. |
+| Jump | Pretrained transitions toward takeoff, airborne and landing goals, blended with the existing clips and game phase clock. |
+| Open a door | A reaching goal plus hand IK targeting the actual ring on the swinging leaf; no automatic approach from outside arm reach. |
+| Rung ladder | Alternating arm/leg goals and four contact targets; the first fixed ladder reaches the smithy's existing loft, with ascent, descent and boarding. City-wide placement is still pending. |
+
+This is **kinematic neural animation with clips and IK**, not learned muscle physics. The game retains collision,
+action timing, stamina and saves. Authored clips keep head/finger channels and take over for combat, swimming
+and riding. Missing runtime assets or late inference preserve clip playback and the available contact corrections.
+
+Verified on **macOS arm64, Apple M5 Pro, two CPU threads**:
+
+- 100 related Godot tests passed; a final focused rerun passed 40 tests.
+- All six native protocol modes passed real-weight checks, including malformed-request recovery; three packaging tests passed.
+- The real city completed `E → climb → loft → E → descend` with active native ladder poses.
+- The exported `.app` loaded weights from `Contents/Resources/neural_runtime` and passed its live-pose smoke check.
+- Warmed capture samples were 44–97 ms per inference. Concurrent heavy builds also produced delays above one second;
+  these samples are not a whole-game performance guarantee, and short action phases can finish before a neural reply.
+
+The complete game suite is not green: existing release-artifact and city-fixture failures were recorded separately.
+The pretrained model uses its specific NVIDIA license; the runtime packages the required license and attribution files.
+See [build, deployment, protocol and licensing](runtime/README.md) for the reproducible path.
 
 ## How the bodies move
 
