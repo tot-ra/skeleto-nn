@@ -5,14 +5,16 @@ Neural network powered character motion for **any skeleton**: people, 🐕 🐈�
 A body is a tree of bones with joint limits, masses and a few anatomical and physiological numbers; what it does is
 decided by small networks that are trained against the physical and physiological consequences of what they do
 (injury, pain, strain, energy, fatigue, falls, heat loss, blood loss, wind), moving the body through its muscles.
-Nothing is replayed: in training a critic compares the motion with references (recorded human walks and runs, the
-old procedural gaits and flight for animals and birds), but at run time a network only excites muscles in the physics.
+The muscle-learning research uses motion references during training and muscle excitation in physics at runtime.
+The new [native pretrained runtime](runtime/README.md) instead generates kinematic poses with NVIDIA MotionBricks
+and scene goal constraints. It is the deployment path now integrated into Reval Rebel; muscle research stays separate.
 
 | network | what it decides | inputs | weights | state |
 |---|---|---|---|---|
 | **Style network** (`adapt/`, [docs/ADAPT.md](docs/ADAPT.md)) | how a body moves in its situation: stride, crouch, lean, arms out or hugged, a hand on a wound, limp, shiver, wingbeat | body, 24 situation channels (friction, sinking feet, wetness, cold, wind, darkness, smoke, blood loss, pain per region, fatigue, load ...) | [`results/style_net.json`](results/style_net.json), MLP 31-64-64-24, about 7,800 weights | works: 99.9 % of a per-case optimisation; trained in about 25 s on a CPU |
 | **Jump network** (`adapt/leap.py`, [docs/ADAPT.md](docs/ADAPT.md#jumping-by-context-adaptleappy)) | whether and how to jump: hop, vault with the hands, pull up onto a ledge, drop, jump into water, or refuse | the ground ahead as a profile (height and water depth every quarter leg length), body, the same 24 channels | [`results/leap_net.json`](results/leap_net.json), MLP scored per landing place, about 14,000 weights | works: 91 % of a per-case optimisation, 95 % the same jump-or-stay decision |
-| **Motor networks**, one per body family (`motor/`, [docs/MOTOR.md](docs/MOTOR.md)) | every joint, 30 times a second | body, environment, goal, the body's state, a motivation profile | none yet | in training: people and quadrupeds move by line muscles and still walk under a part-weight harness; birds fly on joint torques (see each section) |
+| **Native pretrained runtime** (`runtime/`, [build and protocol](runtime/README.md)) | live human locomotion and constrained jump/reach transitions | previous pose, velocity, facing, goal keyframes | external NVIDIA MotionBricks G1 weights, about 183M parameters | working CPU deployment path; no runtime Python or server |
+| **Motor networks**, one per body family (`motor/`, [docs/MOTOR.md](docs/MOTOR.md)) | every joint, 30 times a second | body, environment, goal, the body's state, a motivation profile | none yet | research paused 2026-10-22; last measured results below; not deployed to the game |
 
 The style and jump networks are trained on differentiable consequence models (fast and exact, but reduced-order);
 the motor networks are trained by reinforcement learning in MuJoCo. Their forward passes are a few lines of code in
