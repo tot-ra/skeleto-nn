@@ -125,7 +125,7 @@ def t_energy(x):
 def t_fall(x):
     # required friction: horizontal over vertical ground force at contact ~ half step over hip height
     mu_req = 0.5 * x.step / x.h_eff * (1 - 0.4 * x.k_foot_flat) * (1 + 0.25 * x.Fr) * (1 - 0.15 * x.legs4) * (1 - 0.4 * x.k_care)
-    mu_req = mu_req + 0.05 * relu(x.k_width - 1) + 0.06 * torch.abs(x.k_trunk_roll - 0.3 * x.c_wind_lat) + 0.08 * x.Fr * x.k_tremor
+    mu_req = mu_req + 0.05 * relu(x.k_width - 1) + 0.06 * torch.abs(x.k_trunk_roll - 0.12 * x.c_wind_lat) + 0.08 * x.Fr * x.k_tremor
     mu = x.c_friction
     p_slip = sig((mu_req - mu) / 0.02)
     recover = torch.clamp(0.25 + 0.3 * x.k_arm_out * (x.Bp + x.Wb) + 0.35 * (x.k_width - 1) + 1.8 * x.k_duty_add + 0.3 * x.k_crouch
@@ -151,7 +151,11 @@ def t_balance(x):
 
 @term
 def t_wind(x):
-    k = 0.5 * (1.0 / (x.mass / 70.0) ** (1 / 3)).clamp(0.4, 3.0) * x.h_eff
+    # Lean that cancels the wind moment: theta ~ (0.5 rho Cd A v^2 * lever) / (m g h_com). For a 70 kg
+    # standing person (A 0.6 m^2, Cd 1, lever 1 m) that is 0.21 rad per (20 m/s)^2, i.e. about 3 deg
+    # in a 10 m/s side wind; the old 0.5 leaned people 8 deg in an ordinary overcast breeze (game audit
+    # 2026-11-06).
+    k = 0.2 * (1.0 / (x.mass / 70.0) ** (1 / 3)).clamp(0.4, 3.0) * x.h_eff
     lat = x.c_wind_lat * torch.abs(x.c_wind_lat) * k - x.k_trunk_roll
     fwd = x.c_wind_fwd * torch.abs(x.c_wind_fwd) * k - (x.k_trunk_pitch + 0.25 * x.k_crouch)
     return (6.0 * lat ** 2 + 1.5 * fwd ** 2 * (x.Bp + 0.3)) * x.gnd

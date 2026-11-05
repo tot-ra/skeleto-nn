@@ -69,7 +69,7 @@ environment -> channels -> network -> style -> heat, blood, effort -> state -> c
 | broken right arm | right arm held to the body, left arm supports it |
 | bruised ribs | both arms guard the trunk, slight hunch, slower |
 | drunk | wider stance |
-| gale from the left | leans into the wind, crouches, wider stance |
+| gale from the left | leans into the wind (about 3 deg at 10 m/s since 2026-11-06: the wind term now sizes the lean from the drag moment, 0.5 rho Cd A v^2 x lever / (m g h), after the game showed 8 deg leans in an overcast breeze), crouches, wider stance |
 | headwind | leans forward |
 | darkness | higher swing clearance |
 | smoke | crouches and slows down (head out of the smoke, less breathing) |
