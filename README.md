@@ -22,6 +22,30 @@ any language; a GDScript port runs both finished networks in the Reval Rebel gam
 
 ## Game integration (2026-10-25)
 
+### Status 2026-11-06
+
+Measured in the game repo on 2026-11-06 (`docs/reports/motion_audit_2026-11-06.md` there); this block corrects the
+2026-10-25 snapshot below, which is kept as history.
+
+- **The runtime drives only the hero.** City residents near the camera play five loops baked from this runtime
+  (idle plus walks at 0.7/1.0/1.3/1.6 units per second, game commits `a067031f3`, `38d9cbe54`, 2026-10-30:
+  `tools/bake_neural_gait.gd` -> `assets/characters/shared/neural_gait_library.res`, 97 KB). One worker per
+  resident is not feasible at about 0.74 GB of weights per process. Residents differ only by a start phase; a
+  per-person gait profile is proposed as game ADR 0098.
+- **Baked loops are level.** Mean pelvis roll per loop is within 1 degree (sway 2 to 5 degrees); mean pelvis
+  pitch is 6 to 8 degrees forward (the G1 stance), which the game clamps to 7 degrees of trunk pitch.
+- **Sideways lean seen in the game is not from this runtime.** It comes from the game's style network reading the
+  sky's wind: 7 to 8 degrees of trunk roll in overcast weather, 1 to 2 in clear weather (game task MOT-0).
+- **Weights and worker now live outside the game tree** at `~/.local/share/rebel-reval/neural/` (game commit
+  `4e1431f17`, `tools/setup_neural_runtime.py`); the `build/neural_motion/native` and `build/neural_runtime` paths in
+  [runtime/README.md](runtime/README.md) are stale.
+- **Protocol limits that the game now hits:** the six modes carry fixed C++ keyframes, there are no joint masks (an
+  action replaces locomotion and the game blends it at weight 0.45), no style selection (`slow_walk.mbstyle` loads
+  but is never used), no upper-body goals (gestures, carrying, bracing), no riding, combat or free climbing. The
+  game's riding (`b55eeae9b`) and retarget fixes (`c292ffcf6`, `848780b16`) are game-side. A protocol v2 with joint
+  masks, named parametric goals and a style field is the next runtime step (game task MOT-15).
+- Motor research (people, quadrupeds, birds) is unchanged since 2026-10-25 and still not deployed.
+
 The [native pretrained runtime](runtime/README.md) now drives the hero in **Reval Rebel**.
 The initial game integration was committed as `a29ac7d38`; the native runtime landed here in `a28ee77`.
 The subsequent native stability fix is `81d4946`; the corrected game poses are shown below.
