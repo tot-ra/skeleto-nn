@@ -36,14 +36,17 @@ Measured in the game repo on 2026-11-06 (`docs/reports/motion_audit_2026-11-06.m
   pitch is 6 to 8 degrees forward (the G1 stance), which the game clamps to 7 degrees of trunk pitch.
 - **Sideways lean seen in the game is not from this runtime.** It comes from the game's style network reading the
   sky's wind: 7 to 8 degrees of trunk roll in overcast weather, 1 to 2 in clear weather (game task MOT-0).
-- **Weights and worker now live outside the game tree** at `~/.local/share/rebel-reval/neural/` (game commit
-  `4e1431f17`, `tools/setup_neural_runtime.py`); the `build/neural_motion/native` and `build/neural_runtime` paths in
-  [runtime/README.md](runtime/README.md) are stale.
-- **Protocol limits that the game now hits:** the six modes carry fixed C++ keyframes, there are no joint masks (an
-  action replaces locomotion and the game blends it at weight 0.45), no style selection (`slow_walk.mbstyle` loads
-  but is never used), no upper-body goals (gestures, carrying, bracing), no riding, combat or free climbing. The
-  game's riding (`b55eeae9b`) and retarget fixes (`c292ffcf6`, `848780b16`) are game-side. A protocol v2 with joint
-  masks, named parametric goals and a style field is the next runtime step (game task MOT-15).
+- **Weights and worker live outside the game tree** at `~/.local/share/rebel-reval/neural/` (game commit
+  `4e1431f17`, `tools/setup_neural_runtime.py`); [runtime/README.md](runtime/README.md) now documents those paths.
+- **Protocol v2 shipped (game task MOT-15, 2026-11-06):** `hello` handshake, `plan2` lines with a style name,
+  joint-group mask (`legs`, `arms`, `arm_l`, `arm_r`, `spine`, `head`) and parametric goals; the six v1 modes are
+  goal tables and v1 lines behave as before. A goal over locomotion keeps hips, knees and root identical to the
+  plain plan (measured 0 degrees), so the game's door reach rides on the walk at weight 1.0 instead of replacing it at
+  0.45. Limits that remain: `slow_walk.mbstyle` shares its joint poses with `walk` and only changes stride timing at
+  its own 0.3 m/s pace (`SPEED -1`); the upstream in-betweener masks per boundary slot, not per joint, so joint
+  selection is done by composing the boundary poses; no riding, combat or free climbing. The game's riding
+  (`b55eeae9b`) and retarget fixes (`c292ffcf6`, `848780b16`) are game-side. Details in
+  [runtime/README.md](runtime/README.md#protocol-v2-2026-11-06).
 - Motor research (people, quadrupeds, birds) is unchanged since 2026-10-25 and still not deployed.
 
 The [native pretrained runtime](runtime/README.md) now drives the hero in **Reval Rebel**.

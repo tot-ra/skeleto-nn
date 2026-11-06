@@ -51,7 +51,9 @@ def build(source: Path, output: Path, build_dir: Path) -> dict:
     files.append((source / 'LICENSE', Path('MOTIONBRICKS_CPP_LICENSE')))
     files.append((source / 'ggml/LICENSE', Path('GGML_LICENSE')))
     files.append((Path(__file__).resolve().parents[1] / 'LICENSE', Path('SKELETO_LICENSE')))
-    result = {'protocol': 'skeleto-nn/motion/1', 'platform': platform.system(),
+    # `protocol` names the wire family v1 clients check; `protocol_version` 2 adds the
+    # hello handshake and plan2 lines (runtime/README.md, "Protocol v2").
+    result = {'protocol': 'skeleto-nn/motion/1', 'protocol_version': 2, 'platform': platform.system(),
               'architecture': platform.machine(), 'port_revision': PORT_REVISION,
               'ggml_revision': GGML_REVISION, 'files': {}}
     output.mkdir(parents=True, exist_ok=True)
